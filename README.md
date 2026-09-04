@@ -1,36 +1,50 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ShelfLife
 
-## Getting Started
+Back-of-house operations for convenience retail. Track what arrives, know what expires, stop
+writing off stock nobody noticed.
 
-First, run the development server:
+Built servo-first for the Australian market, generalisable to any small-format retailer.
+
+## The problem
+
+Small-format retail loses money to expiry in a place nobody looks. Short-life stock — milk,
+bread, sandwiches — is rotated daily because it arrives constantly and is front-of-mind.
+The invisible loss is medium and long-life stock sitting at the back of the store room with a
+6–12 month date that no one checks until it is months gone.
+
+## The approach
+
+Every product carries one of three tracking modes, so staff only do work that pays for itself:
+
+| Mode | Applies to | At intake | Surfacing |
+|---|---|---|---|
+| `rotation` | Milk, bread, sandwiches, bakery | Nothing captured | Daily fixture tick-list |
+| `batch` | Drinks, snacks, chilled, grocery | One expiry per line | Auto-surfaces at T-30/14/7/3/1 |
+| `none` | Cigarettes, accessories | Quantity only | Never |
+
+Intake is **docket-driven, not scan-driven**. The docket already lists what arrived, so the app
+pre-populates expected lines from that supplier's history; staff tick what came, adjust quantity,
+and confirm a proposed expiry date — one date per SKU line, covering every box of that SKU.
+
+## Status
+
+In development. MVP scope is delivery intake plus the expiry engine. Invoice reconciliation,
+temperature/compliance logging and fuel wet-stock reconciliation are designed for but not built.
+
+See [docs/PLAN.md](docs/PLAN.md) for the full build plan.
+
+## Stack
+
+Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · Supabase (Postgres, Auth,
+Realtime, Storage, Edge Functions) · Postgres RLS for tenant isolation
+
+## Local development
+
+Requires Node 22 (see `.nvmrc`) and the Supabase CLI.
 
 ```bash
+nvm use
+npm install
+cp .env.example .env.local   # fill in your Supabase project values
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
-
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
