@@ -1,6 +1,6 @@
-// NOTE: the deliveries, delivery_lines, stock_batches, expiry_actions, job_runs,
-// rotation_checks and waste_events entries below — and the record_waste function — were
-// written by hand, because the environment that added them had no database to run
+// NOTE: every table below except memberships, orgs, products, profiles, site_products,
+// sites and suppliers was written by hand — as were the record_waste and write_audit
+// functions — because the environment that added them had no database to run
 // `supabase gen types typescript --local > src/lib/supabase/database.types.ts` against.
 // Regenerate this file once the migrations have actually been applied — the generated
 // output is authoritative. The Relationships entries here were derived from the foreign
@@ -43,6 +43,57 @@ export type Database = {
   }
   public: {
     Tables: {
+      audit_log: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          detail: Json | null
+          id: string
+          org_id: string | null
+          site_id: string | null
+          subject_id: string | null
+          subject_type: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          org_id?: string | null
+          site_id?: string | null
+          subject_id?: string | null
+          subject_type?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          detail?: Json | null
+          id?: string
+          org_id?: string | null
+          site_id?: string | null
+          subject_id?: string | null
+          subject_type?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "audit_log_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       deliveries: {
         Row: {
           closed_at: string | null
@@ -396,6 +447,66 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          failed_at: string | null
+          failure_reason: string | null
+          id: string
+          org_id: string
+          p256dh: string
+          site_id: string | null
+          updated_at: string
+          user_agent: string | null
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          org_id: string
+          p256dh: string
+          site_id?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          failed_at?: string | null
+          failure_reason?: string | null
+          id?: string
+          org_id?: string
+          p256dh?: string
+          site_id?: string | null
+          updated_at?: string
+          user_agent?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "push_subscriptions_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       rotation_checks: {
         Row: {
@@ -792,6 +903,17 @@ export type Database = {
       shares_org_with: {
         Args: { other_user: string }
         Returns: boolean
+      }
+      write_audit: {
+        Args: {
+          p_action: string
+          p_org_id?: string
+          p_site_id?: string
+          p_subject_type?: string
+          p_subject_id?: string
+          p_detail?: Json
+        }
+        Returns: string
       }
     }
     Enums: {
