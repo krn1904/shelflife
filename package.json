@@ -10,7 +10,8 @@
     "seed": "tsx scripts/seed.ts",
     "test:rls": "tsx scripts/test-rls.ts",
     "test:barcode": "tsx scripts/test-barcode.ts",
-    "test": "npm run test:barcode && npm run test:rls"
+    "test": "npm run test:barcode && npm run test:rls",
+    "check:env": "tsx scripts/check-env.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.6",
