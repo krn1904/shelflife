@@ -115,11 +115,11 @@ async function main() {
       category: 'Soft drinks', default_shelf_life_days: 240, tracking_mode: 'batch' as const },
     { barcode: '9300601001019', name: 'Full Cream Milk 2L', brand: 'Pura', size: '2L',
       category: 'Dairy', default_shelf_life_days: 12, tracking_mode: 'rotation' as const },
-    { barcode: '9310072020101', name: 'Tip Top White Sandwich', brand: 'Tip Top', size: '700g',
+    { barcode: '9310072020105', name: 'Tip Top White Sandwich', brand: 'Tip Top', size: '700g',
       category: 'Bakery', default_shelf_life_days: 5, tracking_mode: 'rotation' as const },
     { barcode: '9300682001007', name: 'Mars Bar 53g', brand: 'Mars', size: '53g',
       category: 'Confectionery', default_shelf_life_days: 300, tracking_mode: 'batch' as const },
-    { barcode: '9310155000015', name: 'Winfield Blue 25s', brand: 'Winfield', size: '25s',
+    { barcode: '9310155000017', name: 'Winfield Blue 25s', brand: 'Winfield', size: '25s',
       category: 'Tobacco', default_shelf_life_days: null, tracking_mode: 'none' as const },
   ];
   const { error: productError } = await admin

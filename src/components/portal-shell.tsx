@@ -6,6 +6,7 @@ import type { AppRole } from '@/lib/supabase/types';
 const NAV: { href: string; label: string; bar: AppRole }[] = [
   { href: '/app', label: 'Shift', bar: 'staff' },
   { href: '/manage', label: 'Site', bar: 'manager' },
+  { href: '/manage/products', label: 'Products', bar: 'manager' },
   { href: '/owner', label: 'Group', bar: 'owner' },
   { href: '/admin', label: 'Platform', bar: 'platform_admin' },
 ];
