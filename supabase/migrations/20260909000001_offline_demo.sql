@@ -14,6 +14,13 @@ create unique index waste_events_client_id_key
 alter table public.orgs
   add column is_demo boolean not null default false;
 
+-- Drop the four-argument version first. `create or replace function` only replaces a
+-- function with an identical argument signature — adding a parameter defines a SECOND
+-- overload instead. Both would then match a four-argument call (the fifth having a
+-- default), and Postgres would refuse it as ambiguous: "function record_waste(...) is not
+-- unique". That would break scan-to-waste, which calls it with four arguments.
+drop function if exists public.record_waste(uuid, integer, public.waste_reason, text);
+
 /**
  * record_waste, now idempotent.
  *
