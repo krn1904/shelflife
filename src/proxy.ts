@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
+import { supabasePublishableKey, supabaseUrl } from '@/lib/supabase/env';
 
 /**
  * Refreshes the Supabase session on every request so Server Components always
@@ -12,8 +13,8 @@ export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
 
   const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    supabaseUrl(),
+    supabasePublishableKey(),
     {
       cookies: {
         getAll() {

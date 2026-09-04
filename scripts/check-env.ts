@@ -11,20 +11,21 @@ import type { Database } from '../src/lib/supabase/database.types';
 
 config({ path: '.env.local' });
 
-const REQUIRED = [
-  'NEXT_PUBLIC_SUPABASE_URL',
-  'NEXT_PUBLIC_SUPABASE_ANON_KEY',
-  'SUPABASE_SERVICE_ROLE_KEY',
-] as const;
+// Supabase renamed anon -> publishable and service_role -> secret; accept either.
+const REQUIRED: { label: string; names: string[] }[] = [
+  { label: 'project URL', names: ['NEXT_PUBLIC_SUPABASE_URL'] },
+  { label: 'publishable key', names: ['NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY', 'NEXT_PUBLIC_SUPABASE_ANON_KEY'] },
+  { label: 'secret key', names: ['SUPABASE_SECRET_KEY', 'SUPABASE_SERVICE_ROLE_KEY'] },
+];
 
 const EXPECTED_TABLES = [
   'orgs', 'sites', 'profiles', 'memberships', 'suppliers', 'products', 'site_products',
 ] as const;
 
 async function main() {
-  const missing = REQUIRED.filter((k) => !process.env[k]);
+  const missing = REQUIRED.filter((r) => !r.names.some((n) => process.env[n]));
   if (missing.length) {
-    console.error(`missing env vars: ${missing.join(', ')}`);
+    for (const m of missing) console.error(`missing ${m.label}: set ${m.names.join(' or ')}`);
     console.error('copy .env.example to .env.local and fill it in');
     process.exit(1);
   }
@@ -33,7 +34,7 @@ async function main() {
   const isLocal = url.includes('127.0.0.1') || url.includes('localhost');
   console.log(`target: ${url} (${isLocal ? 'local' : 'hosted'})\n`);
 
-  const admin = createClient<Database>(url, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createClient<Database>(url, (process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY)!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 

@@ -14,7 +14,7 @@ import type { Database } from '../src/lib/supabase/database.types';
 config({ path: '.env.local' });
 
 const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+const ANON = (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY)!;
 const PASSWORD = 'shelflife-dev-password';
 
 type Db = SupabaseClient<Database>;
@@ -35,7 +35,7 @@ async function signIn(email: string): Promise<Db> {
 }
 
 async function main() {
-  const admin = createClient<Database>(URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createClient<Database>(URL, (process.env.SUPABASE_SECRET_KEY ?? process.env.SUPABASE_SERVICE_ROLE_KEY)!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
