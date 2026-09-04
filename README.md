@@ -40,11 +40,33 @@ Realtime, Storage, Edge Functions) · Postgres RLS for tenant isolation
 
 ## Local development
 
-Requires Node 22 (see `.nvmrc`) and the Supabase CLI.
+Requires Node 22 (see `.nvmrc`), the Supabase CLI, and Docker.
 
 ```bash
 nvm use
 npm install
-cp .env.example .env.local   # fill in your Supabase project values
+supabase start          # local Postgres/Auth/Storage on ports 544xx
+npm run seed            # two orgs, so tenant isolation is testable
 npm run dev
 ```
+
+`supabase start` prints the local URL and keys for `.env.local`. The project uses the
+544xx port range rather than Supabase's 543xx defaults, so it can run alongside another
+local Supabase project.
+
+### Verification
+
+```bash
+npm run test:rls        # cross-tenant isolation must pass before anything ships
+npx tsc --noEmit
+npm run build
+```
+
+Seed logins (all share the password printed by `npm run seed`):
+
+| Email | Role | Sees |
+|---|---|---|
+| `owner@northside.test` | owner | all three Northside sites |
+| `manager@northside.test` | manager | Brunswick |
+| `staff@northside.test` | staff | Brunswick |
+| `owner@bayside.test` | owner | St Kilda (separate tenant) |
