@@ -1,0 +1,63 @@
+name: CI
+
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # CI runs its own throwaway Supabase stack rather than pointing at the
+      # hosted project: migrations and seeds must never touch real data, and a
+      # local stack is faster and needs no secrets.
+      - name: Start Supabase
+        run: supabase start
+
+      - name: Export local Supabase credentials
+        run: |
+          echo "NEXT_PUBLIC_SUPABASE_URL=$(supabase status -o env | grep '^API_URL=' | cut -d= -f2- | tr -d '"')" >> $GITHUB_ENV
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(supabase status -o env | grep '^ANON_KEY=' | cut -d= -f2- | tr -d '"')" >> $GITHUB_ENV
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(supabase status -o env | grep '^SERVICE_ROLE_KEY=' | cut -d= -f2- | tr -d '"')" >> $GITHUB_ENV
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Lint
+        run: npx eslint .
+
+      - name: Seed
+        run: npm run seed
+
+      - name: Environment check
+        run: npm run check:env
+
+      - name: Barcode tests
+        run: npm run test:barcode
+
+      # The security claim the whole product rests on. Never allowed to be skipped.
+      - name: Tenant isolation tests
+        run: npm run test:rls
+
+      - name: Build
+        run: npm run build
+
+      - name: Supabase logs on failure
+        if: failure()
+        run: supabase status || true
