@@ -66,6 +66,32 @@ npm run build
 `npm test` needs no database. `npm run test:rls` needs a running Supabase and a seeded
 database, and is the gate that matters — it is the security claim the product rests on.
 
+### The expiry engine
+
+`supabase/functions/expiry-engine` runs nightly at 02:00 Australia/Melbourne. It deletes
+every open `expiry_actions` row and regenerates them from the current batches — a full
+recompute over a few thousand rows takes milliseconds and is always correct, so there is
+no incremental diffing to get wrong. It also creates the day's rotation checks.
+
+The function is a thin wrapper. Every rule it applies lives in `src/lib/expiry/engine.ts`
+as plain TypeScript covered by `npm test`, so the logic is testable even though the
+function itself only runs under Deno.
+
+```bash
+supabase functions deploy expiry-engine
+supabase secrets set CRON_SECRET=...      # required; the function 403s without it
+```
+
+Trigger it by hand to watch it work:
+
+```bash
+curl -X POST "$SUPABASE_URL/functions/v1/expiry-engine" -H "x-cron-secret: $CRON_SECRET"
+```
+
+Every run writes a row to `job_runs`, successful or not — a cron that has silently
+stopped firing is the failure mode that costs the most, because nothing looks broken
+until the stock is already gone.
+
 Seed logins (all share the password printed by `npm run seed`):
 
 | Email | Role | Sees |

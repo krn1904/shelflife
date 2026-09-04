@@ -7,12 +7,14 @@ export default async function ShiftPage() {
   const session = await requireSession();
   const supabase = await createClient();
 
-  // RLS scopes both of these to what this user may see, so no explicit filter is needed.
-  const [{ count: catalogue }, { data: sites }, { count: openDeliveries }] = await Promise.all([
-    supabase.from('site_products').select('*', { count: 'exact', head: true }),
-    supabase.from('sites').select('name'),
-    supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
-  ]);
+  // RLS scopes all of these to what this user may see, so no explicit filter is needed.
+  const [{ count: catalogue }, { data: sites }, { count: openDeliveries }, { count: openActions }] =
+    await Promise.all([
+      supabase.from('site_products').select('*', { count: 'exact', head: true }),
+      supabase.from('sites').select('name'),
+      supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
+      supabase.from('expiry_actions').select('*', { count: 'exact', head: true }).eq('state', 'open'),
+    ]);
 
   return (
     <div>
@@ -23,22 +25,34 @@ export default async function ShiftPage() {
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Stat label="Ranged products" value={catalogue ?? 0} hint="active at your site" />
-        <Stat label="To action today" value="—" hint="expiry engine lands in batch 5" />
+        <Stat label="To action today" value={openActions ?? 0} hint="dated stock needing a decision" />
         <Stat label="Open deliveries" value={openDeliveries ?? 0} hint="started but not closed" />
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
         <Link
-          href="/app/deliveries"
+          href="/app/today"
           className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
         >
+          Today’s list
+        </Link>
+        <Link
+          href="/app/deliveries"
+          className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium"
+        >
           Receive a delivery
+        </Link>
+        <Link
+          href="/app/waste"
+          className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium"
+        >
+          Scan to waste
         </Link>
         <Link
           href="/app/scan"
           className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium"
         >
-          Scan a product
+          Look up a product
         </Link>
       </div>
     </div>
