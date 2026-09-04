@@ -6,11 +6,23 @@
  * is global — one junk row from a typo is visible to every tenant.
  */
 
-const VALID_LENGTHS = [8, 12, 13, 14];
+const VALID_LENGTHS = [8, 13, 14]; // 12-digit UPC-A is padded to 13 by normaliseBarcode
 
-/** Digits only, with the whitespace and hyphens people paste in stripped out. */
+/**
+ * Strips the whitespace and hyphens people paste in, then pads UPC-A to 13 digits.
+ *
+ * UPC-A *is* EAN-13 with a leading zero, and scanners disagree about which form they
+ * report — the native detector and zxing can return different strings for the same
+ * physical barcode. Storing one canonical form is what stops that becoming two
+ * catalogue rows for one product. Prepending the zero cannot change the check digit,
+ * since weights are counted from the right and a leading zero adds nothing to the sum.
+ *
+ * Anything that is not a digit is left in place rather than stripped, so garbage is
+ * rejected by isValidGtin instead of being silently coerced into a plausible code.
+ */
 export function normaliseBarcode(raw: string): string {
-  return raw.replace(/[\s-]/g, '');
+  const trimmed = raw.replace(/[\s-]/g, '');
+  return trimmed.length === 12 && /^\d+$/.test(trimmed) ? `0${trimmed}` : trimmed;
 }
 
 export function isValidGtin(raw: string): boolean {

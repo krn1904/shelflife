@@ -38,3 +38,21 @@ test('tolerates the spacing and hyphens people paste in', () => {
   assert.equal(normaliseBarcode(' 9300675-024235 '), '9300675024235');
   assert.equal(isValidGtin(' 9300675-024235 '), true);
 });
+
+test('UPC-A normalises to its EAN-13 form so one product is one row', () => {
+  // Two scanners can report the same physical barcode differently. If both forms
+  // reached the catalogue we would get two rows for one product.
+  assert.equal(normaliseBarcode('036000291452'), '0036000291452');
+  assert.equal(normaliseBarcode('0036000291452'), '0036000291452');
+  assert.equal(isValidGtin('036000291452'), true);
+  assert.equal(isValidGtin('0036000291452'), true);
+});
+
+test('padding UPC-A does not change whether the check digit holds', () => {
+  assert.equal(isValidGtin('036000291453'), false);
+  assert.equal(isValidGtin('0036000291453'), false);
+});
+
+test('a 13-digit code is never re-padded', () => {
+  assert.equal(normaliseBarcode('9300675024235'), '9300675024235');
+});
