@@ -93,6 +93,9 @@ async function main() {
       { email: 'owner@northside.test', fullName: 'Dana Owner', role: 'owner' },
       { email: 'manager@northside.test', fullName: 'Sam Manager', role: 'manager' },
       { email: 'staff@northside.test', fullName: 'Riley Staff', role: 'staff' },
+      // A platform admin still needs an org row (org_id is NOT NULL); is_platform_admin()
+      // then widens every policy regardless of which org that row points at.
+      { email: 'admin@shelflife.test', fullName: 'Platform Admin', role: 'platform_admin' },
     ],
   });
 
@@ -122,6 +125,27 @@ async function main() {
   const { error: productError } = await admin
     .from('products').upsert(products, { onConflict: 'barcode' });
   if (productError) throw productError;
+
+  const { data: catalogue } = await admin.from('products').select('id, barcode');
+
+  // Range the whole catalogue at every site so each portal has real numbers to show.
+  for (const { org, sites } of [a, b]) {
+    for (const site of sites) {
+      const rows = (catalogue ?? []).map((prod) => ({
+        org_id: org.id,
+        site_id: site.id,
+        product_id: prod.id,
+        retail_price: null,
+        unit_cost: null,
+        par_level: 12,
+        fixture: null,
+        active: true,
+      }));
+      const { error } = await admin
+        .from('site_products').upsert(rows, { onConflict: 'site_id,product_id' });
+      if (error) throw error;
+    }
+  }
 
   console.log(`seeded ${a.org.name} (${a.sites.length} sites), ${b.org.name} (${b.sites.length} site)`);
   console.log(`seeded ${products.length} catalogue products`);

@@ -100,6 +100,24 @@ async function main() {
     check('sees no foreign site_products', (sp ?? []).every((x) => x.org_id === bayside.id));
   }
 
+  console.log('\nrole resolution (regression: staff must not inherit a colleague\'s role):');
+  {
+    // RLS scopes memberships to the ORG, so a staff member legitimately sees the
+    // roster — including the platform admin's row. Application code that derives a
+    // role from this query without filtering by user_id escalates staff to admin.
+    const { data: all } = await staff.from('memberships').select('user_id, role');
+    check('org roster is visible (so the hazard is real, not theoretical)',
+      (all?.length ?? 0) > 1, `got ${all?.length} rows`);
+    check('roster contains a role above staff',
+      (all ?? []).some((m) => m.role !== 'staff'));
+
+    const { data: { user } } = await staff.auth.getUser();
+    const { data: own } = await staff.from('memberships').select('role').eq('user_id', user!.id);
+    check('filtering by user_id yields only the staff role',
+      own?.length === 1 && own[0].role === 'staff',
+      `got ${JSON.stringify(own?.map((m) => m.role))}`);
+  }
+
   console.log('\nanonymous (no session):');
   {
     const anon = createClient<Database>(URL, ANON);
