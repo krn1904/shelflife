@@ -2,18 +2,11 @@
 
 import { useActionState, useCallback, useState, useTransition } from 'react';
 import { BarcodeScanner } from '@/components/barcode-scanner';
-import {
-  batchesForBarcode,
-  recordWaste,
-  WASTE_REASON_LABEL,
-  type ActionResult,
-} from '@/lib/expiry/actions';
-import type { WasteReason } from '@/lib/supabase/types';
+import { batchesForBarcode, recordWaste, type ActionResult } from '@/lib/expiry/actions';
+import { WASTE_REASONS, WASTE_REASON_LABEL } from '@/lib/expiry/waste-reasons';
 
 type Batch = { id: string; expiry_date: string | null; qty_remaining: number };
 type Found = { name: string; brand: string | null; size: string | null } | null;
-
-const REASONS: WasteReason[] = ['expired', 'damaged', 'spoiled', 'recalled', 'staff_error', 'other'];
 
 /**
  * Scan-to-waste is the one place scanning genuinely beats every alternative: the item is
@@ -130,7 +123,7 @@ export function WasteClient({
                 defaultValue="expired"
                 className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
               >
-                {REASONS.map((r) => (
+                {WASTE_REASONS.map((r) => (
                   <option key={r} value={r}>{WASTE_REASON_LABEL[r]}</option>
                 ))}
               </select>
