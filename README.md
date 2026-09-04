@@ -57,10 +57,14 @@ local Supabase project.
 ### Verification
 
 ```bash
+npm test                # pure logic — barcode check digits, tracking-mode resolution
 npm run test:rls        # cross-tenant isolation must pass before anything ships
 npx tsc --noEmit
 npm run build
 ```
+
+`npm test` needs no database. `npm run test:rls` needs a running Supabase and a seeded
+database, and is the gate that matters — it is the security claim the product rests on.
 
 Seed logins (all share the password printed by `npm run seed`):
 

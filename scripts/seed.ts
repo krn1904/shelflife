@@ -7,6 +7,7 @@
 import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from '../src/lib/supabase/database.types';
+import { SEED_CATALOGUE } from './seed-catalogue';
 
 config({ path: '.env.local' });
 
@@ -108,22 +109,8 @@ async function main() {
   });
 
   // Global catalogue: shared across tenants by design.
-  const products = [
-    { barcode: '9300675024235', name: 'Coke Zero Sugar 1.25L', brand: 'Coca-Cola', size: '1.25L',
-      category: 'Soft drinks', default_shelf_life_days: 270, tracking_mode: 'batch' as const },
-    { barcode: '9300675024242', name: 'Coke Zero Sugar 2L', brand: 'Coca-Cola', size: '2L',
-      category: 'Soft drinks', default_shelf_life_days: 240, tracking_mode: 'batch' as const },
-    { barcode: '9300601001019', name: 'Full Cream Milk 2L', brand: 'Pura', size: '2L',
-      category: 'Dairy', default_shelf_life_days: 12, tracking_mode: 'rotation' as const },
-    { barcode: '9310072020101', name: 'Tip Top White Sandwich', brand: 'Tip Top', size: '700g',
-      category: 'Bakery', default_shelf_life_days: 5, tracking_mode: 'rotation' as const },
-    { barcode: '9300682001007', name: 'Mars Bar 53g', brand: 'Mars', size: '53g',
-      category: 'Confectionery', default_shelf_life_days: 300, tracking_mode: 'batch' as const },
-    { barcode: '9310155000015', name: 'Winfield Blue 25s', brand: 'Winfield', size: '25s',
-      category: 'Tobacco', default_shelf_life_days: null, tracking_mode: 'none' as const },
-  ];
   const { error: productError } = await admin
-    .from('products').upsert(products, { onConflict: 'barcode' });
+    .from('products').upsert(SEED_CATALOGUE, { onConflict: 'barcode' });
   if (productError) throw productError;
 
   const { data: catalogue } = await admin.from('products').select('id, barcode');
@@ -148,7 +135,7 @@ async function main() {
   }
 
   console.log(`seeded ${a.org.name} (${a.sites.length} sites), ${b.org.name} (${b.sites.length} site)`);
-  console.log(`seeded ${products.length} catalogue products`);
+  console.log(`seeded ${SEED_CATALOGUE.length} catalogue products`);
   console.log(`all seed users share the password: ${SEED_PASSWORD}`);
 }
 

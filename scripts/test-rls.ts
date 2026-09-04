@@ -98,6 +98,46 @@ async function main() {
 
     const { data: sp } = await other.from('site_products').select('org_id');
     check('sees no foreign site_products', (sp ?? []).every((x) => x.org_id === bayside.id));
+
+    // Ranging is the first write path staff-facing UI exposes, and a Server Action is
+    // reachable by direct POST — so the posted site_id must be rejected in the database,
+    // not only by the application code that normally sets it.
+    const { data: theirSite } = await admin
+      .from('sites').select('id').eq('org_id', northside.id).limit(1).single();
+    const { data: someProduct } = await admin.from('products').select('id').limit(1).single();
+
+    const { error: rangeError } = await other.from('site_products').insert({
+      org_id: northside.id,
+      site_id: theirSite!.id,
+      product_id: someProduct!.id,
+      par_level: 99,
+    });
+    check('cannot range a product at another org\'s site', rangeError !== null,
+      rangeError ? '' : 'insert unexpectedly succeeded');
+
+    // Claiming your own org_id while pointing at their site must fail too — the policy
+    // has to check the site, not just the org column the caller supplies.
+    const { error: spoofError } = await other.from('site_products').insert({
+      org_id: bayside.id,
+      site_id: theirSite!.id,
+      product_id: someProduct!.id,
+      par_level: 99,
+    });
+    check('cannot smuggle a foreign site under its own org_id', spoofError !== null,
+      spoofError ? '' : 'insert unexpectedly succeeded');
+  }
+
+  console.log('\nglobal catalogue (shared on purpose, but not a free-for-all):');
+  {
+    const { data: mine } = await staff.from('products')
+      .select('id').limit(1).single();
+
+    // Any tenant may ADD to the catalogue — that is the design. Editing someone
+    // else's row is a different thing, and must not be allowed.
+    const { data: edited } = await other.from('products')
+      .update({ name: 'Hijacked product' }).eq('id', mine!.id).select();
+    check('cannot rewrite a catalogue row another tenant created',
+      (edited?.length ?? 0) === 0, `updated ${edited?.length} rows`);
   }
 
   console.log('\nrole resolution (regression: staff must not inherit a colleague\'s role):');
