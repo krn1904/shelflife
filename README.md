@@ -109,6 +109,55 @@ Push is per device, not per account: the store tablet and a manager's own phone 
 separate switches, under **Shift → Notifications**. On iPhone the PWA must be added to
 the home screen first — Safari only allows push for installed apps.
 
+### Offline
+
+Shelf-side mutations — writing off stock and ticking an action — are queued in an
+IndexedDB outbox and replayed in order when the connection returns. Every queued write
+carries a client-generated id the server treats as an idempotency key, because a request
+that timed out may or may not have been applied: the only safe design is to retry it and
+make retrying harmless. A persistent strip shows what is still on the device, and says
+why when something cannot be sent rather than dropping it.
+
+Intake is deliberately **not** queued. It is a multi-step flow whose draft lives on the
+server, and pretending otherwise would be a bigger promise than this outbox can keep.
+
+### The demo tenant
+
+```bash
+npm run seed:demo       # 3 sites, ~400 products, 8 months of history
+```
+
+Deterministic: a seeded PRNG, so a rebuild produces the same numbers and a screenshot in
+the case study keeps matching the live site. Set `NEXT_PUBLIC_DEMO_MODE=true` on the
+public deployment to enable the four one-click role logins and the **jump 7 days**
+button, which moves the demo tenant's dates so a visitor can watch the expiry engine fire
+without waiting a week. The engine is never told it is a demo — only the data moves —
+and `demo_jump_days()` refuses outright on any org not flagged `is_demo`.
+
+Leave `NEXT_PUBLIC_DEMO_MODE` unset anywhere real.
+
+## Deploying
+
+Vercel for the app, Supabase for everything else, both on free tiers.
+
+```bash
+supabase link --project-ref <ref>
+supabase db push                     # migrations
+supabase functions deploy expiry-engine
+supabase functions deploy daily-digest
+supabase secrets set CRON_SECRET=... VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
+```
+
+Vercel needs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
+`SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Schedule both Edge
+Functions (02:00 and 06:00 Australia/Melbourne), passing `x-cron-secret`.
+
+After deploying, regenerate the database types against the live schema:
+
+```bash
+supabase gen types typescript --linked > src/lib/supabase/database.types.ts
+```
+
 Seed logins (all share the password printed by `npm run seed`):
 
 | Email | Role | Sees |

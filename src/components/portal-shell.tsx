@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { signOut } from '@/lib/auth/actions';
+import { PendingChanges } from '@/components/pending-changes';
 import { roleAtLeast, type Session } from '@/lib/auth/session';
 import type { AppRole } from '@/lib/supabase/types';
 
@@ -23,6 +24,7 @@ export function PortalShell({ session, children }: { session: Session; children:
 
   return (
     <div className="min-h-dvh">
+      <PendingChanges />
       <header className="border-b border-neutral-200">
         <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
           <span className="font-semibold tracking-tight">ShelfLife</span>

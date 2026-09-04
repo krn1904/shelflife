@@ -365,6 +365,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          is_demo: boolean
           name: string
           slug: string
           updated_at: string
@@ -372,6 +373,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_demo?: boolean
           name: string
           slug: string
           updated_at?: string
@@ -379,6 +381,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_demo?: boolean
           name?: string
           slug?: string
           updated_at?: string
@@ -791,6 +794,7 @@ export type Database = {
       waste_events: {
         Row: {
           batch_id: string | null
+          client_id: string | null
           created_at: string
           id: string
           note: string | null
@@ -805,6 +809,7 @@ export type Database = {
         }
         Insert: {
           batch_id?: string | null
+          client_id?: string | null
           created_at?: string
           id?: string
           note?: string | null
@@ -819,6 +824,7 @@ export type Database = {
         }
         Update: {
           batch_id?: string | null
+          client_id?: string | null
           created_at?: string
           id?: string
           note?: string | null
@@ -883,6 +889,10 @@ export type Database = {
         Args: { org: string }
         Returns: boolean
       }
+      demo_jump_days: {
+        Args: { p_org_id: string; p_days: number }
+        Returns: number
+      }
       has_org_role: {
         Args: { org: string; roles: Database["public"]["Enums"]["app_role"][] }
         Returns: boolean
@@ -897,6 +907,7 @@ export type Database = {
           p_qty: number
           p_reason: Database["public"]["Enums"]["waste_reason"]
           p_note?: string
+          p_client_id?: string
         }
         Returns: string
       }
