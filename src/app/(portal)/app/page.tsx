@@ -8,9 +8,10 @@ export default async function ShiftPage() {
   const supabase = await createClient();
 
   // RLS scopes both of these to what this user may see, so no explicit filter is needed.
-  const [{ count: catalogue }, { data: sites }] = await Promise.all([
+  const [{ count: catalogue }, { data: sites }, { count: openDeliveries }] = await Promise.all([
     supabase.from('site_products').select('*', { count: 'exact', head: true }),
     supabase.from('sites').select('name'),
+    supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
   ]);
 
   return (
@@ -23,15 +24,23 @@ export default async function ShiftPage() {
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Stat label="Ranged products" value={catalogue ?? 0} hint="active at your site" />
         <Stat label="To action today" value="—" hint="expiry engine lands in batch 5" />
-        <Stat label="Open deliveries" value="—" hint="intake lands in batch 4" />
+        <Stat label="Open deliveries" value={openDeliveries ?? 0} hint="started but not closed" />
       </div>
 
-      <Link
-        href="/app/scan"
-        className="mt-6 inline-block rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
-      >
-        Scan a product
-      </Link>
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link
+          href="/app/deliveries"
+          className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
+        >
+          Receive a delivery
+        </Link>
+        <Link
+          href="/app/scan"
+          className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium"
+        >
+          Scan a product
+        </Link>
+      </div>
     </div>
   );
 }

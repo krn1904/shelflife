@@ -1,3 +1,11 @@
+// NOTE: the deliveries, delivery_lines and stock_batches entries below were written by
+// hand, because the environment that added them had no database to run
+// `supabase gen types typescript --local > src/lib/supabase/database.types.ts` against.
+// Regenerate this file once the migrations have actually been applied — the generated
+// output is authoritative. The Relationships entries here were derived from the foreign
+// keys in the migration and are what makes `select('... suppliers(name)')` type-check;
+// the received_by -> auth.users key is omitted because the generator does not expose it.
+
 export type Json =
   | string
   | number
@@ -34,6 +42,131 @@ export type Database = {
   }
   public: {
     Tables: {
+      deliveries: {
+        Row: {
+          closed_at: string | null
+          created_at: string
+          docket_number: string | null
+          docket_photo_path: string | null
+          id: string
+          org_id: string
+          received_at: string | null
+          received_by: string | null
+          site_id: string
+          status: Database["public"]["Enums"]["delivery_status"]
+          supplier_id: string
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          created_at?: string
+          docket_number?: string | null
+          docket_photo_path?: string | null
+          id?: string
+          org_id: string
+          received_at?: string | null
+          received_by?: string | null
+          site_id: string
+          status?: Database["public"]["Enums"]["delivery_status"]
+          supplier_id: string
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          created_at?: string
+          docket_number?: string | null
+          docket_photo_path?: string | null
+          id?: string
+          org_id?: string
+          received_at?: string | null
+          received_by?: string | null
+          site_id?: string
+          status?: Database["public"]["Enums"]["delivery_status"]
+          supplier_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deliveries_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deliveries_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      delivery_lines: {
+        Row: {
+          created_at: string
+          delivery_id: string
+          id: string
+          org_id: string
+          product_id: string
+          qty_docketed: number
+          qty_received: number
+          unit_cost: number | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_id: string
+          id?: string
+          org_id: string
+          product_id: string
+          qty_docketed?: number
+          qty_received?: number
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_id?: string
+          id?: string
+          org_id?: string
+          product_id?: string
+          qty_docketed?: number
+          qty_received?: number
+          unit_cost?: number | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "delivery_lines_delivery_id_fkey"
+            columns: ["delivery_id"]
+            isOneToOne: false
+            referencedRelation: "deliveries"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_lines_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "delivery_lines_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       memberships: {
         Row: {
           created_at: string
@@ -277,6 +410,83 @@ export type Database = {
           },
         ]
       }
+      stock_batches: {
+        Row: {
+          created_at: string
+          delivery_line_id: string | null
+          expiry_date: string | null
+          expiry_photo_path: string | null
+          expiry_source: Database["public"]["Enums"]["expiry_source"]
+          id: string
+          org_id: string
+          product_id: string
+          qty_received: number
+          qty_remaining: number
+          site_id: string
+          status: Database["public"]["Enums"]["batch_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          delivery_line_id?: string | null
+          expiry_date?: string | null
+          expiry_photo_path?: string | null
+          expiry_source?: Database["public"]["Enums"]["expiry_source"]
+          id?: string
+          org_id: string
+          product_id: string
+          qty_received: number
+          qty_remaining: number
+          site_id: string
+          status?: Database["public"]["Enums"]["batch_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          delivery_line_id?: string | null
+          expiry_date?: string | null
+          expiry_photo_path?: string | null
+          expiry_source?: Database["public"]["Enums"]["expiry_source"]
+          id?: string
+          org_id?: string
+          product_id?: string
+          qty_received?: number
+          qty_remaining?: number
+          site_id?: string
+          status?: Database["public"]["Enums"]["batch_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "stock_batches_delivery_line_id_fkey"
+            columns: ["delivery_line_id"]
+            isOneToOne: false
+            referencedRelation: "delivery_lines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "stock_batches_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
           active: boolean
@@ -351,6 +561,9 @@ export type Database = {
     }
     Enums: {
       app_role: "platform_admin" | "owner" | "manager" | "staff"
+      batch_status: "active" | "pulled" | "sold_through"
+      delivery_status: "draft" | "closed"
+      expiry_source: "predicted" | "confirmed" | "manual"
       tracking_mode: "rotation" | "batch" | "none"
     }
     CompositeTypes: {

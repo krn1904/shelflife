@@ -140,6 +140,57 @@ async function main() {
       (edited?.length ?? 0) === 0, `updated ${edited?.length} rows`);
   }
 
+  console.log('\nintake (deliveries, lines and stock batches):');
+  {
+    const { data: theirSite } = await admin
+      .from('sites').select('id, org_id').eq('org_id', northside.id).limit(1).single();
+    const { data: theirSupplier } = await admin
+      .from('suppliers').select('id').eq('org_id', northside.id).limit(1).single();
+    const { data: product } = await admin.from('products').select('id').limit(1).single();
+
+    // A delivery is the first thing staff create, and it carries both org_id and site_id.
+    // Supplying someone else's pair must fail on the site, not merely on the org column.
+    const { error: foreignDelivery } = await other.from('deliveries').insert({
+      org_id: northside.id,
+      site_id: theirSite!.id,
+      supplier_id: theirSupplier!.id,
+    });
+    check('cannot open a delivery at another org\'s site', foreignDelivery !== null,
+      foreignDelivery ? '' : 'insert unexpectedly succeeded');
+
+    const { data: seen } = await other.from('deliveries').select('site_id');
+    check('sees no foreign deliveries', (seen ?? []).every((d) => d.site_id !== theirSite!.id),
+      `got ${seen?.length} deliveries`);
+
+    // stock_batches is what the expiry engine reads. A leak here would surface another
+    // tenant's stock on this tenant's board.
+    const { error: foreignBatch } = await other.from('stock_batches').insert({
+      org_id: northside.id,
+      site_id: theirSite!.id,
+      product_id: product!.id,
+      qty_received: 1,
+      qty_remaining: 1,
+    });
+    check('cannot create a stock batch at another org\'s site', foreignBatch !== null,
+      foreignBatch ? '' : 'insert unexpectedly succeeded');
+
+    const { data: batches } = await other.from('stock_batches').select('site_id');
+    check('sees no foreign stock batches',
+      (batches ?? []).every((b) => b.site_id !== theirSite!.id), `got ${batches?.length} batches`);
+
+    // delivery_lines has no site_id of its own — its policy reaches through the parent
+    // delivery. If that join were wrong, lines would leak while deliveries stayed sealed,
+    // so this is checked against the parent's site rather than trusted.
+    const { data: lines } = await other
+      .from('delivery_lines').select('id, deliveries(site_id)');
+    const baysideSites = new Set(
+      (await other.from('sites').select('id')).data?.map((s) => s.id) ?? [],
+    );
+    check('every visible delivery line belongs to a site this tenant can see',
+      (lines ?? []).every((l) => l.deliveries && baysideSites.has(l.deliveries.site_id)),
+      `got ${lines?.length} lines`);
+  }
+
   console.log('\nrole resolution (regression: staff must not inherit a colleague\'s role):');
   {
     // RLS scopes memberships to the ORG, so a staff member legitimately sees the
