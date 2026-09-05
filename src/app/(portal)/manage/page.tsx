@@ -1,41 +1,101 @@
 import Link from 'next/link';
-import { requireRole } from '@/lib/auth/session';
+import { differenceInCalendarDays, parseISO, subMonths } from 'date-fns';
+import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import { today } from '@/lib/intake/expiry';
+import { bucketFor } from '@/lib/analytics/aggregate';
+import { formatAud } from '@/lib/charts/tokens';
 import { Stat } from '@/components/stat';
 
-export default async function ManagePage() {
-  await requireRole('manager');
-  const supabase = await createClient();
+const ACTIVITY_LIMIT = 8;
 
-  const [{ data: suppliers }, { count: ranged }, { data: sites }] = await Promise.all([
-    supabase.from('suppliers').select('name').order('name'),
-    supabase.from('site_products').select('*', { count: 'exact', head: true }),
-    supabase.from('sites').select('id, name').order('name'),
-  ]);
+export default async function ManagePage() {
+  const session = await requireRole('manager');
+  const site = activeSite(session);
+  const supabase = await createClient();
+  const asOf = today();
+  const monthStart = subMonths(new Date(asOf), 1).toISOString();
+
+  const [{ count: ranged }, { data: batches }, { data: waste }, { count: openDeliveries }, { data: recent }] =
+    await Promise.all([
+      supabase.from('site_products').select('*', { count: 'exact', head: true }),
+      supabase
+        .from('stock_batches')
+        .select('expiry_date')
+        .eq('status', 'active')
+        .gt('qty_remaining', 0)
+        .not('expiry_date', 'is', null),
+      supabase.from('waste_events').select('value_aud').gte('wasted_at', monthStart),
+      supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
+      supabase
+        .from('deliveries')
+        .select('id, closed_at, docket_number, suppliers(name)')
+        .eq('status', 'closed')
+        .order('closed_at', { ascending: false })
+        .limit(ACTIVITY_LIMIT),
+    ]);
+
+  const urgent = (batches ?? []).filter((b) => {
+    if (!b.expiry_date) return false;
+    const bucket = bucketFor(differenceInCalendarDays(parseISO(b.expiry_date), parseISO(asOf)));
+    return bucket === 'overdue' || bucket === 'today' || bucket === 'soon';
+  }).length;
+
+  const wasteThisMonth = (waste ?? []).reduce((sum, w) => sum + (w.value_aud ?? 0), 0);
 
   return (
     <div>
-      <h1 className="text-xl font-semibold">Site</h1>
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <h1 className="text-xl font-semibold">Site</h1>
+        <p className="text-sm text-neutral-500">{site?.name ?? 'No site assigned'}</p>
+      </div>
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-3">
-        <Stat label="Sites in scope" value={sites?.length ?? 0} />
-        <Stat label="Suppliers" value={suppliers?.length ?? 0} />
+      <div className="mt-6 grid gap-3 sm:grid-cols-4">
+        <Stat label="Needs attention" value={urgent} hint="expiring within 7 days" />
+        <Stat label="Waste (30 days)" value={formatAud(wasteThisMonth)} />
+        <Stat label="Open deliveries" value={openDeliveries ?? 0} />
         <Stat label="Ranged products" value={ranged ?? 0} />
       </div>
 
-      <Link
-        href="/manage/products"
-        className="mt-6 inline-block rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
-      >
-        Products &amp; ranging
-      </Link>
+      <div className="mt-6 flex flex-wrap gap-2">
+        <Link
+          href="/manage/expiry"
+          className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
+        >
+          Expiry board
+        </Link>
+        <Link
+          href="/manage/waste"
+          className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium"
+        >
+          Waste
+        </Link>
+        <Link
+          href="/manage/products"
+          className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium"
+        >
+          Products &amp; ranging
+        </Link>
+      </div>
 
-      <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">Suppliers</h2>
+      <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">
+        Recent deliveries
+      </h2>
       <ul className="mt-2 divide-y divide-neutral-200 rounded border border-neutral-200">
-        {(suppliers ?? []).map((s) => (
-          <li key={s.name} className="px-4 py-2 text-sm">{s.name}</li>
+        {(recent ?? []).map((d) => (
+          <li key={d.id} className="flex flex-wrap items-baseline gap-3 px-4 py-2 text-sm">
+            <span className="font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
+            {d.docket_number && (
+              <span className="font-mono text-xs text-neutral-500">#{d.docket_number}</span>
+            )}
+            <span className="ml-auto text-xs text-neutral-500">
+              {d.closed_at ? new Date(d.closed_at).toLocaleDateString('en-AU') : '—'}
+            </span>
+          </li>
         ))}
-        {!suppliers?.length && <li className="px-4 py-2 text-sm text-neutral-500">None yet.</li>}
+        {(recent ?? []).length === 0 && (
+          <li className="px-4 py-2 text-sm text-neutral-500">Nothing received yet.</li>
+        )}
       </ul>
     </div>
   );

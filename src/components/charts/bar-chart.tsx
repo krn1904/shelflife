@@ -1,0 +1,84 @@
+'use client';
+
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  LabelList,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { CHART_INK, SERIES, formatAud } from '@/lib/charts/tokens';
+
+export type BarDatum = { label: string; value: number; tone?: string };
+
+/**
+ * Horizontal bars for "how much, by category" — the form that reads fastest when the
+ * categories have names of unequal length, because the labels run along the reading
+ * direction instead of being turned on their side.
+ *
+ * One series, so there is no legend: the heading names it. Values are direct-labelled,
+ * which is also the relief the palette needs where a fill sits under 3:1 on white.
+ */
+export function HorizontalBars({
+  data,
+  emptyNote,
+  money = true,
+}: {
+  data: BarDatum[];
+  emptyNote: string;
+  money?: boolean;
+}) {
+  if (data.length === 0 || data.every((d) => d.value === 0)) {
+    return <p className="py-8 text-center text-sm text-neutral-500">{emptyNote}</p>;
+  }
+
+  // Recharts hands formatters a widened value type, so coerce here rather than lying
+  // to TypeScript about the signature.
+  const show = (value: unknown) => {
+    const n = typeof value === 'number' ? value : Number(value ?? 0);
+    return money ? formatAud(n) : String(n);
+  };
+
+  return (
+    <div style={{ height: Math.max(140, data.length * 44 + 30) }}>
+      <ResponsiveContainer width="100%" height="100%">
+        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 8 }}>
+          <CartesianGrid horizontal={false} stroke={CHART_INK.grid} />
+          <XAxis type="number" hide />
+          <YAxis
+            type="category"
+            dataKey="label"
+            width={130}
+            tickLine={false}
+            axisLine={{ stroke: CHART_INK.axis }}
+            tick={{ fill: CHART_INK.muted, fontSize: 12 }}
+          />
+          <Tooltip
+            cursor={{ fill: 'rgba(11,11,11,0.04)' }}
+            formatter={(value) => [show(value), '']}
+            contentStyle={{
+              border: '1px solid rgba(11,11,11,0.10)',
+              borderRadius: 6,
+              fontSize: 12,
+            }}
+          />
+          <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={18} isAnimationActive={false}>
+            {data.map((d) => (
+              <Cell key={d.label} fill={d.tone ?? SERIES} />
+            ))}
+            <LabelList
+              dataKey="value"
+              position="right"
+              formatter={(value) => show(value)}
+              style={{ fill: '#52514e', fontSize: 12 }}
+            />
+          </Bar>
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}

@@ -4,20 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { activeSite, requireSession } from '@/lib/auth/session';
-import type { ActionState, WasteReason } from '@/lib/supabase/types';
+import type { ActionState } from '@/lib/supabase/types';
 
 export type ActionResult = { status: 'idle' } | { status: 'error'; message: string };
 
 const WASTE_REASONS = ['expired', 'damaged', 'spoiled', 'recalled', 'staff_error', 'other'] as const;
-
-export const WASTE_REASON_LABEL: Record<WasteReason, string> = {
-  expired: 'Expired',
-  damaged: 'Damaged',
-  spoiled: 'Spoiled',
-  recalled: 'Recalled',
-  staff_error: 'Staff error',
-  other: 'Other',
-};
 
 const WasteInput = z.object({
   batch_id: z.string().uuid(),
