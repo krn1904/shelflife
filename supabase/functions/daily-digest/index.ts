@@ -8,9 +8,9 @@
 
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
-import { buildDigest } from '../../../src/lib/expiry/digest.ts';
+import { buildDigest } from '../_shared/digest.ts';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
-import type { JobResult } from '../../../src/lib/expiry/engine.ts';
+import type { JobResult } from '../_shared/engine.ts';
 
 const JOB = 'daily-digest';
 const SITE_TIMEZONE = 'Australia/Melbourne';

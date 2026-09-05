@@ -148,8 +148,11 @@ supabase functions deploy daily-digest
 supabase secrets set CRON_SECRET=... VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 ```
 
-Vercel needs `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY`,
-`SUPABASE_SERVICE_ROLE_KEY` and `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Schedule both Edge
+Vercel needs `NEXT_PUBLIC_SUPABASE_URL`, the anon/publishable key, the service/secret
+key, and `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Supabase renamed its keys in 2025 and both
+naming schemes are accepted — `NEXT_PUBLIC_SUPABASE_ANON_KEY` or
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` or
+`SUPABASE_SECRET_KEY` — so use whichever pair your project's API settings show. Schedule both Edge
 Functions (02:00 and 06:00 Australia/Melbourne), passing `x-cron-secret`.
 
 After deploying, regenerate the database types against the live schema:

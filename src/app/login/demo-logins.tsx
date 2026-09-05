@@ -2,7 +2,7 @@
 
 import { useActionState } from 'react';
 import { signInAsDemo, type DemoState } from '@/lib/demo/actions';
-import { DEMO_LOGINS } from '../../../scripts/demo-config';
+import { DEMO_LOGINS } from '@/lib/demo/config';
 
 /**
  * Four one-click logins, one per role, no signup.

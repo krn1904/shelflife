@@ -15,8 +15,8 @@ import {
   type BatchRow,
   type FixtureRow,
   type JobResult,
-} from '../../../src/lib/expiry/engine.ts';
-import { effectiveTrackingMode } from '../../../src/lib/products/tracking.ts';
+} from '../_shared/engine.ts';
+import { effectiveTrackingMode } from '../_shared/tracking.ts';
 
 const JOB = 'expiry-engine';
 const SITE_TIMEZONE = 'Australia/Melbourne';
