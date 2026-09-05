@@ -1,5 +1,6 @@
-// NOTE: the deliveries, delivery_lines and stock_batches entries below were written by
-// hand, because the environment that added them had no database to run
+// NOTE: the deliveries, delivery_lines, stock_batches, expiry_actions, job_runs,
+// rotation_checks and waste_events entries below — and the record_waste function — were
+// written by hand, because the environment that added them had no database to run
 // `supabase gen types typescript --local > src/lib/supabase/database.types.ts` against.
 // Regenerate this file once the migrations have actually been applied — the generated
 // output is authoritative. The Relationships entries here were derived from the foreign
@@ -167,6 +168,103 @@ export type Database = {
           },
         ]
       }
+      expiry_actions: {
+        Row: {
+          action: Database["public"]["Enums"]["expiry_action_kind"]
+          actioned_at: string | null
+          actioned_by: string | null
+          batch_id: string
+          created_at: string
+          due_date: string
+          id: string
+          org_id: string
+          site_id: string
+          state: Database["public"]["Enums"]["action_state"]
+          updated_at: string
+        }
+        Insert: {
+          action: Database["public"]["Enums"]["expiry_action_kind"]
+          actioned_at?: string | null
+          actioned_by?: string | null
+          batch_id: string
+          created_at?: string
+          due_date: string
+          id?: string
+          org_id: string
+          site_id: string
+          state?: Database["public"]["Enums"]["action_state"]
+          updated_at?: string
+        }
+        Update: {
+          action?: Database["public"]["Enums"]["expiry_action_kind"]
+          actioned_at?: string | null
+          actioned_by?: string | null
+          batch_id?: string
+          created_at?: string
+          due_date?: string
+          id?: string
+          org_id?: string
+          site_id?: string
+          state?: Database["public"]["Enums"]["action_state"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "expiry_actions_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "stock_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expiry_actions_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "expiry_actions_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      job_runs: {
+        Row: {
+          duration_ms: number | null
+          id: string
+          job: string
+          ok: boolean
+          processed: number
+          ran_at: string
+          reason: string | null
+          skipped: number
+        }
+        Insert: {
+          duration_ms?: number | null
+          id?: string
+          job: string
+          ok: boolean
+          processed?: number
+          ran_at?: string
+          reason?: string | null
+          skipped?: number
+        }
+        Update: {
+          duration_ms?: number | null
+          id?: string
+          job?: string
+          ok?: boolean
+          processed?: number
+          ran_at?: string
+          reason?: string | null
+          skipped?: number
+        }
+        Relationships: []
+      }
       memberships: {
         Row: {
           created_at: string
@@ -298,6 +396,60 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      rotation_checks: {
+        Row: {
+          check_date: string
+          checked_at: string | null
+          checked_by: string | null
+          created_at: string
+          fixture: string
+          id: string
+          org_id: string
+          site_id: string
+          state: Database["public"]["Enums"]["action_state"]
+          updated_at: string
+        }
+        Insert: {
+          check_date: string
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string
+          fixture: string
+          id?: string
+          org_id: string
+          site_id: string
+          state?: Database["public"]["Enums"]["action_state"]
+          updated_at?: string
+        }
+        Update: {
+          check_date?: string
+          checked_at?: string | null
+          checked_by?: string | null
+          created_at?: string
+          fixture?: string
+          id?: string
+          org_id?: string
+          site_id?: string
+          state?: Database["public"]["Enums"]["action_state"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rotation_checks_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "rotation_checks_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       site_products: {
         Row: {
@@ -525,6 +677,80 @@ export type Database = {
           },
         ]
       }
+      waste_events: {
+        Row: {
+          batch_id: string | null
+          created_at: string
+          id: string
+          note: string | null
+          org_id: string
+          product_id: string
+          qty: number
+          reason: Database["public"]["Enums"]["waste_reason"]
+          site_id: string
+          value_aud: number | null
+          wasted_at: string
+          wasted_by: string | null
+        }
+        Insert: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          org_id: string
+          product_id: string
+          qty: number
+          reason: Database["public"]["Enums"]["waste_reason"]
+          site_id: string
+          value_aud?: number | null
+          wasted_at?: string
+          wasted_by?: string | null
+        }
+        Update: {
+          batch_id?: string | null
+          created_at?: string
+          id?: string
+          note?: string | null
+          org_id?: string
+          product_id?: string
+          qty?: number
+          reason?: Database["public"]["Enums"]["waste_reason"]
+          site_id?: string
+          value_aud?: number | null
+          wasted_at?: string
+          wasted_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "waste_events_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "stock_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waste_events_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waste_events_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "products"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "waste_events_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -554,17 +780,35 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: boolean
       }
+      record_waste: {
+        Args: {
+          p_batch_id: string
+          p_qty: number
+          p_reason: Database["public"]["Enums"]["waste_reason"]
+          p_note?: string
+        }
+        Returns: string
+      }
       shares_org_with: {
         Args: { other_user: string }
         Returns: boolean
       }
     }
     Enums: {
+      action_state: "open" | "done" | "dismissed"
       app_role: "platform_admin" | "owner" | "manager" | "staff"
       batch_status: "active" | "pulled" | "sold_through"
       delivery_status: "draft" | "closed"
+      expiry_action_kind: "check" | "markdown" | "pull"
       expiry_source: "predicted" | "confirmed" | "manual"
       tracking_mode: "rotation" | "batch" | "none"
+      waste_reason:
+        | "expired"
+        | "damaged"
+        | "spoiled"
+        | "recalled"
+        | "staff_error"
+        | "other"
     }
     CompositeTypes: {
       [_ in never]: never
