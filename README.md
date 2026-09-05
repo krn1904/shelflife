@@ -90,7 +90,24 @@ curl -X POST "$SUPABASE_URL/functions/v1/expiry-engine" -H "x-cron-secret: $CRON
 
 Every run writes a row to `job_runs`, successful or not — a cron that has silently
 stopped firing is the failure mode that costs the most, because nothing looks broken
-until the stock is already gone.
+until the stock is already gone. The platform-admin portal says so in as many words
+when the engine has not reported in for 36 hours.
+
+### The morning digest
+
+`supabase/functions/daily-digest` runs at 06:00 and pushes each site's list to whoever
+has notifications on for that site. A day with nothing outstanding sends nothing — a
+daily "all clear" is how people learn to swipe the notification away unread.
+
+```bash
+supabase functions deploy daily-digest
+npx web-push generate-vapid-keys
+supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
+```
+
+Push is per device, not per account: the store tablet and a manager's own phone are
+separate switches, under **Shift → Notifications**. On iPhone the PWA must be added to
+the home screen first — Safari only allows push for installed apps.
 
 Seed logins (all share the password printed by `npm run seed`):
 

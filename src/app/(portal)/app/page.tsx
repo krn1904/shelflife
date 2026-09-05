@@ -54,6 +54,12 @@ export default async function ShiftPage() {
         >
           Look up a product
         </Link>
+        <Link
+          href="/app/settings"
+          className="rounded border border-neutral-300 px-4 py-2 text-sm font-medium"
+        >
+          Notifications
+        </Link>
       </div>
     </div>
   );
