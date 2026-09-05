@@ -92,6 +92,27 @@ export async function getSession(): Promise<Session | null> {
   };
 }
 
+/**
+ * Which site an action applies to. Staff and managers are pinned to one site by their
+ * membership; owners and platform admins see several, so they pass a choice.
+ *
+ * `session.sites` is already RLS-scoped, so a requested id the user cannot see simply
+ * fails to match and falls through to their pinned site — a caller cannot widen its
+ * own scope by passing someone else's site id. Returns null only when the user can
+ * see no sites at all.
+ */
+export function activeSite(session: Session, requestedId?: string | null): SessionSite | null {
+  if (session.sites.length === 0) return null;
+
+  if (requestedId) {
+    const requested = session.sites.find((s) => s.id === requestedId);
+    if (requested) return requested;
+  }
+
+  const pinned = session.memberships.find((m) => m.siteId !== null)?.siteId;
+  return session.sites.find((s) => s.id === pinned) ?? session.sites[0];
+}
+
 /** Session or bounce to login. Use at the top of every authenticated route. */
 export async function requireSession(): Promise<Session> {
   const session = await getSession();

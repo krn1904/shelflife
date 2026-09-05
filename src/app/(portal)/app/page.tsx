@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { Stat } from '@/components/stat';
@@ -24,6 +25,13 @@ export default async function ShiftPage() {
         <Stat label="To action today" value="—" hint="expiry engine lands in batch 5" />
         <Stat label="Open deliveries" value="—" hint="intake lands in batch 4" />
       </div>
+
+      <Link
+        href="/app/scan"
+        className="mt-6 inline-block rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
+      >
+        Scan a product
+      </Link>
     </div>
   );
 }
