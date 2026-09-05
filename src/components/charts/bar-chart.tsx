@@ -43,6 +43,15 @@ export function HorizontalBars({
     return money ? formatAud(n) : String(n);
   };
 
+  // Category labels are site and reason names of very uneven length, so the axis track is
+  // sized to the longest one rather than fixed — a fixed width clips "Coca-Cola
+  // Europacific" and leaves acres of gap next to "Other". Capped so one long name cannot
+  // squeeze the bars themselves down to nothing.
+  const axisWidth = Math.min(
+    220,
+    Math.max(90, ...data.map((d) => d.label.length * 7 + 16)),
+  );
+
   return (
     <div style={{ height: Math.max(140, data.length * 44 + 30) }}>
       <ResponsiveContainer width="100%" height="100%">
@@ -52,7 +61,7 @@ export function HorizontalBars({
           <YAxis
             type="category"
             dataKey="label"
-            width={130}
+            width={axisWidth}
             tickLine={false}
             axisLine={{ stroke: CHART_INK.axis }}
             tick={{ fill: CHART_INK.muted, fontSize: 12 }}

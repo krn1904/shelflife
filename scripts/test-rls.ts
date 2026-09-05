@@ -13,8 +13,24 @@ import type { Database } from '../src/lib/supabase/database.types';
 
 config({ path: '.env.local' });
 
-const URL = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const ANON = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+// Credentials, under either of the two names Supabase has used for them. The scripts
+// read .env.local directly rather than going through src/lib/supabase/env.ts, because
+// that module is compiled for the app and pulls in Next's build-time inlining.
+const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
+const ANON_KEY =
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY;
+
+if (!URL_) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set in .env.local');
+if (!SERVICE_KEY) throw new Error('Set SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) in .env.local');
+if (!ANON_KEY) throw new Error('Set NEXT_PUBLIC_SUPABASE_ANON_KEY (or NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY) in .env.local');
+
+// Re-bound after the guards: TypeScript drops control-flow narrowing on module-level
+// bindings once they are read inside a function body.
+const URL = URL_;
+const ANON = ANON_KEY;
+const SERVICE = SERVICE_KEY;
 const PASSWORD = 'shelflife-dev-password';
 
 type Db = SupabaseClient<Database>;
@@ -35,7 +51,7 @@ async function signIn(email: string): Promise<Db> {
 }
 
 async function main() {
-  const admin = createClient<Database>(URL, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+  const admin = createClient<Database>(URL, SERVICE, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 

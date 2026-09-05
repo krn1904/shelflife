@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers';
 import { createServerClient } from '@supabase/ssr';
 import type { Database } from './database.types';
+import { requirePublicEnv } from './env';
 
 /**
  * Request-scoped client that carries the signed-in user, so every query runs
@@ -11,9 +12,11 @@ import type { Database } from './database.types';
 export async function createClient() {
   const cookieStore = await cookies();
 
+  const { url, key } = requirePublicEnv();
+
   return createServerClient<Database>(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    url,
+    key,
     {
       cookies: {
         getAll() {

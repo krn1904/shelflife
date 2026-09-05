@@ -1,4 +1,4 @@
-import type { Database } from '../src/lib/supabase/database.types';
+import type { AppRole } from '@/lib/supabase/types';
 
 /**
  * Shared between the demo seed and the app's one-click login buttons, so the two can
@@ -12,7 +12,7 @@ export const DEMO_PASSWORD = 'shelflife-demo';
 export type DemoLogin = {
   email: string;
   fullName: string;
-  role: Database['public']['Enums']['app_role'];
+  role: AppRole;
   label: string;
   blurb: string;
 };

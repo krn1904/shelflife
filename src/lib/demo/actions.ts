@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireSession, homePathFor } from '@/lib/auth/session';
-import { DEMO_LOGINS, DEMO_ORG_SLUG, DEMO_PASSWORD } from '../../../scripts/demo-config';
+import { DEMO_LOGINS, DEMO_ORG_SLUG, DEMO_PASSWORD } from '@/lib/demo/config';
 
 export type DemoState = { status: 'idle' } | { status: 'error'; message: string };
 

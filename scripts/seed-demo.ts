@@ -11,16 +11,25 @@ import { config } from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 import { addDays, format, subDays } from 'date-fns';
 import type { Database } from '../src/lib/supabase/database.types';
-import { DEMO_LOGINS, DEMO_ORG_SLUG, DEMO_PASSWORD } from './demo-config';
+import { DEMO_LOGINS, DEMO_ORG_SLUG, DEMO_PASSWORD } from '../src/lib/demo/config';
 
 config({ path: '.env.local' });
+
+// Credentials, under either of the two names Supabase has used for them. The scripts
+// read .env.local directly rather than going through src/lib/supabase/env.ts, because
+// that module is compiled for the app and pulls in Next's build-time inlining.
+const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SERVICE_KEY =
+  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
+if (!URL_) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set in .env.local');
+if (!SERVICE_KEY) throw new Error('Set SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) in .env.local');
 
 const HISTORY_DAYS = 240; // ~8 months
 const SITE_NAMES = ['Brunswick', 'Coburg', 'Preston'];
 
 const admin = createClient<Database>(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
+  URL_,
+  SERVICE_KEY,
   { auth: { autoRefreshToken: false, persistSession: false } },
 );
 
