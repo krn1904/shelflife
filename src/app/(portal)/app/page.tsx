@@ -2,6 +2,8 @@ import Link from 'next/link';
 import { requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { Stat } from '@/components/stat';
+import { DemoJump } from '@/components/demo-jump';
+import { demoEnabled } from '@/lib/demo/actions';
 
 export default async function ShiftPage() {
   const session = await requireSession();
@@ -22,6 +24,12 @@ export default async function ShiftPage() {
       <p className="mt-1 text-sm text-neutral-500">
         {session.fullName ?? session.email} · {sites?.map((s) => s.name).join(', ') || 'no site assigned'}
       </p>
+
+      {(await demoEnabled()) && (
+        <div className="mt-6">
+          <DemoJump />
+        </div>
+      )}
 
       <div className="mt-6 grid gap-3 sm:grid-cols-3">
         <Stat label="Ranged products" value={catalogue ?? 0} hint="active at your site" />
