@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { createServerClient } from '@supabase/ssr';
-import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/supabase/env';
+import { requirePublicEnv } from '@/lib/supabase/env';
 
 /**
  * Refreshes the Supabase session on every request so Server Components always
@@ -12,9 +12,11 @@ import { SUPABASE_ANON_KEY, SUPABASE_URL } from '@/lib/supabase/env';
 export async function proxy(request: NextRequest) {
   const response = NextResponse.next({ request });
 
+  const { url, key } = requirePublicEnv();
+
   const supabase = createServerClient(
-    SUPABASE_URL,
-    SUPABASE_ANON_KEY,
+    url,
+    key,
     {
       cookies: {
         getAll() {
