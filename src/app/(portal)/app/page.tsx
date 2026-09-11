@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { requireSession } from '@/lib/auth/session';
+import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { Stat } from '@/components/stat';
 import { DemoJump } from '@/components/demo-jump';
@@ -7,22 +7,32 @@ import { demoEnabled } from '@/lib/demo/actions';
 
 export default async function ShiftPage() {
   const session = await requireSession();
+  const site = activeSite(session);
+  if (!site) {
+    return (
+      <div>
+        <h1 className="text-xl font-semibold">Shift</h1>
+        <p className="mt-2 text-sm text-neutral-500">You are not assigned to a store yet.</p>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
 
   // RLS scopes all of these to what this user may see, so no explicit filter is needed.
   const [{ count: catalogue }, { data: sites }, { count: openDeliveries }, { count: openActions }] =
     await Promise.all([
-      supabase.from('site_products').select('*', { count: 'exact', head: true }),
-      supabase.from('sites').select('name'),
-      supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
-      supabase.from('expiry_actions').select('*', { count: 'exact', head: true }).eq('state', 'open'),
+      supabase.from('site_products').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
+      supabase.from('sites').select('name').eq('id', site.id).maybeSingle(),
+      supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('site_id', site.id).eq('status', 'draft'),
+      supabase.from('expiry_actions').select('*', { count: 'exact', head: true }).eq('site_id', site.id).eq('state', 'open'),
     ]);
 
   return (
     <div>
       <h1 className="text-xl font-semibold">Shift</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        {session.fullName ?? session.email} · {sites?.map((s) => s.name).join(', ') || 'no site assigned'}
+        {session.fullName ?? session.email} · {sites?.name ?? site.name}
       </p>
 
       {(await demoEnabled()) && (

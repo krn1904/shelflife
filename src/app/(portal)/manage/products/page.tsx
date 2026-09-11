@@ -18,7 +18,7 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
   const session = await requireRole('manager');
   const params = await props.searchParams;
   const query = escapeFilterTerm(firstParam(params.q) ?? '');
-  const site = activeSite(session, firstParam(params.site));
+  const site = activeSite(session);
   const supabase = await createClient();
 
   let request = supabase
@@ -48,17 +48,6 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
       </div>
 
       <form className="mt-4 flex flex-wrap gap-2">
-        {site && session.sites.length > 1 && (
-          <select
-            name="site"
-            defaultValue={site.id}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
-          >
-            {session.sites.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        )}
         <input
           name="q"
           defaultValue={firstParam(params.q) ?? ''}
@@ -87,7 +76,7 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
           return (
             <li key={product.id}>
               <Link
-                href={`/manage/products/${product.id}${site ? `?site=${site.id}` : ''}`}
+                href={`/manage/products/${product.id}`}
                 className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3 hover:bg-neutral-50"
               >
                 <span className="text-sm font-medium">{product.name}</span>

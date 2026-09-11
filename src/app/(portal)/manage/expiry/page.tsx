@@ -4,7 +4,6 @@ import { createClient } from '@/lib/supabase/server';
 import { today } from '@/lib/intake/expiry';
 import { BUCKET_LABEL, bucketFor, type ExpiryBucket } from '@/lib/analytics/aggregate';
 import { STATUS } from '@/lib/charts/tokens';
-import { firstParam } from '@/lib/search-params';
 
 const COLUMNS: ExpiryBucket[] = ['overdue', 'today', 'soon', 'watch'];
 
@@ -27,10 +26,9 @@ type BoardCard = {
   predicted: boolean;
 };
 
-export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>) {
+export default async function ExpiryBoardPage() {
   const session = await requireRole('manager');
-  const params = await props.searchParams;
-  const site = activeSite(session, firstParam(params.site));
+  const site = activeSite(session);
   const supabase = await createClient();
   const asOf = today();
 
@@ -71,23 +69,6 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
         <h1 className="text-xl font-semibold">Expiry board</h1>
         <p className="text-sm text-neutral-500">{site?.name ?? 'No site'}</p>
       </div>
-
-      {session.sites.length > 1 && site && (
-        <form className="mt-4">
-          <select
-            name="site"
-            defaultValue={site.id}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
-          >
-            {session.sites.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <button type="submit" className="ml-2 rounded border border-neutral-300 px-3 py-2 text-sm">
-            Show
-          </button>
-        </form>
-      )}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-4">
         {board.map(({ bucket, cards: column }) => (

@@ -1,5 +1,5 @@
 /**
- * Seeds the demo tenant: three Melbourne sites, a few hundred products, and eight months
+ * Seeds the demo tenant: one Melbourne store, a few hundred products, and eight months
  * of delivery and waste history so every chart has a real shape rather than two points.
  *
  * Deterministic on purpose — a seeded PRNG, not Math.random — so the demo looks the same
@@ -25,7 +25,7 @@ if (!URL_) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set in .env.local');
 if (!SERVICE_KEY) throw new Error('Set SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) in .env.local');
 
 const HISTORY_DAYS = 240; // ~8 months
-const SITE_NAMES = ['Brunswick', 'Coburg', 'Preston'];
+const SITE_NAMES = ['Brunswick'];
 
 const admin = createClient<Database>(
   URL_,

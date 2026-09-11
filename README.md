@@ -31,6 +31,11 @@ and confirm a proposed expiry date — one date per SKU line, covering every box
 In development. MVP scope is delivery intake plus the expiry engine. Invoice reconciliation,
 temperature/compliance logging and fuel wet-stock reconciliation are designed for but not built.
 
+The current product workflow is intentionally single-store: staff and managers work in one
+store context, and owners enter the same store dashboard. The database keeps tenant and site
+boundaries ready for a later multi-store rollout, but store switching and group rollups are
+out of scope until the core workflow is finalised.
+
 See [docs/PLAN.md](docs/PLAN.md) for the full build plan.
 
 ## Stack
@@ -124,7 +129,7 @@ server, and pretending otherwise would be a bigger promise than this outbox can 
 ### The demo tenant
 
 ```bash
-npm run seed:demo       # 3 sites, ~400 products, 8 months of history
+npm run seed:demo       # 1 store, ~400 products, 8 months of history
 ```
 
 Deterministic: a seeded PRNG, so a rebuild produces the same numbers and a screenshot in
@@ -165,7 +170,7 @@ Seed logins (all share the password printed by `npm run seed`):
 
 | Email | Role | Sees |
 |---|---|---|
-| `owner@northside.test` | owner | all three Northside sites |
+| `owner@northside.test` | owner | Northside store dashboard |
 | `manager@northside.test` | manager | Brunswick |
 | `staff@northside.test` | staff | Brunswick |
 | `owner@bayside.test` | owner | St Kilda (separate tenant) |

@@ -8,15 +8,13 @@ import { formatAud } from '@/lib/charts/tokens';
 import { HorizontalBars } from '@/components/charts/bar-chart';
 import { TrendChart } from '@/components/charts/trend-chart';
 import { Stat } from '@/components/stat';
-import { firstParam } from '@/lib/search-params';
 
 const WINDOW_MONTHS = 6;
 const LOG_LIMIT = 50;
 
-export default async function WastePage(props: PageProps<'/manage/waste'>) {
+export default async function WastePage() {
   const session = await requireRole('manager');
-  const params = await props.searchParams;
-  const site = activeSite(session, firstParam(params.site));
+  const site = activeSite(session);
   const supabase = await createClient();
   const asOf = today();
   const since = subMonths(new Date(asOf), WINDOW_MONTHS - 1).toISOString();

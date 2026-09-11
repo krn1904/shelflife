@@ -8,7 +8,7 @@ const RECENT_LIMIT = 20;
 export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>) {
   const session = await requireSession();
   const params = await props.searchParams;
-  const site = activeSite(session, firstParam(params.site));
+  const site = activeSite(session);
   const justClosed = firstParam(params.closed);
   const supabase = await createClient();
 

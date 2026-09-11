@@ -38,7 +38,7 @@ ShelfLife exists to be that mechanism, while asking as little of staff as possib
 |---|---|---|
 | **Console staff** | Phone in hand, mid-shift, often in a store room or cool room with poor signal | Receive a delivery fast; be told what to pull today; record waste in seconds |
 | **Site manager** | Desktop or tablet in the back office | See what is expiring, what was received, what was written off and why |
-| **Owner / multi-site** | Owns or franchises several sites | Compare sites, see waste in dollars, spot which site or supplier is the problem |
+| **Store owner** | Owns the current store | See waste in dollars, spot which product or supplier is the problem |
 | **Platform admin** | Operating the service | Support tenants, moderate the shared product catalogue, monitor scheduled jobs |
 
 ---
@@ -144,4 +144,5 @@ and not an accounting integration. It records what arrives and what is thrown aw
 - A repeat supplier delivery is received in under 60 seconds
 - Staff record expiry dates for fewer than a third of the lines they handle
 - A site can state, in dollars, what it wrote off last month and how much of it was avoidable
+- Multi-store switching, rollups and site comparison are deferred until the single-store workflow is finalised
 - Expired stock is found by the system before it is found by a customer

@@ -12,24 +12,35 @@ const ACTIVITY_LIMIT = 8;
 export default async function ManagePage() {
   const session = await requireRole('manager');
   const site = activeSite(session);
+  if (!site) {
+    return (
+      <div>
+        <h1 className="text-xl font-semibold">Store</h1>
+        <p className="mt-2 text-sm text-neutral-500">You are not assigned to a store yet.</p>
+      </div>
+    );
+  }
+
   const supabase = await createClient();
   const asOf = today();
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
   const [{ count: ranged }, { data: batches }, { data: waste }, { count: openDeliveries }, { data: recent }] =
     await Promise.all([
-      supabase.from('site_products').select('*', { count: 'exact', head: true }),
+      supabase.from('site_products').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
       supabase
         .from('stock_batches')
         .select('expiry_date')
+        .eq('site_id', site.id)
         .eq('status', 'active')
         .gt('qty_remaining', 0)
         .not('expiry_date', 'is', null),
-      supabase.from('waste_events').select('value_aud').gte('wasted_at', monthStart),
-      supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
+      supabase.from('waste_events').select('value_aud').eq('site_id', site.id).gte('wasted_at', monthStart),
+      supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('site_id', site.id).eq('status', 'draft'),
       supabase
         .from('deliveries')
         .select('id, closed_at, docket_number, suppliers(name)')
+        .eq('site_id', site.id)
         .eq('status', 'closed')
         .order('closed_at', { ascending: false })
         .limit(ACTIVITY_LIMIT),
@@ -46,8 +57,8 @@ export default async function ManagePage() {
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Site</h1>
-        <p className="text-sm text-neutral-500">{site?.name ?? 'No site assigned'}</p>
+        <h1 className="text-xl font-semibold">Store</h1>
+        <p className="text-sm text-neutral-500">{site.name}</p>
       </div>
 
       <div className="mt-6 grid gap-3 sm:grid-cols-4">

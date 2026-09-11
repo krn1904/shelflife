@@ -37,7 +37,7 @@ export function roleAtLeast(role: AppRole, bar: AppRole) {
 export function homePathFor(role: AppRole) {
   switch (role) {
     case 'platform_admin': return '/admin';
-    case 'owner': return '/owner';
+    case 'owner': return '/manage';
     case 'manager': return '/manage';
     case 'staff': return '/app';
   }
@@ -93,13 +93,13 @@ export async function getSession(): Promise<Session | null> {
 }
 
 /**
- * Which site an action applies to. Staff and managers are pinned to one site by their
- * membership; owners and platform admins see several, so they pass a choice.
+ * Which site an action applies to. The current workflow intentionally uses one active
+ * store; this keeps the RLS-safe requested-id fallback ready for a later store switcher.
  *
  * `session.sites` is already RLS-scoped, so a requested id the user cannot see simply
  * fails to match and falls through to their pinned site — a caller cannot widen its
- * own scope by passing someone else's site id. Returns null only when the user can
- * see no sites at all.
+ * own scope by passing someone else's site id. Returns null only when the user can see no
+ * stores at all.
  */
 export function activeSite(session: Session, requestedId?: string | null): SessionSite | null {
   if (session.sites.length === 0) return null;
