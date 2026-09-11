@@ -16,7 +16,7 @@ config({ path: '.env.local' });
 // that module is compiled for the app and pulls in Next's build-time inlining.
 const URL_ = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY;
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY;
 if (!URL_) throw new Error('NEXT_PUBLIC_SUPABASE_URL is not set in .env.local');
 if (!SERVICE_KEY) throw new Error('Set SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SECRET_KEY) in .env.local');
 
