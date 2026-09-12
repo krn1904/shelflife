@@ -23,32 +23,36 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-function fuzzyScore(needle: string, haystack: string): number {
-  const a = normalize(needle);
-  const b = normalize(haystack);
-  if (!a || !b) return 0;
-  if (b.includes(a)) return 1;
-  if (a.includes(b) && b.length >= 4) return 0.9;
+/**
+ * Scores how well a product name matches an OCR line.
+ *
+ * The question is: "does this product appear in this OCR text?"
+ * So we check whether the product's significant words appear in the OCR line,
+ * not the other way around.
+ */
+function matchScore(ocrLine: string, productName: string): number {
+  const ocrNorm = normalize(ocrLine);
+  const prodNorm = normalize(productName);
+  if (!ocrNorm || !prodNorm) return 0;
 
-  const words = needle.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
-  if (words.length === 0) return 0;
+  // Full product name found inside the OCR line
+  if (ocrNorm.includes(prodNorm)) return 1;
 
-  let matches = 0;
-  for (const word of words) {
-    if (b.includes(normalize(word))) matches++;
+  // Word-level: what fraction of the product's words appear in the OCR line?
+  const prodWords = productName.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+  if (prodWords.length === 0) return 0;
+
+  let hits = 0;
+  for (const word of prodWords) {
+    if (ocrNorm.includes(normalize(word))) hits++;
   }
-  return matches / words.length;
+
+  // Require at least 2 words to match (or all of them if product has only 1-2 words)
+  const ratio = hits / prodWords.length;
+  if (hits < Math.min(2, prodWords.length)) return 0;
+  return ratio;
 }
 
-/**
- * Extracts quantity + product name pairs from raw OCR text.
- *
- * Delivery dockets typically have lines like:
- *   "2 x Coca-Cola Zero 1.25L"
- *   "3  Sprite 600ml"
- *   "Pepsi Max 375ml  x4"
- *   "1 Coffee"
- */
 const SKIP_LINE = new RegExp(
   '^(' +
   'date|time|invoice|docket|total|subtotal|gst|abn|phone|fax|address|page|delivery|' +
@@ -63,18 +67,24 @@ const SKIP_LINE = new RegExp(
 
 const SKIP_FULL = new RegExp(
   '(' +
-  '\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{2,4}|' +        // dates
-  '\\d{4,}\\s*$|' +                                // bare numbers (postcodes, refs)
-  '^[A-Z\\s]{2,}\\d{4}$|' +                        // "TRUGANINA 3029" — suburb + postcode
-  '\\d+\\s+[A-Z]+\\s+RD|ST|AVE|DR|HWY|LANE|' +    // street addresses
-  'PTY\\s*(LTD|LIMITED)|' +                         // company suffixes
-  'PETROLEUM|METRO|TRUGANINA|' +                    // known non-product entities (common on fuel dockets)
+  '\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{2,4}|' +
+  '\\d{4,}\\s*$|' +
+  '^[A-Z\\s]{2,}\\d{4}$|' +
+  '\\d+\\s+[A-Z]+\\s+(RD|ST|AVE|DR|HWY|LANE)\\b|' +
+  'PTY\\s*(LTD|LIMITED)|' +
   'ABN\\s*:?\\s*\\d|' +
-  '^\\d{5,}$' +                                     // bare long numbers
+  '^\\d{5,}$' +
   ')',
   'i',
 );
 
+/**
+ * Extracts quantity + product description from OCR text.
+ *
+ * Handles two formats:
+ * 1. Structured: "955732 * 600Ml PET X 24 Coca-Cola  2  $3.29  $68.75  $137.50"
+ * 2. Simple: "2 x Coca-Cola Zero 1.25L" or "Pepsi Max 375ml x4"
+ */
 function extractRawLines(text: string): { name: string; qty: number }[] {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const results: { name: string; qty: number }[] = [];
@@ -87,46 +97,58 @@ function extractRawLines(text: string): { name: string; qty: number }[] {
     let qty = 1;
     let name = line;
 
-    // Structured docket line: "955732 * 600Ml PET X 24 Coca-Cola... 2 $3.29 ..."
+    // Structured docket: "955732 * 600Ml PET X 24 Coca-Cola  2  $3.29 ..."
+    // The SKU number prefix and trailing price columns are noise.
     const skuLine = line.match(/^\d{4,}\s*\*\s*(.+)/);
     if (skuLine) {
       name = skuLine[1];
-    }
-
-    // Strip prices first so they don't interfere with qty extraction
-    name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
-
-    // Pattern: "3 x Product Name" or "3x Product Name"
-    const leadingQty = name.match(/^(\d+)\s*[xX×]\s+(.+)/);
-    if (leadingQty) {
-      qty = parseInt(leadingQty[1], 10);
-      name = leadingQty[2];
+      // Strip prices
+      name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
+      // For structured dockets, qty is typically a standalone number among the columns.
+      // Extract the last standalone small number (1-999) as qty after stripping prices.
+      const parts = name.split(/\s{2,}/);
+      if (parts.length > 1) {
+        const lastPart = parts[parts.length - 1].trim();
+        if (/^\d{1,3}$/.test(lastPart)) {
+          qty = parseInt(lastPart, 10);
+          parts.pop();
+          name = parts.join(' ');
+        }
+      }
+      // Keep the full description including size info (e.g. "600Ml PET X 24 Coca-Cola")
+      // — the product matcher will score against it.
     } else {
-      // Pattern: "3  Product Name" (number followed by spaces then text)
-      const leadingNum = name.match(/^(\d+)\s{2,}(.+)/);
-      if (leadingNum) {
-        qty = parseInt(leadingNum[1], 10);
-        name = leadingNum[2];
+      // Strip prices
+      name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
+
+      // Simple formats
+      const leadingQty = name.match(/^(\d{1,3})\s*[xX×]\s+(.+)/);
+      if (leadingQty) {
+        qty = parseInt(leadingQty[1], 10);
+        name = leadingQty[2];
       } else {
-        // Pattern: "Product Name x4" or "Product Name  4"
-        const trailingQty = name.match(/(.+?)\s+[xX×]\s*(\d+)\s*$/);
-        if (trailingQty) {
-          name = trailingQty[1];
-          qty = parseInt(trailingQty[2], 10);
+        const leadingNum = name.match(/^(\d{1,3})\s{2,}(.+)/);
+        if (leadingNum) {
+          qty = parseInt(leadingNum[1], 10);
+          name = leadingNum[2];
         } else {
-          const trailingNum = name.match(/(.+?)\s{2,}(\d+)\s*$/);
-          if (trailingNum && parseInt(trailingNum[2], 10) <= 999) {
-            name = trailingNum[1];
-            qty = parseInt(trailingNum[2], 10);
+          const trailingQty = name.match(/(.+?)\s+[xX×]\s*(\d{1,3})\s*$/);
+          if (trailingQty) {
+            name = trailingQty[1];
+            qty = parseInt(trailingQty[2], 10);
+          } else {
+            const trailingNum = name.match(/(.+?)\s{2,}(\d{1,3})\s*$/);
+            if (trailingNum) {
+              name = trailingNum[1];
+              qty = parseInt(trailingNum[2], 10);
+            }
           }
         }
       }
     }
 
-    // Strip remaining prices and trailing hash codes
     name = name.replace(/\$?\d+\.\d{2}/g, '').trim();
     name = name.replace(/\s*#\w+$/, '').trim();
-    // Strip CDS/P/C column values (single short tokens at the end)
     name = name.replace(/\s+[A-Z]{1,3}\/[A-Z]{1,3}\s*$/, '').trim();
 
     if (name.length >= 3 && qty > 0 && qty <= 9999) {
@@ -161,17 +183,23 @@ export async function parseDocketText(ocrText: string): Promise<DocketParseResul
   const textLower = ocrText.toLowerCase();
 
   for (const supplier of suppliers ?? []) {
-    const score = fuzzyScore(supplier.name, textLower);
+    const words = supplier.name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+    if (words.length === 0) continue;
+    let hits = 0;
+    for (const word of words) {
+      if (textLower.includes(word)) hits++;
+    }
+    const score = hits / words.length;
     if (score > bestSupplierScore && score >= 0.5) {
       bestSupplierScore = score;
       bestSupplier = supplier;
     }
   }
 
-  // Extract raw lines from OCR text
   const rawLines = extractRawLines(ocrText);
 
-  // Match each extracted line against the product catalogue
+  // Match each extracted line against the product catalogue.
+  // For each OCR line, find the product whose name best appears IN the OCR text.
   const matched: ParsedLine[] = [];
   const usedProducts = new Set<string>();
 
@@ -182,14 +210,14 @@ export async function parseDocketText(ocrText: string): Promise<DocketParseResul
     for (const product of products ?? []) {
       if (usedProducts.has(product.id)) continue;
 
+      // Score: does this product's name/brand appear in the OCR line?
       const candidates = [
         product.name,
-        `${product.brand ?? ''} ${product.name}`.trim(),
-        `${product.name} ${product.size ?? ''}`.trim(),
-      ];
+        product.brand ? `${product.brand} ${product.name}` : null,
+      ].filter((c): c is string => !!c);
 
       for (const candidate of candidates) {
-        const score = fuzzyScore(raw.name, candidate);
+        const score = matchScore(raw.name, candidate);
         if (score > bestScore) {
           bestScore = score;
           bestProduct = product;
