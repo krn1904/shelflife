@@ -1,16 +1,14 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { activeSite, requireRole } from '@/lib/auth/session';
+import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { TRACKING_HINT, TRACKING_LABEL, effectiveTrackingMode } from '@/lib/products/tracking';
-import { firstParam } from '@/lib/search-params';
 import { OverridesForm } from './overrides-form';
 
 export default async function ProductDetailPage(props: PageProps<'/manage/products/[productId]'>) {
-  const session = await requireRole('manager');
+  const session = await requireSession();
   const { productId } = await props.params;
-  const params = await props.searchParams;
-  const site = activeSite(session, firstParam(params.site));
+  const site = activeSite(session);
   const supabase = await createClient();
 
   const { data: product } = await supabase

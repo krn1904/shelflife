@@ -34,13 +34,8 @@ export function roleAtLeast(role: AppRole, bar: AppRole) {
   return ROLE_RANK[role] >= ROLE_RANK[bar];
 }
 
-export function homePathFor(role: AppRole) {
-  switch (role) {
-    case 'platform_admin': return '/admin';
-    case 'owner': return '/owner';
-    case 'manager': return '/manage';
-    case 'staff': return '/app';
-  }
+export function homePathFor(_role: AppRole) {
+  return '/app';
 }
 
 /**

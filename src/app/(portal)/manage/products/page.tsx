@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import { activeSite, requireRole } from '@/lib/auth/session';
+import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { TRACKING_LABEL, effectiveTrackingMode } from '@/lib/products/tracking';
 import { firstParam } from '@/lib/search-params';
@@ -15,10 +15,10 @@ function escapeFilterTerm(term: string): string {
 }
 
 export default async function ProductsPage(props: PageProps<'/manage/products'>) {
-  const session = await requireRole('manager');
+  const session = await requireSession();
   const params = await props.searchParams;
   const query = escapeFilterTerm(firstParam(params.q) ?? '');
-  const site = activeSite(session, firstParam(params.site));
+  const site = activeSite(session);
   const supabase = await createClient();
 
   let request = supabase
@@ -48,17 +48,6 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
       </div>
 
       <form className="mt-4 flex flex-wrap gap-2">
-        {site && session.sites.length > 1 && (
-          <select
-            name="site"
-            defaultValue={site.id}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
-          >
-            {session.sites.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-        )}
         <input
           name="q"
           defaultValue={firstParam(params.q) ?? ''}

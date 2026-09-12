@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { differenceInCalendarDays, parseISO, subMonths } from 'date-fns';
-import { activeSite, requireRole } from '@/lib/auth/session';
+import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { today } from '@/lib/intake/expiry';
 import { bucketFor } from '@/lib/analytics/aggregate';
@@ -10,7 +10,7 @@ import { Stat } from '@/components/stat';
 const ACTIVITY_LIMIT = 8;
 
 export default async function ManagePage() {
-  const session = await requireRole('manager');
+  const session = await requireSession();
   const site = activeSite(session);
   const supabase = await createClient();
   const asOf = today();
