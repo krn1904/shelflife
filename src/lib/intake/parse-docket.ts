@@ -23,33 +23,34 @@ function normalize(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
-/**
- * Scores how well a product name matches an OCR line.
- *
- * The question is: "does this product appear in this OCR text?"
- * So we check whether the product's significant words appear in the OCR line,
- * not the other way around.
- */
+const SIZE_WORD = /^\d+(\.\d+)?(ml|l|g|kg|oz|pk|pack)$/i;
+
 function matchScore(ocrLine: string, productName: string): number {
   const ocrNorm = normalize(ocrLine);
   const prodNorm = normalize(productName);
   if (!ocrNorm || !prodNorm) return 0;
 
-  // Full product name found inside the OCR line
   if (ocrNorm.includes(prodNorm)) return 1;
 
-  // Word-level: what fraction of the product's words appear in the OCR line?
-  const prodWords = productName.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+  const prodWords = [...new Set(
+    productName.toLowerCase().split(/\s+/)
+      .filter((w) => w.length >= 3 && !SIZE_WORD.test(w))
+      .map(normalize)
+  )];
   if (prodWords.length === 0) return 0;
 
   let hits = 0;
   for (const word of prodWords) {
-    if (ocrNorm.includes(normalize(word))) hits++;
+    if (ocrNorm.includes(word)) hits++;
   }
 
-  // Require at least 2 words to match (or all of them if product has only 1-2 words)
   const ratio = hits / prodWords.length;
   if (hits < Math.min(2, prodWords.length)) return 0;
+
+  if (prodWords.length > 2 && !ocrNorm.includes(prodWords[0])) {
+    return ratio * 0.5;
+  }
+
   return ratio;
 }
 
@@ -60,7 +61,10 @@ const SKIP_LINE = new RegExp(
   'material|number|description|price|extended|net|charge|taxable|' +
   'cash|cheque|card|tc\\s|epod|bpay|pallets|terms|missing|' +
   'product\\s*total|total\\s*quantity|total\\s*returned|total\\s*price|total\\s*gst|' +
-  'tax\\s*invoice|po\\s*number|equip|web|www\\.|vic$|nsw$|qld$|sa$|wa$|tas$|act$|nt$' +
+  'tax\\s*invoice|po\\s*number|equip|web|www\\.|vic$|nsw$|qld$|sa$|wa$|tas$|act$|nt$|' +
+  'sold\\s*to|route|product\\s*code|product\\s*description|' +
+  'units|order\\s*qty|delvr|uom|unit\\s*price|qty\\s*ordered|qty\\s*supplied|' +
+  'crates|cartons|eaches|ordered|picked|delivered|^code\\s' +
   ')',
   'i',
 );
@@ -70,58 +74,112 @@ const SKIP_FULL = new RegExp(
   '\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{2,4}|' +
   '\\d{4,}\\s*$|' +
   '^[A-Z\\s]{2,}\\d{4}$|' +
-  '\\d+\\s+[A-Z]+\\s+(RD|ST|AVE|DR|HWY|LANE)\\b|' +
+  '\\d+\\s+[A-Z]+\\s+(RD|ST|AVE|DR|HWY|LANE|ROAD|STREET|AVENUE|DRIVE)\\b|' +
   'PTY\\s*(LTD|LIMITED)|' +
   'ABN\\s*:?\\s*\\d|' +
-  '^\\d{5,}$' +
+  '^\\d{5,}$|' +
+  'TOTAL\\s+WEIGHT|' +
+  'TOTAL\\s+QUANTITY|' +
+  'CUSTOMER\\s*#|' +
+  'DELIVERY\\s*#' +
   ')',
   'i',
 );
 
-/**
- * Extracts quantity + product description from OCR text.
- *
- * Handles two formats:
- * 1. Structured: "955732 * 600Ml PET X 24 Coca-Cola  2  $3.29  $68.75  $137.50"
- * 2. Simple: "2 x Coca-Cola Zero 1.25L" or "Pepsi Max 375ml x4"
- */
 function extractRawLines(text: string): { name: string; qty: number }[] {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const results: { name: string; qty: number }[] = [];
 
   for (const line of lines) {
-    if (line.length < 3 || line.length > 120) continue;
+    if (line.length < 3 || line.length > 200) continue;
     if (SKIP_LINE.test(line)) continue;
     if (SKIP_FULL.test(line)) continue;
 
     let qty = 1;
     let name = line;
+    let handled = false;
 
-    // Structured docket: "955732 * 600Ml PET X 24 Coca-Cola  2  $3.29 ..."
-    // The SKU number prefix and trailing price columns are noise.
-    const skuLine = line.match(/^\d{4,}\s*\*\s*(.+)/);
-    if (skuLine) {
-      name = skuLine[1];
-      // Strip prices
-      name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
-      // For structured dockets, qty is typically a standalone number among the columns.
-      // Extract the last standalone small number (1-999) as qty after stripping prices.
-      const parts = name.split(/\s{2,}/);
-      if (parts.length > 1) {
-        const lastPart = parts[parts.length - 1].trim();
-        if (/^\d{1,3}$/.test(lastPart)) {
-          qty = parseInt(lastPart, 10);
-          parts.pop();
+    // Format: Bega/Lion Dairy — pipe-separated code and description
+    const begaMatch = line.match(/\|EA\s+EA\s*\|\s*(.+?)\s+(\d+)\s+(\d+)\s*$/);
+    if (begaMatch) {
+      name = begaMatch[1];
+      qty = parseInt(begaMatch[3], 10) || parseInt(begaMatch[2], 10);
+      handled = true;
+    }
+
+    // Format: CCA structured — SKU * description
+    if (!handled) {
+      const skuLine = line.match(/^\d{4,}\s*\*\s*(.+)/);
+      if (skuLine) {
+        name = skuLine[1];
+        name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
+        const parts = name.split(/\s{2,}/);
+        if (parts.length > 1) {
+          const lastPart = parts[parts.length - 1].trim();
+          if (/^\d{1,3}$/.test(lastPart)) {
+            qty = parseInt(lastPart, 10);
+            parts.pop();
+            name = parts.join(' ');
+          }
+        }
+        handled = true;
+      }
+    }
+
+    // Format: Suntory — code + desc + units + orderQty + delvrQty + UoM + price
+    if (!handled) {
+      const suntoryMatch = line.match(/^\d{4}\s+(.+?)\s+\d+\s+\d+\s+(\d+)\s+CTN\s+[\d.]+\s*$/);
+      if (suntoryMatch) {
+        name = suntoryMatch[1];
+        qty = parseInt(suntoryMatch[2], 10);
+        name = name.replace(/\s+\d*x?\d+pk\s+\w+\s+AU$/i, '').trim();
+        name = name.replace(/\s+x\d+\s+\w+\s+AU$/i, '').trim();
+        name = name.replace(/\s+\d+x\d+pk\s+\w+\s+AU$/i, '').trim();
+        handled = true;
+      }
+    }
+
+    // Format: PFD — code + sizeSpec + description + EA + qtyOrdered + qtySupplied + price
+    if (!handled) {
+      const pfdMatch = line.match(/^\d{5,6}\s+(.+?)\s+EA\s+([\d.]+)\s+([\d.]+|NOT\s+AVAIL)\s+[\d.]+\s*$/);
+      if (pfdMatch) {
+        name = pfdMatch[1];
+        const supplied = pfdMatch[3];
+        qty = /NOT\s+AVAIL/i.test(supplied) ? 0 : Math.round(parseFloat(supplied));
+        const words = name.split(/\s+/);
+        while (words.length > 1 && /^\d/.test(words[0])) {
+          words.shift();
+        }
+        name = words.join(' ');
+        handled = true;
+      }
+    }
+
+    // Format: CCA non-asterisk — 6-digit code + description + qty + prices
+    if (!handled) {
+      const ccaMatch = line.match(/^(\d{6})\s+(.+)/);
+      if (ccaMatch) {
+        name = ccaMatch[2];
+        name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
+        const parts = name.split(/\s{2,}/);
+        if (parts.length > 1) {
+          while (parts.length > 1) {
+            const last = parts[parts.length - 1].trim();
+            if (/^\d{1,4}$/.test(last)) {
+              qty = parseInt(last, 10);
+              parts.pop();
+            } else break;
+          }
           name = parts.join(' ');
         }
+        handled = true;
       }
-      // Keep the full description including size info (e.g. "600Ml PET X 24 Coca-Cola")
-      // — the product matcher will score against it.
-    } else {
-      // Strip prices
+    }
+
+    // Simple/generic formats
+    if (!handled) {
       name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
 
-      // Simple formats
       const leadingQty = name.match(/^(\d{1,3})\s*[xX×]\s+(.+)/);
       if (leadingQty) {
         qty = parseInt(leadingQty[1], 10);
@@ -147,7 +205,7 @@ function extractRawLines(text: string): { name: string; qty: number }[] {
       }
     }
 
-    name = name.replace(/\$?\d+\.\d{2}/g, '').trim();
+    name = name.replace(/\$\d+\.\d{2}/g, '').trim();
     name = name.replace(/\s*#\w+$/, '').trim();
     name = name.replace(/\s+[A-Z]{1,3}\/[A-Z]{1,3}\s*$/, '').trim();
 
@@ -177,7 +235,6 @@ export async function parseDocketText(ocrText: string): Promise<DocketParseResul
       .limit(2000),
   ]);
 
-  // Match supplier: find which supplier name appears in the OCR text
   let bestSupplier: { id: string; name: string } | null = null;
   let bestSupplierScore = 0;
   const textLower = ocrText.toLowerCase();
@@ -198,30 +255,46 @@ export async function parseDocketText(ocrText: string): Promise<DocketParseResul
 
   const rawLines = extractRawLines(ocrText);
 
-  // Match each extracted line against the product catalogue.
-  // For each OCR line, find the product whose name best appears IN the OCR text.
+  // Filter out lines that are the supplier name
+  const filteredLines = rawLines.filter((raw) => {
+    if (!bestSupplier) return true;
+    const rawNorm = normalize(raw.name);
+    const supplierNorm = normalize(bestSupplier.name);
+    if (rawNorm.includes(supplierNorm)) return false;
+    const supplierWords = bestSupplier.name.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+    if (supplierWords.length === 0) return true;
+    let hits = 0;
+    for (const word of supplierWords) {
+      if (rawNorm.includes(normalize(word))) hits++;
+    }
+    return hits / supplierWords.length < 0.7;
+  });
+
   const matched: ParsedLine[] = [];
   const usedProducts = new Set<string>();
 
-  for (const raw of rawLines) {
+  for (const raw of filteredLines) {
     let bestProduct: (typeof products extends (infer T)[] | null ? T : never) | null = null;
     let bestScore = 0;
 
     for (const product of products ?? []) {
       if (usedProducts.has(product.id)) continue;
 
-      // Score: does this product's name/brand appear in the OCR line?
-      const candidates = [
-        product.name,
-        product.brand ? `${product.brand} ${product.name}` : null,
-      ].filter((c): c is string => !!c);
+      let score = matchScore(raw.name, product.name);
 
-      for (const candidate of candidates) {
-        const score = matchScore(raw.name, candidate);
-        if (score > bestScore) {
-          bestScore = score;
-          bestProduct = product;
+      // Try brand+name only if the brand actually appears in the OCR line
+      if (product.brand) {
+        const brandNorm = normalize(product.brand);
+        const rawNorm = normalize(raw.name);
+        if (brandNorm.length >= 3 && rawNorm.includes(brandNorm)) {
+          const brandScore = matchScore(raw.name, `${product.brand} ${product.name}`);
+          score = Math.max(score, brandScore);
         }
+      }
+
+      if (score > bestScore) {
+        bestScore = score;
+        bestProduct = product;
       }
     }
 
