@@ -313,6 +313,101 @@ export async function closeDelivery(_prev: IntakeState, formData: FormData): Pro
   redirect(`/app/deliveries?closed=${delivery.id}`);
 }
 
+/**
+ * One-shot action for the docket-upload flow: creates the delivery, inserts lines,
+ * creates stock batches for batch-tracked products, and closes the delivery in one go.
+ */
+export async function startDeliveryWithLines(_prev: IntakeState, formData: FormData): Promise<IntakeState> {
+  const session = await requireSession();
+  const supplierId = String(formData.get('supplier_id') ?? '');
+  const site = activeSite(session, String(formData.get('site_id') ?? '') || null);
+
+  if (!site) return { status: 'error', message: 'You are not assigned to a site.' };
+  if (!z.string().uuid().safeParse(supplierId).success) {
+    return { status: 'error', message: 'Pick a supplier first.' };
+  }
+
+  let payload: unknown;
+  try {
+    payload = JSON.parse(String(formData.get('lines') ?? '[]'));
+  } catch {
+    return { status: 'error', message: 'Those lines did not make sense.' };
+  }
+
+  const parsed = z.array(LineInput).safeParse(payload);
+  if (!parsed.success) return { status: 'error', message: 'Those lines did not make sense.' };
+
+  const received = parsed.data.filter((l) => l.qty_received > 0);
+  if (received.length === 0) {
+    return { status: 'error', message: 'Add at least one item before saving.' };
+  }
+
+  const supabase = await createClient();
+
+  const { data: delivery, error: deliveryError } = await supabase
+    .from('deliveries')
+    .insert({
+      org_id: site.orgId,
+      site_id: site.id,
+      supplier_id: supplierId,
+      received_by: session.userId,
+      received_at: new Date().toISOString(),
+      status: 'closed',
+      closed_at: new Date().toISOString(),
+    })
+    .select('id')
+    .single();
+
+  if (deliveryError) {
+    return { status: 'error', message: `Could not create the delivery (${deliveryError.code ?? 'unknown'}).` };
+  }
+
+  const { data: products } = await supabase
+    .from('products')
+    .select('id, tracking_mode')
+    .in('id', received.map((l) => l.product_id));
+  const trackingMode = new Map((products ?? []).map((p) => [p.id, p.tracking_mode]));
+
+  const { data: lines, error: lineError } = await supabase
+    .from('delivery_lines')
+    .insert(received.map((l) => ({
+      org_id: site.orgId,
+      delivery_id: delivery.id,
+      product_id: l.product_id,
+      qty_docketed: l.qty_received,
+      qty_received: l.qty_received,
+    })))
+    .select('id, product_id');
+
+  if (lineError) {
+    return { status: 'error', message: `Could not save the lines (${lineError.code ?? 'unknown'}).` };
+  }
+
+  const lineByProduct = new Map((lines ?? []).map((l) => [l.product_id, l.id]));
+  const batches = received
+    .filter((l) => trackingMode.get(l.product_id) === 'batch' && l.expiry_date)
+    .map((l) => ({
+      org_id: site.orgId,
+      site_id: site.id,
+      product_id: l.product_id,
+      delivery_line_id: lineByProduct.get(l.product_id) ?? null,
+      expiry_date: l.expiry_date,
+      expiry_source: l.confirmed ? ('confirmed' as const) : ('predicted' as const),
+      qty_received: l.qty_received,
+      qty_remaining: l.qty_received,
+    }));
+
+  if (batches.length > 0) {
+    const { error: batchError } = await supabase.from('stock_batches').insert(batches);
+    if (batchError) {
+      return { status: 'error', message: `Could not create the stock batches (${batchError.code ?? 'unknown'}).` };
+    }
+  }
+
+  revalidatePath('/app/deliveries');
+  redirect(`/app/deliveries?closed=${delivery.id}`);
+}
+
 /** Records where the uploaded docket photo landed. The upload itself happens client-side. */
 export async function attachDocketPhoto(deliveryId: string, path: string): Promise<IntakeState> {
   const session = await requireSession();

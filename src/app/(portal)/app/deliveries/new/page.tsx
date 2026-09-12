@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { SupplierPicker } from './supplier-picker';
+import { DocketUpload } from './docket-upload';
 
 export default async function NewDeliveryPage() {
   const session = await requireSession();
@@ -20,14 +20,16 @@ export default async function NewDeliveryPage() {
         ← Deliveries
       </Link>
 
-      <h1 className="mt-3 text-xl font-semibold">Who is delivering?</h1>
+      <h1 className="mt-3 text-xl font-semibold">New delivery</h1>
       <p className="mt-1 text-sm text-neutral-500">
-        {site ? `Receiving at ${site.name}.` : 'You are not assigned to a site.'}
+        {site
+          ? `Upload the delivery docket to auto-fill items, or start manually.`
+          : 'You are not assigned to a site.'}
       </p>
 
       <div className="mt-6">
         {site ? (
-          <SupplierPicker siteId={site.id} suppliers={suppliers ?? []} />
+          <DocketUpload siteId={site.id} suppliers={suppliers ?? []} />
         ) : (
           <p className="text-sm text-neutral-500">Ask your manager to assign you to a site.</p>
         )}
