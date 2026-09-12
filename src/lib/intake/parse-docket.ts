@@ -26,15 +26,18 @@ function normalize(s: string): string {
 function fuzzyScore(needle: string, haystack: string): number {
   const a = normalize(needle);
   const b = normalize(haystack);
+  if (!a || !b) return 0;
   if (b.includes(a)) return 1;
-  if (a.includes(b)) return 0.9;
+  if (a.includes(b) && b.length >= 4) return 0.9;
+
+  const words = needle.toLowerCase().split(/\s+/).filter((w) => w.length >= 3);
+  if (words.length === 0) return 0;
 
   let matches = 0;
-  const words = needle.toLowerCase().split(/\s+/);
   for (const word of words) {
     if (b.includes(normalize(word))) matches++;
   }
-  return words.length > 0 ? matches / words.length : 0;
+  return matches / words.length;
 }
 
 /**
@@ -46,38 +49,72 @@ function fuzzyScore(needle: string, haystack: string): number {
  *   "Pepsi Max 375ml  x4"
  *   "1 Coffee"
  */
+const SKIP_LINE = new RegExp(
+  '^(' +
+  'date|time|invoice|docket|total|subtotal|gst|abn|phone|fax|address|page|delivery|' +
+  'bill\\s*to|deliver\\s*to|customer|contact|contractor|shipment|payment|' +
+  'material|number|description|price|extended|net|charge|taxable|' +
+  'cash|cheque|card|tc\\s|epod|bpay|pallets|terms|missing|' +
+  'product\\s*total|total\\s*quantity|total\\s*returned|total\\s*price|total\\s*gst|' +
+  'tax\\s*invoice|po\\s*number|equip|web|www\\.|vic$|nsw$|qld$|sa$|wa$|tas$|act$|nt$' +
+  ')',
+  'i',
+);
+
+const SKIP_FULL = new RegExp(
+  '(' +
+  '\\d{2}[/\\-.]\\d{2}[/\\-.]\\d{2,4}|' +        // dates
+  '\\d{4,}\\s*$|' +                                // bare numbers (postcodes, refs)
+  '^[A-Z\\s]{2,}\\d{4}$|' +                        // "TRUGANINA 3029" — suburb + postcode
+  '\\d+\\s+[A-Z]+\\s+RD|ST|AVE|DR|HWY|LANE|' +    // street addresses
+  'PTY\\s*(LTD|LIMITED)|' +                         // company suffixes
+  'PETROLEUM|METRO|TRUGANINA|' +                    // known non-product entities (common on fuel dockets)
+  'ABN\\s*:?\\s*\\d|' +
+  '^\\d{5,}$' +                                     // bare long numbers
+  ')',
+  'i',
+);
+
 function extractRawLines(text: string): { name: string; qty: number }[] {
   const lines = text.split('\n').map((l) => l.trim()).filter(Boolean);
   const results: { name: string; qty: number }[] = [];
 
   for (const line of lines) {
-    // Skip lines that are clearly headers/footers
-    if (/^(date|time|invoice|docket|total|subtotal|gst|abn|phone|fax|address|page|delivery)/i.test(line)) continue;
-    if (/^\d{2}[/\-.]\d{2}[/\-.]\d{2,4}$/.test(line)) continue;
     if (line.length < 3 || line.length > 120) continue;
+    if (SKIP_LINE.test(line)) continue;
+    if (SKIP_FULL.test(line)) continue;
 
     let qty = 1;
     let name = line;
 
+    // Structured docket line: "955732 * 600Ml PET X 24 Coca-Cola... 2 $3.29 ..."
+    const skuLine = line.match(/^\d{4,}\s*\*\s*(.+)/);
+    if (skuLine) {
+      name = skuLine[1];
+    }
+
+    // Strip prices first so they don't interfere with qty extraction
+    name = name.replace(/\$\s?\d+[,.]?\d*\.?\d*/g, '').trim();
+
     // Pattern: "3 x Product Name" or "3x Product Name"
-    const leadingQty = line.match(/^(\d+)\s*[xX×]\s+(.+)/);
+    const leadingQty = name.match(/^(\d+)\s*[xX×]\s+(.+)/);
     if (leadingQty) {
       qty = parseInt(leadingQty[1], 10);
       name = leadingQty[2];
     } else {
       // Pattern: "3  Product Name" (number followed by spaces then text)
-      const leadingNum = line.match(/^(\d+)\s{2,}(.+)/);
+      const leadingNum = name.match(/^(\d+)\s{2,}(.+)/);
       if (leadingNum) {
         qty = parseInt(leadingNum[1], 10);
         name = leadingNum[2];
       } else {
         // Pattern: "Product Name x4" or "Product Name  4"
-        const trailingQty = line.match(/(.+?)\s+[xX×]\s*(\d+)\s*$/);
+        const trailingQty = name.match(/(.+?)\s+[xX×]\s*(\d+)\s*$/);
         if (trailingQty) {
           name = trailingQty[1];
           qty = parseInt(trailingQty[2], 10);
         } else {
-          const trailingNum = line.match(/(.+?)\s{2,}(\d+)\s*$/);
+          const trailingNum = name.match(/(.+?)\s{2,}(\d+)\s*$/);
           if (trailingNum && parseInt(trailingNum[2], 10) <= 999) {
             name = trailingNum[1];
             qty = parseInt(trailingNum[2], 10);
@@ -86,10 +123,11 @@ function extractRawLines(text: string): { name: string; qty: number }[] {
       }
     }
 
-    // Strip prices (e.g. "$5.99", "5.99")
+    // Strip remaining prices and trailing hash codes
     name = name.replace(/\$?\d+\.\d{2}/g, '').trim();
-    // Strip trailing hash codes
     name = name.replace(/\s*#\w+$/, '').trim();
+    // Strip CDS/P/C column values (single short tokens at the end)
+    name = name.replace(/\s+[A-Z]{1,3}\/[A-Z]{1,3}\s*$/, '').trim();
 
     if (name.length >= 3 && qty > 0 && qty <= 9999) {
       results.push({ name, qty });
@@ -144,11 +182,10 @@ export async function parseDocketText(ocrText: string): Promise<DocketParseResul
     for (const product of products ?? []) {
       if (usedProducts.has(product.id)) continue;
 
-      // Score against product name, brand+name, and name+size
       const candidates = [
         product.name,
-        `${product.brand ?? ''} ${product.name}`,
-        product.brand ?? '',
+        `${product.brand ?? ''} ${product.name}`.trim(),
+        `${product.name} ${product.size ?? ''}`.trim(),
       ];
 
       for (const candidate of candidates) {
@@ -160,7 +197,7 @@ export async function parseDocketText(ocrText: string): Promise<DocketParseResul
       }
     }
 
-    if (bestProduct && bestScore >= 0.4) {
+    if (bestProduct && bestScore >= 0.6) {
       usedProducts.add(bestProduct.id);
       matched.push({
         productId: bestProduct.id,
