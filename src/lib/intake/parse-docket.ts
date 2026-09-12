@@ -137,20 +137,6 @@ function extractRawLines(text: string): { name: string; qty: number }[] {
   return results;
 }
 
-export async function parseDocketImage(imageBase64: string): Promise<DocketParseResult> {
-  const { createWorker } = await import('tesseract.js');
-  const worker = await createWorker('eng');
-  const buf = Buffer.from(imageBase64, 'base64');
-  const { data: { text } } = await worker.recognize(buf);
-  await worker.terminate();
-
-  if (!text.trim()) {
-    return { supplierId: null, supplierName: null, lines: [], rawText: '' };
-  }
-
-  return parseDocketText(text);
-}
-
 export async function parseDocketText(ocrText: string): Promise<DocketParseResult> {
   const session = await requireSession();
   const site = activeSite(session);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
-import { parseDocketImage, type DocketParseResult, type ParsedLine } from '@/lib/intake/parse-docket';
+import { parseDocketText, type DocketParseResult, type ParsedLine } from '@/lib/intake/parse-docket';
 import { startDeliveryWithLines, type IntakeState } from '@/lib/intake/actions';
 
 type Step = 'upload' | 'processing' | 'review' | 'expiry';
@@ -11,7 +11,7 @@ type DraftLine = ParsedLine & {
   expiry: string;
 };
 
-function resizeImage(file: File, maxDim: number): Promise<string> {
+function resizeForOCR(file: File, maxDim: number): Promise<Blob> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.onload = () => {
@@ -26,8 +26,14 @@ function resizeImage(file: File, maxDim: number): Promise<string> {
       canvas.height = height;
       const ctx = canvas.getContext('2d')!;
       ctx.drawImage(img, 0, 0, width, height);
-      const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
-      resolve(dataUrl.split(',')[1]);
+      canvas.toBlob(
+        (blob) => {
+          URL.revokeObjectURL(img.src);
+          blob ? resolve(blob) : reject(new Error('Could not compress image.'));
+        },
+        'image/jpeg',
+        0.85,
+      );
     };
     img.onerror = () => reject(new Error('Could not load the image.'));
     img.src = URL.createObjectURL(file);
@@ -42,6 +48,7 @@ export function DocketUpload({
   suppliers: { id: string; name: string }[];
 }) {
   const [step, setStep] = useState<Step>('upload');
+  const [progress, setProgress] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [parseResult, setParseResult] = useState<DocketParseResult | null>(null);
   const [selectedSupplier, setSelectedSupplier] = useState<string | null>(null);
@@ -61,8 +68,25 @@ export function DocketUpload({
     }
 
     try {
-      const base64 = await resizeImage(file, 1600);
-      const result = await parseDocketImage(base64);
+      setProgress('Preparing image…');
+      const resized = await resizeForOCR(file, 1600);
+
+      setProgress('Loading OCR engine…');
+      const { createWorker } = await import('tesseract.js');
+      const worker = await createWorker('eng');
+
+      setProgress('Reading docket…');
+      const { data: { text } } = await worker.recognize(resized);
+      await worker.terminate();
+
+      if (!text.trim()) {
+        setError('Could not read any text from the image. Try a clearer photo.');
+        setStep('upload');
+        return;
+      }
+
+      setProgress('Matching products…');
+      const result = await parseDocketText(text);
       setParseResult(result);
 
       if (result.supplierId) {
@@ -161,7 +185,7 @@ export function DocketUpload({
     return (
       <div className="rounded border border-neutral-200 p-8 text-center">
         <div className="mx-auto size-8 animate-spin rounded-full border-4 border-neutral-200 border-t-neutral-900" />
-        <p className="mt-4 text-sm font-medium">Reading docket…</p>
+        <p className="mt-4 text-sm font-medium">{progress}</p>
         <p className="mt-1 text-xs text-neutral-500">This may take a few seconds</p>
       </div>
     );
