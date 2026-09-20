@@ -1,10 +1,10 @@
-import Link from 'next/link';
 import { signOut } from '@/lib/auth/actions';
 import { PendingChanges } from '@/components/pending-changes';
+import { PortalNav, type NavLink } from '@/components/portal-nav';
 import { roleAtLeast, type Session } from '@/lib/auth/session';
 import type { AppRole } from '@/lib/supabase/types';
 
-const NAV: { href: string; label: string; bar: AppRole }[] = [
+const NAV: (NavLink & { bar: AppRole })[] = [
   { href: '/app', label: 'Shift', bar: 'staff' },
   { href: '/manage', label: 'Site', bar: 'manager' },
   { href: '/owner', label: 'Group', bar: 'owner' },
@@ -25,23 +25,22 @@ export function PortalShell({ session, children }: { session: Session; children:
   return (
     <div className="min-h-dvh">
       <PendingChanges />
-      <header className="border-b border-neutral-200">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-6 gap-y-2 px-4 py-3">
-          <span className="font-semibold tracking-tight">ShelfLife</span>
-          <nav className="flex gap-4 text-sm">
-            {links.map((n) => (
-              <Link key={n.href} href={n.href} className="text-neutral-600 hover:text-neutral-900">
-                {n.label}
-              </Link>
-            ))}
-          </nav>
-          <div className="ml-auto flex items-center gap-3 text-sm text-neutral-500">
-            <span>{org?.orgName}</span>
-            <span className="rounded bg-neutral-100 px-2 py-0.5 text-xs">
-              {ROLE_LABEL[session.primaryRole]}
-            </span>
+      <header className="sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur">
+        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
+          <span className="flex items-center gap-2 font-semibold tracking-tight">
+            <span aria-hidden className="inline-block h-4 w-4 rounded-[5px] bg-brand" />
+            ShelfLife
+          </span>
+
+          {links.length > 1 && <PortalNav links={links} />}
+
+          <div className="ml-auto flex items-center gap-3 text-sm">
+            <div className="hidden text-right leading-tight sm:block">
+              <div className="font-medium text-ink">{org?.orgName}</div>
+              <div className="text-xs text-faint">{ROLE_LABEL[session.primaryRole]}</div>
+            </div>
             <form action={signOut}>
-              <button type="submit" className="text-neutral-600 underline hover:text-neutral-900">
+              <button type="submit" className="btn btn-ghost px-2.5 py-1.5 text-sm">
                 Sign out
               </button>
             </form>

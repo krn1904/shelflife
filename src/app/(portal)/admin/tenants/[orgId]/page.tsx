@@ -2,19 +2,40 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import { createAdminClient } from '@/lib/supabase/admin';
 import { Stat } from '@/components/stat';
+import { PageHeader, SectionTitle } from '@/components/ui';
 import { formatAud } from '@/lib/charts/tokens';
+import { SiteAdmin, type ManagedSite } from './site-admin';
+import { PeopleAdmin, type Person } from './people-admin';
 
 const AUDIT_LIMIT = 20;
 
+/** A site is removable only while nothing has been recorded against it (see removeSite). */
+async function removableSiteIds(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+  siteIds: string[],
+): Promise<Set<string>> {
+  const removable = new Set<string>();
+  await Promise.all(
+    siteIds.map(async (id) => {
+      const [{ count: d }, { count: b }, { count: w }] = await Promise.all([
+        supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('site_id', id),
+        supabase.from('stock_batches').select('*', { count: 'exact', head: true }).eq('site_id', id),
+        supabase.from('waste_events').select('*', { count: 'exact', head: true }).eq('site_id', id),
+      ]);
+      if ((d ?? 0) + (b ?? 0) + (w ?? 0) === 0) removable.add(id);
+    }),
+  );
+  return removable;
+}
+
 /**
- * A platform admin looking at one tenant's numbers.
+ * A platform admin looking at one tenant, and managing its sites and people.
  *
- * This is the "impersonation" the plan asks for, in the only form that is safe to build:
- * is_platform_admin() already widens every RLS policy, so an admin can read across
- * tenants without any token swapping — and issuing a session as another user would be a
- * genuinely dangerous mechanism to add for the sake of a convenience. Every visit writes
- * an audit_log row the tenant themselves can read.
+ * is_platform_admin() already widens every RLS policy, so the reads here are cross-tenant
+ * without any token swapping. The write actions run under the service key and re-authorise
+ * themselves; every visit and change is written to the tenant's own audit log.
  */
 export default async function TenantPage(props: PageProps<'/admin/tenants/[orgId]'>) {
   await requireRole('platform_admin');
@@ -34,7 +55,7 @@ export default async function TenantPage(props: PageProps<'/admin/tenants/[orgId
       supabase.from('sites').select('id, name').eq('org_id', org.id).order('name'),
       supabase
         .from('memberships')
-        .select('role, profiles(full_name)')
+        .select('id, user_id, site_id, role')
         .eq('org_id', org.id),
       supabase.from('waste_events').select('value_aud').eq('org_id', org.id),
       supabase
@@ -50,6 +71,37 @@ export default async function TenantPage(props: PageProps<'/admin/tenants/[orgId
         .limit(AUDIT_LIMIT),
     ]);
 
+  // Email and name live on auth.users (there is no FK from memberships to profiles for
+  // PostgREST to join), so both come from the service-role client in one listing.
+  const admin = createAdminClient();
+  const { data: userList } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const userById = new Map(
+    (userList?.users ?? []).map((u) => [
+      u.id,
+      {
+        email: u.email ?? '—',
+        fullName: (u.user_metadata?.full_name as string | undefined) ?? '',
+      },
+    ]),
+  );
+
+  const siteRows = sites ?? [];
+  const removable = await removableSiteIds(supabase, siteRows.map((s) => s.id));
+
+  const managedSites: ManagedSite[] = siteRows.map((s) => ({
+    id: s.id,
+    name: s.name,
+    removable: removable.has(s.id),
+  }));
+
+  const people: Person[] = (members ?? []).map((m) => ({
+    membershipId: m.id,
+    fullName: userById.get(m.user_id)?.fullName ?? '',
+    email: userById.get(m.user_id)?.email ?? '—',
+    role: m.role,
+    siteId: m.site_id,
+  }));
+
   // Recorded after the reads, so the entry reflects a view that actually happened.
   await supabase.rpc('write_audit', {
     p_action: 'platform_admin.viewed_tenant',
@@ -61,50 +113,59 @@ export default async function TenantPage(props: PageProps<'/admin/tenants/[orgId
   const totalWaste = (waste ?? []).reduce((sum, w) => sum + (w.value_aud ?? 0), 0);
 
   return (
-    <div>
-      <Link href="/admin" className="text-sm text-neutral-500 underline">
-        ← Platform
-      </Link>
+    <div className="space-y-8">
+      <div>
+        <Link href="/admin" className="text-sm text-muted hover:text-ink">
+          ← Platform
+        </Link>
+        <div className="mt-3">
+          <PageHeader
+            title={org.name}
+            subtitle={<span className="font-mono">{org.slug}</span>}
+          />
+        </div>
+        <p className="mt-3 rounded-xl border border-warning/30 bg-warning-soft px-4 py-2.5 text-xs text-warning">
+          This visit has been written to {org.name}&rsquo;s audit log, which their owner can read.
+        </p>
+      </div>
 
-      <h1 className="mt-3 text-xl font-semibold">{org.name}</h1>
-      <p className="mt-1 font-mono text-sm text-neutral-500">{org.slug}</p>
-      <p className="mt-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-        This visit has been written to {org.name}&rsquo;s audit log, which their owner can read.
-      </p>
-
-      <div className="mt-6 grid gap-3 sm:grid-cols-4">
-        <Stat label="Sites" value={sites?.length ?? 0} />
-        <Stat label="People" value={members?.length ?? 0} />
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat label="Sites" value={managedSites.length} />
+        <Stat label="People" value={people.length} />
         <Stat label="Active batches" value={batches ?? 0} />
         <Stat label="Waste recorded" value={formatAud(totalWaste)} hint="all time" />
       </div>
 
-      <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">Sites</h2>
-      <ul className="mt-2 divide-y divide-neutral-200 rounded border border-neutral-200">
-        {(sites ?? []).map((s) => (
-          <li key={s.id} className="px-4 py-2 text-sm">{s.name}</li>
-        ))}
-        {(sites ?? []).length === 0 && (
-          <li className="px-4 py-2 text-sm text-neutral-500">No sites.</li>
-        )}
-      </ul>
+      <section>
+        <SectionTitle>Sites</SectionTitle>
+        <SiteAdmin orgId={org.id} sites={managedSites} />
+      </section>
 
-      <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">
-        Recent audit entries
-      </h2>
-      <ul className="mt-2 divide-y divide-neutral-200 rounded border border-neutral-200">
-        {(audit ?? []).map((entry) => (
-          <li key={entry.id} className="flex flex-wrap items-baseline gap-3 px-4 py-2 text-sm">
-            <span className="font-mono text-xs">{entry.action}</span>
-            <span className="ml-auto text-xs text-neutral-500">
-              {new Date(entry.created_at).toLocaleString('en-AU')}
-            </span>
-          </li>
-        ))}
-        {(audit ?? []).length === 0 && (
-          <li className="px-4 py-2 text-sm text-neutral-500">Nothing logged yet.</li>
-        )}
-      </ul>
+      <section>
+        <SectionTitle>People</SectionTitle>
+        <PeopleAdmin
+          orgId={org.id}
+          people={people}
+          sites={siteRows.map((s) => ({ id: s.id, name: s.name }))}
+        />
+      </section>
+
+      <section>
+        <SectionTitle>Recent audit entries</SectionTitle>
+        <ul className="card divide-y divide-line overflow-hidden">
+          {(audit ?? []).map((entry) => (
+            <li key={entry.id} className="flex flex-wrap items-baseline gap-3 px-4 py-2.5 text-sm">
+              <span className="font-mono text-xs">{entry.action}</span>
+              <span className="ml-auto text-xs text-faint">
+                {new Date(entry.created_at).toLocaleString('en-AU')}
+              </span>
+            </li>
+          ))}
+          {(audit ?? []).length === 0 && (
+            <li className="px-4 py-6 text-center text-sm text-muted">Nothing logged yet.</li>
+          )}
+        </ul>
+      </section>
     </div>
   );
 }

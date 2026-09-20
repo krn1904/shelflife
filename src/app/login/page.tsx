@@ -9,10 +9,20 @@ export default async function LoginPage() {
   if (session) redirect(homePathFor(session.primaryRole));
 
   return (
-    <main className="mx-auto flex min-h-dvh max-w-sm flex-col justify-center px-6 py-12">
-      <h1 className="text-2xl font-semibold tracking-tight">ShelfLife</h1>
-      <p className="mt-1 text-sm text-neutral-500">Back-of-house operations</p>
-      <LoginForm />
+    <main className="mx-auto flex min-h-dvh w-full max-w-sm flex-col justify-center px-6 py-12">
+      <div className="mb-6 flex items-center gap-2.5">
+        <span aria-hidden className="inline-block h-7 w-7 rounded-lg bg-brand" />
+        <div>
+          <h1 className="text-xl font-semibold leading-tight tracking-tight">ShelfLife</h1>
+          <p className="text-xs text-muted">Back-of-house operations for retail</p>
+        </div>
+      </div>
+
+      <div className="card p-6">
+        <h2 className="text-sm font-semibold">Sign in</h2>
+        <LoginForm />
+      </div>
+
       {(await demoEnabled()) && <DemoLogins />}
     </main>
   );

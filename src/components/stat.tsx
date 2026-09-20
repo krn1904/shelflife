@@ -1,9 +1,22 @@
-export function Stat({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+export function Stat({
+  label,
+  value,
+  hint,
+  tone = 'default',
+}: {
+  label: string;
+  value: string | number;
+  hint?: string;
+  tone?: 'default' | 'brand' | 'critical';
+}) {
+  const accent =
+    tone === 'brand' ? 'text-brand' : tone === 'critical' ? 'text-critical' : 'text-ink';
+
   return (
-    <div className="rounded border border-neutral-200 px-4 py-3">
-      <div className="text-xs uppercase tracking-wide text-neutral-500">{label}</div>
-      <div className="mt-1 text-2xl font-semibold tabular-nums">{value}</div>
-      {hint && <div className="mt-0.5 text-xs text-neutral-500">{hint}</div>}
+    <div className="card p-4">
+      <div className="section-title">{label}</div>
+      <div className={`mt-1.5 text-3xl font-semibold tabular-nums ${accent}`}>{value}</div>
+      {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   );
 }

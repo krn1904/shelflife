@@ -16,9 +16,9 @@ export function DemoLogins() {
   });
 
   return (
-    <div className="mt-8 border-t border-neutral-200 pt-6">
-      <h2 className="text-sm font-medium">Have a look around</h2>
-      <p className="mt-1 text-xs text-neutral-500">
+    <div className="mt-8 border-t border-line pt-6">
+      <h2 className="text-sm font-semibold">Have a look around</h2>
+      <p className="mt-1 text-xs text-muted">
         Demo data, four roles, no signup. Everything you change is fake.
       </p>
 
@@ -29,17 +29,20 @@ export function DemoLogins() {
             <button
               type="submit"
               disabled={pending}
-              className="w-full rounded border border-neutral-300 px-4 py-2 text-left hover:bg-neutral-50 disabled:opacity-50"
+              className="card w-full p-3 text-left transition hover:border-line-strong disabled:opacity-50"
             >
-              <span className="block text-sm font-medium">{login.label}</span>
-              <span className="block text-xs text-neutral-500">{login.blurb}</span>
+              <span className="flex items-center justify-between text-sm font-medium">
+                {login.label}
+                <span aria-hidden className="text-faint">→</span>
+              </span>
+              <span className="mt-0.5 block text-xs text-muted">{login.blurb}</span>
             </button>
           </form>
         ))}
       </div>
 
       {state.status === 'error' && (
-        <p className="mt-3 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="mt-3 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
           {state.message}
         </p>
       )}
