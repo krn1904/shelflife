@@ -233,13 +233,59 @@ async function main() {
     check('platform admin sees every organisation',
       visible?.length === orgs!.length, `got ${visible?.length}`);
 
+    const { error: directOrgInsert } = await platform
+      .from('orgs')
+      .insert({ name: 'Bypassed onboarding', slug: `bypass-${Date.now()}` });
+    check('platform admin cannot bypass audited organisation provisioning',
+      directOrgInsert !== null, directOrgInsert ? '' : 'insert unexpectedly succeeded');
+
+    const cascadeSlug = `cascade-${Date.now()}`;
+    const { data: cascadeOrg } = await admin
+      .from('orgs')
+      .insert({ name: 'Cascade check', slug: cascadeSlug })
+      .select('id')
+      .single();
+    const { data: cascadeSite } = await admin
+      .from('sites')
+      .insert({ org_id: cascadeOrg!.id, name: 'Cascade site' })
+      .select('id')
+      .single();
+    await admin.from('memberships').insert({
+      org_id: cascadeOrg!.id,
+      site_id: cascadeSite!.id,
+      user_id: otherUser!.id,
+      role: 'manager',
+    });
+    const { error: cascadeDeleteError } = await admin.from('orgs').delete().eq('id', cascadeOrg!.id);
+    check('hard delete can cascade through sites and memberships',
+      cascadeDeleteError === null, cascadeDeleteError?.message ?? '');
+
     const { data: baysideSite } = await admin
       .from('sites')
       .select('id')
       .eq('org_id', bayside.id)
       .limit(1)
       .single();
+    const { data: northsideSite } = await admin
+      .from('sites')
+      .select('id')
+      .eq('org_id', northside.id)
+      .limit(1)
+      .single();
     const endpoint = `https://push.test/${Date.now()}`;
+    const { error: crossOrgSubscription } = await other
+      .from('push_subscriptions')
+      .insert({
+        user_id: otherUser!.id,
+        org_id: bayside.id,
+        site_id: northsideSite!.id,
+        endpoint: `${endpoint}/cross-org`,
+        p256dh: 'test-p256dh',
+        auth: 'test-auth',
+      });
+    check('subscription cannot reference another organisation site',
+      crossOrgSubscription !== null, crossOrgSubscription ? '' : 'insert unexpectedly succeeded');
+
     const { data: subscription, error: subscriptionError } = await other
       .from('push_subscriptions')
       .insert({
@@ -254,6 +300,14 @@ async function main() {
       .single();
     check('owner can create a subscription in an active organisation',
       subscriptionError === null, subscriptionError?.message ?? '');
+
+    const { data: crossOrgUpdate } = await other
+      .from('push_subscriptions')
+      .update({ site_id: northsideSite!.id })
+      .eq('id', subscription!.id)
+      .select('id');
+    check('subscription cannot be reassigned to another organisation site',
+      (crossOrgUpdate?.length ?? 0) === 0, `updated ${crossOrgUpdate?.length} subscriptions`);
 
     const { data: ownerMutation } = await other
       .from('orgs')

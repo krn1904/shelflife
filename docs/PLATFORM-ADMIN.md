@@ -70,6 +70,8 @@ Archived organisations are read-only in the admin UI except for Restore. Service
 actions independently re-authorize every call because the service key bypasses RLS. Archive and
 restore run through database RPCs that update lifecycle state and write the audit event in one
 transaction. Database triggers serialize site and membership changes against archival.
+Site and membership removal use locked, audited RPCs so normal deletes cannot race an archive;
+cascade deletion remains available for explicit break-glass maintenance.
 
 ## Implementation map
 
@@ -83,6 +85,7 @@ transaction. Database triggers serialize site and membership changes against arc
   - `supabase/migrations/20260920000002_archived_account_guard.sql`
   - `supabase/migrations/20260920000003_archived_identity_audit.sql`
   - `supabase/migrations/20260920000004_lifecycle_review_hardening.sql`
+  - `supabase/migrations/20260920000005_review_followup.sql`
 - Background-job lifecycle filters: `supabase/functions/expiry-engine/index.ts`,
   `supabase/functions/daily-digest/index.ts`
 - RLS verification: `scripts/test-rls.ts`

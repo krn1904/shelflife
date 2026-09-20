@@ -911,6 +911,14 @@ export type Database = {
         Args: { p_org_id: string }
         Returns: undefined
       }
+      remove_empty_site: {
+        Args: { p_site_id: string }
+        Returns: string
+      }
+      remove_organisation_member: {
+        Args: { p_membership_id: string }
+        Returns: string
+      }
       shares_org_with: { Args: { other_user: string }; Returns: boolean }
       write_audit: {
         Args: {

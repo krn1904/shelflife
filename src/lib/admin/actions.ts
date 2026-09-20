@@ -332,37 +332,16 @@ export async function createSite(_prev: SiteFormState, formData: FormData): Prom
  * product exists to keep — so this refuses and names what stands in the way instead.
  */
 export async function removeSite(formData: FormData): Promise<void> {
-  const { admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
 
   const siteId = z.string().uuid().safeParse(String(formData.get('site_id') ?? ''));
   if (!siteId.success) return;
 
-  const { data: site } = await admin
-    .from('sites').select('id, org_id').eq('id', siteId.data).maybeSingle();
-  if (!site) return;
-  if (!(await isActiveOrganisation(admin, site.org_id))) return;
-
-  const [{ count: deliveries }, { count: batches }, { count: waste }] = await Promise.all([
-    admin.from('deliveries').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
-    admin.from('stock_batches').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
-    admin.from('waste_events').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
-  ]);
-
-  // A site with any recorded activity is kept. The button is for sites added by mistake.
-  if ((deliveries ?? 0) + (batches ?? 0) + (waste ?? 0) > 0) return;
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: 'platform_admin.remove_site_requested',
-    p_org_id: site.org_id,
-    p_subject_type: 'site',
-    p_subject_id: site.id,
+  const { data: orgId, error } = await user.rpc('remove_empty_site', {
+    p_site_id: siteId.data,
   });
-  if (auditError) return;
-
-  const { error } = await admin.from('sites').delete().eq('id', site.id);
   if (error) return;
-
-  revalidateOrganisation(site.org_id);
+  if (orgId) revalidateOrganisation(orgId);
 }
 
 // ── People ───────────────────────────────────────────────────────────────
@@ -607,26 +586,14 @@ export async function updateMemberRole(formData: FormData): Promise<void> {
 
 /** Unlinks a person from the organisation. The auth login itself is left intact. */
 export async function removeMember(formData: FormData): Promise<void> {
-  const { admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
 
   const membershipId = z.string().uuid().safeParse(String(formData.get('membership_id') ?? ''));
   if (!membershipId.success) return;
 
-  const { data: membership } = await admin
-    .from('memberships').select('id, org_id').eq('id', membershipId.data).maybeSingle();
-  if (!membership) return;
-  if (!(await isActiveOrganisation(admin, membership.org_id))) return;
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: 'platform_admin.remove_member_requested',
-    p_org_id: membership.org_id,
-    p_subject_type: 'membership',
-    p_subject_id: membership.id,
+  const { data: orgId, error } = await user.rpc('remove_organisation_member', {
+    p_membership_id: membershipId.data,
   });
-  if (auditError) return;
-
-  const { error } = await admin.from('memberships').delete().eq('id', membership.id);
   if (error) return;
-
-  revalidateOrganisation(membership.org_id);
+  if (orgId) revalidateOrganisation(orgId);
 }
