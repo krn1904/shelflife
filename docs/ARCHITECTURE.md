@@ -131,7 +131,8 @@ product rests on — treat a failure here as a release blocker, not a flaky test
 ## Organisation lifecycle
 
 `orgs.status` is `active` or `archived`. Platform admins provision an organisation together with
-its first site and owner, then manage it at `/admin/organisations/[orgId]`.
+its first site and owner, then manage it at `/admin/organisations/[orgId]`. The complete operator
+workflow is documented in [PLATFORM-ADMIN.md](PLATFORM-ADMIN.md).
 
 Archival is deliberately reversible: operational rows and auth users remain intact, while
 `auth_org_ids()`, `auth_site_ids()` and role checks stop returning access for organisation

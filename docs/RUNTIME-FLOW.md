@@ -14,7 +14,7 @@ How the app works end-to-end, one line per step. For the code-level map see
 9. **Record waste** — scan-to-waste with qty + reason code; unit cost turns it into dollars written off.
 10. **Offline** — waste/tick writes queue in the Dexie outbox with a UUID idempotency key, replayed oldest-first on reconnect (intake is *not* queued).
 11. **Managers/owners view** — expiry board, waste analytics, multi-site rollup, CSV export — all reading RLS-scoped data.
-12. **Admin operates the platform** — creates organisations with their first site and owner, archives/restores organisations, and monitors catalogue and `job_runs` health. Archived organisations retain their records but lose member access, jobs and notifications.
+12. **Admin operates the platform** — creates organisations with their first site and owner, manages members and temporary password resets, archives/restores organisations, and monitors catalogue and `job_runs` health. Archived organisations retain their records but lose member access, jobs and notifications.
 
 ## The four portals
 

@@ -3,8 +3,10 @@
 import { useActionState, useState } from 'react';
 import {
   addPerson,
+  resetMemberPassword,
   updateMemberRole,
   removeMember,
+  type PasswordResetState,
   type PersonFormState,
 } from '@/lib/admin/actions';
 import type { AppRole } from '@/lib/supabase/types';
@@ -116,6 +118,49 @@ function RoleEditor({ person, sites }: { person: Person; sites: SiteOption[] }) 
         <input type="hidden" name="membership_id" value={person.membershipId} />
         <button type="submit" className="btn btn-danger">Remove</button>
       </form>
+      <ResetPasswordForm person={person} />
+    </div>
+  );
+}
+
+function ResetPasswordForm({ person }: { person: Person }) {
+  const [state, formAction, pending] = useActionState<PasswordResetState, FormData>(
+    resetMemberPassword,
+    { status: 'idle' },
+  );
+
+  return (
+    <div className="basis-full">
+      <form
+        action={formAction}
+        onSubmit={(event) => {
+          if (!confirm(`Reset the password for ${person.fullName || person.email}? Their current password will stop working.`)) {
+            event.preventDefault();
+          }
+        }}
+      >
+        <input type="hidden" name="membership_id" value={person.membershipId} />
+        <button type="submit" disabled={pending} className="btn btn-outline">
+          {pending ? 'Resetting…' : 'Reset password'}
+        </button>
+      </form>
+
+      {state.status === 'error' && (
+        <p className="mt-2 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+          {state.message}
+        </p>
+      )}
+      {state.status === 'reset' && (
+        <p className="mt-2 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+          New temporary password for <strong>{state.email}</strong> (shown once):{' '}
+          <code className="rounded bg-surface px-1 font-mono text-ink">{state.tempPassword}</code>
+          {state.auditWarning && (
+            <span className="mt-1 block text-critical">
+              The password changed, but the audit entry failed. Contact support.
+            </span>
+          )}
+        </p>
+      )}
     </div>
   );
 }

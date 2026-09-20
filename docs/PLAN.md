@@ -177,6 +177,7 @@ can show run history.
 
 **Platform admin**
 - Create an organisation with its first site and owner; archive/restore organisations
+- Manage organisation members and issue audit-logged temporary password resets
 - Global catalogue moderation and `job_runs` history
 - Archival blocks organisation members and pauses jobs/notifications without deleting records
 

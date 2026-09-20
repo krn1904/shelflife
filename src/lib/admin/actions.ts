@@ -532,6 +532,58 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
     : { status: 'linked', email };
 }
 
+export type PasswordResetState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  | { status: 'reset'; email: string; tempPassword: string; auditWarning: boolean };
+
+export async function resetMemberPassword(
+  _prev: PasswordResetState,
+  formData: FormData,
+): Promise<PasswordResetState> {
+  const { admin, user } = await requireAdmin();
+  const membershipId = z.string().uuid().safeParse(String(formData.get('membership_id') ?? ''));
+  if (!membershipId.success) return { status: 'error', message: 'That membership was not valid.' };
+
+  const { data: membership } = await admin
+    .from('memberships')
+    .select('id, user_id, org_id')
+    .eq('id', membershipId.data)
+    .maybeSingle();
+  if (!membership) return { status: 'error', message: 'That person is no longer a member.' };
+  if (!(await isActiveOrganisation(admin, membership.org_id))) {
+    return { status: 'error', message: 'Passwords cannot be reset for an archived organisation.' };
+  }
+
+  const password = tempPassword();
+  const { data, error } = await admin.auth.admin.updateUserById(
+    membership.user_id,
+    { password },
+  );
+  if (error || !data.user) {
+    return {
+      status: 'error',
+      message: `Could not reset the password: ${error?.message ?? 'unknown error'}`,
+    };
+  }
+
+  const { error: auditError } = await user.rpc('write_audit', {
+    p_action: 'platform_admin.reset_password',
+    p_org_id: membership.org_id,
+    p_subject_type: 'membership',
+    p_subject_id: membership.id,
+    p_detail: { email: data.user.email ?? null },
+  });
+
+  revalidateOrganisation(membership.org_id);
+  return {
+    status: 'reset',
+    email: data.user.email ?? 'the member',
+    tempPassword: password,
+    auditWarning: Boolean(auditError),
+  };
+}
+
 const UpdateRole = z.object({
   membership_id: z.string().uuid(),
   role,

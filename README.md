@@ -33,6 +33,8 @@ temperature/compliance logging and fuel wet-stock reconciliation are designed fo
 
 See [docs/PLAN.md](docs/PLAN.md) for the full build plan, and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a developer's map of the codebase.
+Platform operations are documented in
+[docs/PLATFORM-ADMIN.md](docs/PLATFORM-ADMIN.md).
 
 ## Stack
 
