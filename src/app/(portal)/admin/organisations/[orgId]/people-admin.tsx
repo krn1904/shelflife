@@ -59,7 +59,7 @@ export function PeopleAdmin({
         ))}
         {people.length === 0 && (
           <li className="px-4 py-6 text-center text-sm text-muted">
-            No one has access to this tenant yet. Add the first person below.
+            No one has access to this organisation yet. Add the first person below.
           </li>
         )}
       </ul>
@@ -110,7 +110,7 @@ function RoleEditor({ person, sites }: { person: Person; sites: SiteOption[] }) 
       <form
         action={removeMember}
         onSubmit={(e) => {
-          if (!confirm(`Remove ${person.fullName || person.email} from this tenant?`)) e.preventDefault();
+          if (!confirm(`Remove ${person.fullName || person.email} from this organisation?`)) e.preventDefault();
         }}
       >
         <input type="hidden" name="membership_id" value={person.membershipId} />
@@ -131,7 +131,7 @@ function AddPersonForm({ orgId, sites }: { orgId: string; sites: SiteOption[] })
     <form action={formAction} className="rounded-xl border border-line bg-surface-2 p-4">
       <h3 className="text-sm font-semibold">Add a person</h3>
       <p className="mt-1 text-xs text-muted">
-        Creates a login if the email is new, or links an existing account to this tenant.
+        Creates a login if the email is new, or links an existing account to this organisation.
       </p>
       <input type="hidden" name="org_id" value={orgId} />
 
@@ -183,7 +183,7 @@ function AddPersonForm({ orgId, sites }: { orgId: string; sites: SiteOption[] })
       )}
       {state.status === 'linked' && (
         <p className="mt-3 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
-          Linked existing account <strong>{state.email}</strong> to this tenant. Their password is unchanged.
+          Linked existing account <strong>{state.email}</strong> to this organisation. Their password is unchanged.
         </p>
       )}
 

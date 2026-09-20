@@ -6,14 +6,8 @@ import { createAdminClient } from '@/lib/supabase/admin';
 import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle } from '@/components/ui';
 import { formatAud } from '@/lib/charts/tokens';
-import {
-  SiteAdmin,
-  type ManagedSite,
-} from '@/app/(portal)/admin/tenants/[orgId]/site-admin';
-import {
-  PeopleAdmin,
-  type Person,
-} from '@/app/(portal)/admin/tenants/[orgId]/people-admin';
+import { SiteAdmin, type ManagedSite } from './site-admin';
+import { PeopleAdmin, type Person } from './people-admin';
 import { OrganisationLifecycleAdmin } from './lifecycle-admin';
 
 const AUDIT_LIMIT = 20;
