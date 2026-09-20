@@ -225,6 +225,93 @@ async function main() {
       `got ${JSON.stringify(own?.map((m) => m.role))}`);
   }
 
+  console.log('\norganisation lifecycle:');
+  {
+    const platform = await signIn('admin@shelflife.test');
+    const { data: visible } = await platform.from('orgs').select('id, status');
+    check('platform admin sees every organisation',
+      visible?.length === orgs!.length, `got ${visible?.length}`);
+
+    const { data: ownerMutation } = await other
+      .from('orgs')
+      .update({
+        status: 'archived',
+        archived_at: new Date().toISOString(),
+        archived_by: (await other.auth.getUser()).data.user!.id,
+      })
+      .eq('id', bayside.id)
+      .select('id');
+    check('owner cannot change organisation lifecycle',
+      (ownerMutation?.length ?? 0) === 0, `updated ${ownerMutation?.length} rows`);
+
+    const { data: deleted } = await platform
+      .from('orgs')
+      .delete()
+      .eq('id', bayside.id)
+      .select('id');
+    check('platform admin cannot hard-delete an organisation',
+      (deleted?.length ?? 0) === 0, `deleted ${deleted?.length} rows`);
+
+    const { data: { user: platformUser } } = await platform.auth.getUser();
+    const { error: archiveError } = await platform
+      .from('orgs')
+      .update({
+        status: 'archived',
+        archived_at: new Date().toISOString(),
+        archived_by: platformUser!.id,
+      })
+      .eq('id', bayside.id);
+    check('platform admin can archive an organisation', archiveError === null,
+      archiveError?.message ?? '');
+
+    const [
+      { data: archivedOrg },
+      { data: archivedSites },
+      { data: archivedMemberships },
+      { data: archivedProducts },
+    ] =
+      await Promise.all([
+        other.from('orgs').select('id'),
+        other.from('sites').select('id'),
+        other.from('memberships').select('id'),
+        other.from('products').select('id'),
+      ]);
+    check('archived organisation is hidden from its owner', archivedOrg?.length === 0,
+      `got ${archivedOrg?.length} orgs`);
+    check('archived sites are hidden from its owner', archivedSites?.length === 0,
+      `got ${archivedSites?.length} sites`);
+    check('archived memberships are hidden from its owner', archivedMemberships?.length === 0,
+      `got ${archivedMemberships?.length} memberships`);
+    check('archived owner cannot read the shared catalogue', archivedProducts?.length === 0,
+      `got ${archivedProducts?.length} products`);
+
+    const { error: archivedProductWrite } = await other
+      .from('products')
+      .insert({ name: 'Archived account write', tracking_mode: 'none' });
+    check('archived owner cannot add to the shared catalogue', archivedProductWrite !== null,
+      archivedProductWrite ? '' : 'insert unexpectedly succeeded');
+
+    const { data: adminView } = await platform
+      .from('orgs')
+      .select('status')
+      .eq('id', bayside.id)
+      .single();
+    check('platform admin can inspect an archived organisation',
+      adminView?.status === 'archived', `got ${adminView?.status}`);
+
+    const { error: restoreError } = await platform
+      .from('orgs')
+      .update({ status: 'active', archived_at: null, archived_by: null })
+      .eq('id', bayside.id);
+    check('platform admin can restore an organisation', restoreError === null,
+      restoreError?.message ?? '');
+
+    const { data: restored } = await other.from('orgs').select('id');
+    check('owner access returns after restore',
+      restored?.length === 1 && restored[0].id === bayside.id,
+      `got ${restored?.length} orgs`);
+  }
+
   console.log('\nanonymous (no session):');
   {
     const anon = createClient<Database>(URL, ANON);

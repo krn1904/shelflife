@@ -891,6 +891,7 @@ export type Database = {
         Args: { org: string; roles: Database["public"]["Enums"]["app_role"][] }
         Returns: boolean
       }
+      has_active_membership: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       record_waste: {
         Args: {
