@@ -915,6 +915,10 @@ export type Database = {
         Args: { org: string; roles: Database["public"]["Enums"]["app_role"][] }
         Returns: boolean
       }
+      insert_active_expiry_actions: {
+        Args: { p_actions: Json }
+        Returns: number
+      }
       has_active_membership: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       record_waste: {
@@ -954,6 +958,10 @@ export type Database = {
           p_site_id: string | null
         }
         Returns: string
+      }
+      upsert_active_rotation_checks: {
+        Args: { p_checks: Json }
+        Returns: number
       }
       remove_empty_site: {
         Args: { p_site_id: string }

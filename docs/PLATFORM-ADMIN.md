@@ -74,7 +74,15 @@ transaction. Database triggers serialize site and membership changes against arc
 Site and membership removal use locked, audited RPCs so normal deletes cannot race an archive;
 cascade deletion remains available for explicit break-glass maintenance.
 Site creation and membership creation/role changes use the same transactional RPC pattern, so
-platform admins cannot bypass audit through direct PostgREST writes.
+platform admins cannot bypass audit through direct PostgREST writes. Organisation owners keep
+direct insert/update (and membership delete) policies for their own organisation; those paths
+cannot be used by a platform admin.
+Expiry-engine rebuilds and rotation-check upserts lock each organisation and skip rows whose
+organisation is no longer active, so an archive that commits after the job's snapshot cannot
+still insert work. The daily digest rechecks organisation status immediately before dispatch
+and matches subscriptions by organisation, not site id alone. Owners keep organisation-
+scoped insert/update policies for sites and memberships; those policies use `has_org_role(...,
+owner)` rather than `can_manage_org`, so they do not reopen a direct platform-admin write path.
 
 ## Implementation map
 
@@ -91,7 +99,13 @@ platform admins cannot bypass audit through direct PostgREST writes.
   - `supabase/migrations/20260920000005_review_followup.sql`
   - `supabase/migrations/20260920000006_audited_admin_writes.sql`
   - `supabase/migrations/20260920000007_atomic_organisation_provisioning.sql`
+  - `supabase/migrations/20260920000008_review_scope_and_job_guards.sql`
 - Background-job lifecycle filters: `supabase/functions/expiry-engine/index.ts`,
   `supabase/functions/daily-digest/index.ts` (both page all active data rather than relying on
-  PostgREST's 1,000-row default response limit)
+  PostgREST's 1,000-row default response limit). The expiry engine writes actions and rotation
+  checks through RPCs that lock each organisation and skip archived rows; the digest rechecks
+  organisation status immediately before dispatch and only delivers subscriptions whose
+  `org_id` matches the site being processed.
+- Owners retain direct insert/update policies for sites and memberships in their own
+  organisation. Platform-admin child writes still go through the audited RPCs.
 - RLS verification: `scripts/test-rls.ts`

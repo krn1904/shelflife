@@ -104,19 +104,22 @@ Deno.serve(async (request: Request) => {
 
     if (planned.length > 0) {
       for (const page of chunks(planned)) {
-        const { error: insertError } = await supabase.from('expiry_actions').insert(
-          page.map((p) => ({
-          org_id: p.orgId,
-          site_id: p.siteId,
-          batch_id: p.batchId,
-          action: p.action,
-          due_date: p.dueDate,
-          })),
+        const { data: inserted, error: insertError } = await supabase.rpc(
+          'insert_active_expiry_actions',
+          {
+            p_actions: page.map((p) => ({
+              org_id: p.orgId,
+              site_id: p.siteId,
+              batch_id: p.batchId,
+              action: p.action,
+              due_date: p.dueDate,
+            })),
+          },
         );
         if (insertError) throw insertError;
+        result.processed += Number(inserted ?? 0);
       }
     }
-    result.processed = planned.length;
 
     // Rotation stock carries no dates, so its whole mechanism is the daily fixture list.
     const ranged = await fetchAllPages<{
@@ -152,16 +155,16 @@ Deno.serve(async (request: Request) => {
     if (checks.length > 0) {
       // Upsert, not insert: a re-run on the same day must not wipe the ticks staff have
       // already made, and the unique index on (site_id, fixture, check_date) enforces it.
+      // The RPC also locks each organisation and skips rows whose org is no longer active.
       for (const page of chunks(checks)) {
-        const { error: checkError } = await supabase.from('rotation_checks').upsert(
-          page.map((c) => ({
+        const { error: checkError } = await supabase.rpc('upsert_active_rotation_checks', {
+          p_checks: page.map((c) => ({
             org_id: c.orgId,
             site_id: c.siteId,
             fixture: c.fixture,
             check_date: c.checkDate,
           })),
-          { onConflict: 'site_id,fixture,check_date', ignoreDuplicates: true },
-        );
+        });
         if (checkError) throw checkError;
       }
     }

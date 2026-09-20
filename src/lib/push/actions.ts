@@ -2,7 +2,7 @@
 
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { activeSite, requireSession } from '@/lib/auth/session';
+import { activeSite, requireSession, roleAtLeast } from '@/lib/auth/session';
 
 export type PushResult = { status: 'idle' } | { status: 'error'; message: string };
 
@@ -30,12 +30,17 @@ export async function savePushSubscription(input: unknown): Promise<PushResult> 
   const org = session.memberships[0];
   if (!org) return { status: 'error', message: 'You are not attached to an organisation.' };
 
+  const orgWide = roleAtLeast(org.role, 'owner');
+  if (!orgWide && !site) {
+    return { status: 'error', message: 'You are not attached to a site.' };
+  }
+
   const supabase = await createClient();
   const { error } = await supabase.from('push_subscriptions').upsert(
     {
       user_id: session.userId,
       org_id: org.orgId,
-      site_id: site?.id ?? null,
+      site_id: orgWide ? (site?.id ?? null) : site!.id,
       endpoint: parsed.data.endpoint,
       p256dh: parsed.data.p256dh,
       auth: parsed.data.auth,

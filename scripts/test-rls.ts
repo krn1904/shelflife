@@ -99,6 +99,59 @@ async function main() {
       .update({ name: 'Hijacked' }).eq('id', bayside.id).select();
     check('cannot update another org', (updated?.length ?? 0) === 0,
       `updated ${updated?.length} rows`);
+
+    const { data: createdSite, error: ownerSiteInsert } = await owner
+      .from('sites')
+      .insert({ org_id: northside.id, name: `Owner site ${Date.now()}` })
+      .select('id')
+      .single();
+    check('owner can create a site in their organisation',
+      ownerSiteInsert === null && Boolean(createdSite?.id),
+      ownerSiteInsert?.message ?? '');
+
+    const { data: renamedSite } = await owner
+      .from('sites')
+      .update({ name: `Owner site renamed ${Date.now()}` })
+      .eq('id', createdSite!.id)
+      .select('id');
+    check('owner can update a site in their organisation',
+      (renamedSite?.length ?? 0) === 1, `updated ${renamedSite?.length} sites`);
+
+    const { data: { user: staffUser } } = await staff.auth.getUser();
+    const staffSiteId = (await staff.from('sites').select('id').single()).data?.id;
+    const extraSite = (await owner.from('sites').select('id').neq('id', staffSiteId!)).data?.[0];
+    const { data: ownerMembership, error: ownerMembershipError } = await owner
+      .from('memberships')
+      .insert({
+        user_id: staffUser!.id,
+        org_id: northside.id,
+        site_id: extraSite!.id,
+        role: 'staff',
+      })
+      .select('id')
+      .single();
+    check('owner can add a membership in their organisation',
+      ownerMembershipError === null && Boolean(ownerMembership?.id),
+      ownerMembershipError?.message ?? '');
+
+    const { data: ownerMembershipUpdate } = await owner
+      .from('memberships')
+      .update({ role: 'manager' })
+      .eq('id', ownerMembership!.id)
+      .select('id');
+    check('owner can update a membership in their organisation',
+      (ownerMembershipUpdate?.length ?? 0) === 1,
+      `updated ${ownerMembershipUpdate?.length} memberships`);
+
+    const { data: ownerMembershipDelete } = await owner
+      .from('memberships')
+      .delete()
+      .eq('id', ownerMembership!.id)
+      .select('id');
+    check('owner can remove a membership in their organisation',
+      (ownerMembershipDelete?.length ?? 0) === 1,
+      `deleted ${ownerMembershipDelete?.length} memberships`);
+    await admin.from('sites').delete().eq('id', createdSite!.id);
   }
 
   console.log('\nbayside owner (the other tenant):');
@@ -309,6 +362,87 @@ async function main() {
     check('hard delete can cascade through sites and memberships',
       cascadeDeleteError === null, cascadeDeleteError?.message ?? '');
 
+    const jobSlug = `job-guard-${Date.now()}`;
+    const { data: jobOrg } = await admin
+      .from('orgs')
+      .insert({ name: 'Job guard', slug: jobSlug })
+      .select('id')
+      .single();
+    const { data: jobSite } = await admin
+      .from('sites')
+      .insert({ org_id: jobOrg!.id, name: 'Job site' })
+      .select('id')
+      .single();
+    const { data: jobProduct } = await admin.from('products').select('id').limit(1).single();
+    const { data: jobBatch } = await admin
+      .from('stock_batches')
+      .insert({
+        org_id: jobOrg!.id,
+        site_id: jobSite!.id,
+        product_id: jobProduct!.id,
+        qty_received: 1,
+        qty_remaining: 1,
+        expiry_date: '2099-01-01',
+      })
+      .select('id')
+      .single();
+    const { error: archiveJobOrg } = await platform.rpc('archive_organisation', {
+      p_org_id: jobOrg!.id,
+      p_confirm_slug: jobSlug,
+    });
+    check('job-guard organisation can be archived before engine writes',
+      archiveJobOrg === null, archiveJobOrg?.message ?? '');
+
+    const { data: insertedActions, error: archivedActionError } = await admin.rpc(
+      'insert_active_expiry_actions',
+      {
+        p_actions: [{
+          org_id: jobOrg!.id,
+          site_id: jobSite!.id,
+          batch_id: jobBatch!.id,
+          action: 'check',
+          due_date: '2099-01-01',
+        }],
+      },
+    );
+    check('expiry-action job RPC skips archived organisations',
+      archivedActionError === null && Number(insertedActions) === 0,
+      `inserted ${insertedActions}; ${archivedActionError?.message ?? ''}`);
+    const { data: leakedActions } = await admin
+      .from('expiry_actions')
+      .select('id')
+      .eq('org_id', jobOrg!.id);
+    check('no expiry actions exist for the archived organisation',
+      leakedActions?.length === 0, `got ${leakedActions?.length}`);
+
+    const { data: insertedChecks, error: archivedCheckError } = await admin.rpc(
+      'upsert_active_rotation_checks',
+      {
+        p_checks: [{
+          org_id: jobOrg!.id,
+          site_id: jobSite!.id,
+          fixture: 'cold-room',
+          check_date: '2099-01-01',
+        }],
+      },
+    );
+    check('rotation-check job RPC skips archived organisations',
+      archivedCheckError === null && Number(insertedChecks) === 0,
+      `inserted ${insertedChecks}; ${archivedCheckError?.message ?? ''}`);
+    const { data: leakedChecks } = await admin
+      .from('rotation_checks')
+      .select('id')
+      .eq('org_id', jobOrg!.id);
+    check('no rotation checks exist for the archived organisation',
+      leakedChecks?.length === 0, `got ${leakedChecks?.length}`);
+
+    const { error: platformJobWrite } = await platform.rpc('insert_active_expiry_actions', {
+      p_actions: [],
+    });
+    check('platform admin cannot call the service-role expiry-action writer',
+      platformJobWrite !== null, platformJobWrite ? '' : 'rpc unexpectedly succeeded');
+    await admin.from('orgs').delete().eq('id', jobOrg!.id);
+
     const { data: baysideSite } = await admin
       .from('sites')
       .select('id')
@@ -447,6 +581,60 @@ async function main() {
       .single();
     check('owner can create a subscription in an active organisation',
       subscriptionError === null, subscriptionError?.message ?? '');
+
+    const { data: orgWideSubscription, error: orgWideSubscriptionError } = await other
+      .from('push_subscriptions')
+      .insert({
+        user_id: otherUser!.id,
+        org_id: bayside.id,
+        site_id: null,
+        endpoint: `${endpoint}/org-wide`,
+        p256dh: 'test-p256dh',
+        auth: 'test-auth',
+      })
+      .select('id')
+      .single();
+    check('owner can create an organisation-wide subscription',
+      orgWideSubscriptionError === null, orgWideSubscriptionError?.message ?? '');
+    await other.from('push_subscriptions').delete().eq('id', orgWideSubscription!.id);
+
+    const { data: { user: staffUserForPush } } = await staff.auth.getUser();
+    const { data: staffSite } = await staff.from('sites').select('id').single();
+    const { error: staffOrgWide } = await staff.from('push_subscriptions').insert({
+      user_id: staffUserForPush!.id,
+      org_id: northside.id,
+      site_id: null,
+      endpoint: `${endpoint}/staff-org-wide`,
+      p256dh: 'test-p256dh',
+      auth: 'test-auth',
+    });
+    check('staff cannot create an organisation-wide subscription',
+      staffOrgWide !== null, staffOrgWide ? '' : 'insert unexpectedly succeeded');
+
+    const { data: staffSubscription, error: staffSubscriptionError } = await staff
+      .from('push_subscriptions')
+      .insert({
+        user_id: staffUserForPush!.id,
+        org_id: northside.id,
+        site_id: staffSite!.id,
+        endpoint: `${endpoint}/staff-site`,
+        p256dh: 'test-p256dh',
+        auth: 'test-auth',
+      })
+      .select('id')
+      .single();
+    check('staff can create a site-scoped subscription',
+      staffSubscriptionError === null, staffSubscriptionError?.message ?? '');
+
+    const { data: staffOrgWideUpdate } = await staff
+      .from('push_subscriptions')
+      .update({ site_id: null })
+      .eq('id', staffSubscription!.id)
+      .select('id');
+    check('staff cannot retarget a subscription to the whole organisation',
+      (staffOrgWideUpdate?.length ?? 0) === 0,
+      `updated ${staffOrgWideUpdate?.length} subscriptions`);
+    await staff.from('push_subscriptions').delete().eq('id', staffSubscription!.id);
 
     const { data: crossOrgUpdate } = await other
       .from('push_subscriptions')

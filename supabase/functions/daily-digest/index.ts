@@ -8,7 +8,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import webpush from 'web-push';
-import { buildDigest } from '../_shared/digest.ts';
+import { buildDigest, subscriptionTargetsSite } from '../_shared/digest.ts';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobResult } from '../_shared/engine.ts';
 import { fetchAllPages } from '../_shared/pagination.ts';
@@ -118,11 +118,24 @@ Deno.serve(async (request: Request) => {
         continue;
       }
 
+      // Recheck immediately before dispatch: the earlier pages are a snapshot, and an
+      // archive that committed after they were fetched must still cancel delivery.
+      const { data: liveOrg, error: liveOrgError } = await supabase
+        .from('orgs')
+        .select('status')
+        .eq('id', site.org_id)
+        .maybeSingle();
+      if (liveOrgError) throw liveOrgError;
+      if (liveOrg?.status !== 'active') {
+        result.skipped += 1;
+        continue;
+      }
+
       // A subscription with a null site_id belongs to someone who sees the whole org —
-      // an owner — so they get every site's digest.
-      const targets = subscriptions.filter(
-        (s) => s.site_id === site.id || (s.site_id === null && s.org_id === site.org_id),
-      );
+      // an owner — so they get every site's digest. Site-scoped rows must also share
+      // this site's organisation; matching by site id alone would follow a cross-org
+      // break-glass row.
+      const targets = subscriptions.filter((s) => subscriptionTargetsSite(s, site));
 
       for (const target of targets) {
         try {

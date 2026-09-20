@@ -150,7 +150,9 @@ A second function at 06:00 sends the digest: Web Push to on-shift manager, email
 
 Both functions return a typed result (`{ processed, skipped, reason }`) written to a
 `job_runs` table so failures are legible rather than silent, and the platform-admin portal
-can show run history.
+can show run history. Archiving an organisation pauses both jobs: engine writes lock and
+recheck each organisation so they cannot insert into an organisation that archived after
+the snapshot, and the digest rechecks status immediately before dispatch.
 
 ---
 

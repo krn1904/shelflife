@@ -74,7 +74,8 @@ database, and is the gate that matters — it is the security claim the product 
 `supabase/functions/expiry-engine` runs nightly at 02:00 Australia/Melbourne. It deletes
 every open `expiry_actions` row and regenerates them from the current batches — a full
 recompute over a few thousand rows takes milliseconds and is always correct, so there is
-no incremental diffing to get wrong. It also creates the day's rotation checks.
+no incremental diffing to get wrong. It also creates the day's rotation checks. Both writes
+lock each organisation and skip any that have been archived since the job's snapshot.
 
 The function is a thin wrapper. Every rule it applies lives in `src/lib/expiry/engine.ts`
 as plain TypeScript covered by `npm test`, so the logic is testable even though the
@@ -99,7 +100,8 @@ when the engine has not reported in for 36 hours.
 ### The morning digest
 
 `supabase/functions/daily-digest` runs at 06:00 and pushes each site's list to whoever
-has notifications on for that site. A day with nothing outstanding sends nothing — a
+has notifications on for that organisation and site. Delivery is cancelled if the
+organisation is no longer active. A day with nothing outstanding sends nothing — a
 daily "all clear" is how people learn to swipe the notification away unread.
 
 ```bash

@@ -138,9 +138,14 @@ Archival is deliberately reversible: operational rows and auth users remain inta
 `auth_org_ids()`, `auth_site_ids()` and role checks stop returning access for organisation
 members. `is_platform_admin()` remains independent of organisation status so the platform can
 inspect and restore archived organisations. The service-role Edge Functions bypass RLS, so both
-the expiry engine and daily digest explicitly query active organisation IDs. Normal application
-users have no `DELETE` policy on `orgs`; permanent deletion is break-glass maintenance, not a UI
-operation.
+the expiry engine and daily digest explicitly query active organisation IDs, then recheck that
+status at write/dispatch time: expiry actions and rotation checks go through RPCs that lock each
+organisation and skip archived rows, and the digest cancels delivery if an organisation is no
+longer active. Site-scoped push delivery also requires the subscription's `org_id` to match the
+site. Owners can still insert and update sites and memberships in their own organisation; those
+policies are owner-scoped, so platform admins cannot use them to bypass the audited RPCs.
+Normal application users have no `DELETE` policy on `orgs`; permanent deletion is break-glass
+maintenance, not a UI operation.
 
 ---
 
@@ -172,9 +177,10 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
   state = 'open'`.
 - `planRotationChecks(fixtures, today)` emits one check per fixture per site per day.
 - The wrapper is thin: authenticate the cron call (`x-cron-secret`, else 403), scope to active
-  organisations, read active batches, **delete their `open` `expiry_actions` and re-insert** (full recompute — correct by
+  organisations, read active batches, **delete their `open` `expiry_actions` and re-insert** through
+  RPCs that lock each organisation and skip any that have been archived since the snapshot (full recompute — correct by
   construction, no incremental diffing to get wrong; done/dismissed rows are history and stay),
-  then upsert rotation checks (`ignoreDuplicates`, so a same-day re-run never wipes staff ticks).
+  then upsert rotation checks the same way (`ignoreDuplicates`, so a same-day re-run never wipes staff ticks).
 - "Today" is computed in `Australia/Melbourne`, not UTC — a 02:00 Melbourne run is still
   yesterday in UTC and the whole ladder would shift by a day.
 - **Every run writes a `job_runs` row, success or failure.** A silently-stopped cron is the
@@ -182,9 +188,11 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
   that has not reported in 36 hours.
 
 The 06:00 [daily-digest](../supabase/functions/daily-digest/index.ts) shares the same shape:
-authenticate, scope to active organisations, build per-site summary text via `_shared/digest.ts`, Web Push to live
-subscriptions (pruning 404/410 dead ones), email the owner. A site with nothing outstanding
-sends nothing.
+authenticate, scope to active organisations, build per-site summary text via `_shared/digest.ts`,
+Web Push to live subscriptions whose `org_id` matches the site (pruning 404/410 dead ones), and
+cancel delivery if the organisation is no longer active at dispatch time. Email the owner. A site
+with nothing outstanding sends nothing. Organisation-wide (null `site_id`) subscriptions are
+restricted to owners and platform admins.
 
 ---
 
