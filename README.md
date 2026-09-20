@@ -31,7 +31,8 @@ and confirm a proposed expiry date — one date per SKU line, covering every box
 In development. MVP scope is delivery intake plus the expiry engine. Invoice reconciliation,
 temperature/compliance logging and fuel wet-stock reconciliation are designed for but not built.
 
-See [docs/PLAN.md](docs/PLAN.md) for the full build plan.
+See [docs/PLAN.md](docs/PLAN.md) for the full build plan, and
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a developer's map of the codebase.
 
 ## Stack
 
