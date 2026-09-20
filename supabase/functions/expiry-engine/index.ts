@@ -56,9 +56,21 @@ Deno.serve(async (request: Request) => {
   try {
     const today = todayAt(SITE_TIMEZONE);
 
+    // Service-role clients bypass RLS, so lifecycle scope must be explicit here.
+    const { data: activeOrgs, error: orgError } = await supabase
+      .from('orgs')
+      .select('id')
+      .eq('status', 'active');
+    if (orgError) throw orgError;
+    const activeOrgIds = (activeOrgs ?? []).map((org) => org.id);
+    const scopedOrgIds = activeOrgIds.length > 0
+      ? activeOrgIds
+      : ['00000000-0000-0000-0000-000000000000'];
+
     const { data: batches, error: batchError } = await supabase
       .from('stock_batches')
       .select('id, org_id, site_id, expiry_date')
+      .in('org_id', scopedOrgIds)
       .eq('status', 'active')
       .gt('qty_remaining', 0)
       .not('expiry_date', 'is', null);
@@ -81,6 +93,7 @@ Deno.serve(async (request: Request) => {
     const { error: clearError } = await supabase
       .from('expiry_actions')
       .delete()
+      .in('org_id', scopedOrgIds)
       .eq('state', 'open');
     if (clearError) throw clearError;
 
@@ -102,6 +115,7 @@ Deno.serve(async (request: Request) => {
     const { data: ranged, error: rangedError } = await supabase
       .from('site_products')
       .select('org_id, site_id, fixture, tracking_mode_override, products(tracking_mode)')
+      .in('org_id', scopedOrgIds)
       .eq('active', true)
       .not('fixture', 'is', null);
     if (rangedError) throw rangedError;

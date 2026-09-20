@@ -360,27 +360,36 @@ export type Database = {
       }
       orgs: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           created_at: string
           id: string
           is_demo: boolean
           name: string
           slug: string
+          status: Database["public"]["Enums"]["org_status"]
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           id?: string
           is_demo?: boolean
           name: string
           slug: string
+          status?: Database["public"]["Enums"]["org_status"]
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           id?: string
           is_demo?: boolean
           name?: string
           slug?: string
+          status?: Database["public"]["Enums"]["org_status"]
           updated_at?: string
         }
         Relationships: []
@@ -913,6 +922,7 @@ export type Database = {
       delivery_status: "draft" | "closed"
       expiry_action_kind: "check" | "markdown" | "pull"
       expiry_source: "predicted" | "confirmed" | "manual"
+      org_status: "active" | "archived"
       tracking_mode: "rotation" | "batch" | "none"
       waste_reason:
         | "expired"
@@ -1057,6 +1067,7 @@ export const Constants = {
       delivery_status: ["draft", "closed"],
       expiry_action_kind: ["check", "markdown", "pull"],
       expiry_source: ["predicted", "confirmed", "manual"],
+      org_status: ["active", "archived"],
       tracking_mode: ["rotation", "batch", "none"],
       waste_reason: [
         "expired",

@@ -50,18 +50,36 @@ Deno.serve(async (request: Request) => {
 
     const today = todayAt(SITE_TIMEZONE);
 
+    // The service role bypasses lifecycle-aware RLS, so archived organisations must be
+    // excluded explicitly before any notification targets are assembled.
+    const { data: activeOrgs, error: orgError } = await supabase
+      .from('orgs')
+      .select('id')
+      .eq('status', 'active');
+    if (orgError) throw orgError;
+    const activeOrgIds = (activeOrgs ?? []).map((org) => org.id);
+    const scopedOrgIds = activeOrgIds.length > 0
+      ? activeOrgIds
+      : ['00000000-0000-0000-0000-000000000000'];
+
     const [{ data: sites }, { data: actions }, { data: checks }, { data: subscriptions }] =
       await Promise.all([
-        supabase.from('sites').select('id, org_id, name'),
-        supabase.from('expiry_actions').select('site_id, action, due_date').eq('state', 'open'),
+        supabase.from('sites').select('id, org_id, name').in('org_id', scopedOrgIds),
+        supabase
+          .from('expiry_actions')
+          .select('site_id, action, due_date')
+          .in('org_id', scopedOrgIds)
+          .eq('state', 'open'),
         supabase
           .from('rotation_checks')
           .select('site_id')
+          .in('org_id', scopedOrgIds)
           .eq('check_date', today)
           .eq('state', 'open'),
         supabase
           .from('push_subscriptions')
           .select('id, endpoint, p256dh, auth, site_id, org_id')
+          .in('org_id', scopedOrgIds)
           .is('failed_at', null),
       ]);
 
