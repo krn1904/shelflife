@@ -75,7 +75,7 @@ genuinely the fastest way to identify it.
 
 - **Next.js 15** (App Router) + TypeScript strict, Tailwind + shadcn/ui
 - **Supabase** — Postgres, Auth, Realtime, Storage (docket photos), Edge Functions (cron jobs)
-- **Tenant isolation via RLS** on every table, keyed by `org_id`
+- **Organisation isolation via RLS** on every table, keyed by `org_id`
 - **Barcode scanning:** native `BarcodeDetector` API where available, `@zxing/browser` WASM fallback
 - **Offline:** service worker + Dexie (IndexedDB) outbox, client-generated UUIDs, idempotent upserts
 - **Notifications:** Web Push (VAPID) via Edge Function + Resend for email digests
@@ -99,7 +99,7 @@ ends. Before any code is written, the project must live in a real folder Karan c
 
 Core tables (all with `org_id`, `created_at`, RLS enabled):
 
-- `orgs` — tenant (a servo or a franchise group)
+- `orgs` — organisation (a servo or a franchise group), with an active/archived lifecycle
 - `sites` — individual store; `org_id`
 - `memberships` — `user_id`, `org_id`, `site_id` (nullable = all sites), `role`
 - `suppliers` — per-org, seeded with AU names (Metcash, CCA, Lion, PFD, local bread/milk DSD)
@@ -123,7 +123,7 @@ Core tables (all with `org_id`, `created_at`, RLS enabled):
 - `waste_events` — `batch_id` (nullable), `product_id`, `qty`, `reason_code`, `value_aud`, `by`
 - `push_subscriptions`, `audit_log`
 
-**Roles:** `platform_admin` (cross-tenant), `owner` (multi-site), `manager` (one site),
+**Roles:** `platform_admin` (all organisations), `owner` (multi-site), `manager` (one site),
 `staff` (phone only).
 
 **RLS pattern:** a `SECURITY DEFINER` helper `current_user_org_ids()` reading `memberships`,
@@ -131,7 +131,7 @@ called from policies — avoids the recursive-policy trap of querying `membershi
 Write a dedicated test that asserts a user from org A cannot read org B's rows.
 
 **Global product catalogue:** scanning an unknown barcode prompts "add this product once" and
-writes to the shared `products` table, so every tenant benefits. Per-site overrides never leak.
+writes to the shared `products` table, so every organisation benefits. Per-site overrides never leak.
 Platform admin moderates.
 
 ---
@@ -176,7 +176,9 @@ can show run history.
 - Multi-site rollup, waste % league table by site, trend charts, CSV export
 
 **Platform admin**
-- Tenants, impersonation (audit-logged), global catalogue moderation, `job_runs` history
+- Create an organisation with its first site and owner; archive/restore organisations
+- Global catalogue moderation and `job_runs` history
+- Archival blocks organisation members and pauses jobs/notifications without deleting records
 
 ---
 
@@ -196,7 +198,7 @@ Right-sized, not event-sourced:
 ## Build phases (~6 weeks part-time)
 
 1. **Week 1** — Repo, Supabase project, schema + RLS + seed script, auth, org/site/membership,
-   role-based routing shell. Gate: cross-tenant isolation test passes.
+   role-based routing shell. Gate: cross-organisation isolation test passes.
 2. **Week 2** — Product catalogue, `site_products`, barcode scanning component with fallback
    (used for catalogue-add and scan-to-waste), unknown-barcode add flow.
 3. **Week 3** — Docket-driven intake end to end: supplier history → expected lines, qty
@@ -206,7 +208,7 @@ Right-sized, not event-sourced:
    waste capture with reason codes.
 5. **Week 5** — Web Push + email digest, manager dashboard, expiry board, waste analytics,
    owner multi-site rollup, platform admin.
-6. **Week 6** — PWA offline outbox, seed a realistic demo tenant (3 sites, 8 months of history),
+6. **Week 6** — PWA offline outbox, seed a realistic demo organisation (3 sites, 8 months of history),
    demo logins, polish, deploy.
 
 ---

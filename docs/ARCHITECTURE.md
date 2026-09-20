@@ -35,7 +35,7 @@ src/
       app/                       staff PWA  — deliveries, today, scan, waste, settings
       manage/                    manager    — expiry board, waste, products
       owner/                     owner      — multi-site rollup + CSV export route
-      admin/                     platform admin — tenants, job history
+      admin/                     platform admin — organisations, lifecycle, job history
     login/                     one public route (+ demo one-click logins)
   components/                  shared UI (portal shell, charts, scanner, toggles)
   lib/
@@ -108,7 +108,7 @@ everything in `PortalShell`. Individual portal roots call `requireRole(...)` for
 
 ## Row-Level Security (the security boundary)
 
-Three migrations build it in order: `..._core_tables`, `..._rls_helpers`, `..._rls_policies`.
+The core tables, helper, policy and organisation-lifecycle migrations build it in order.
 
 The helpers in [rls_helpers.sql](../supabase/migrations/20260905000002_rls_helpers.sql) are the
 foundation every policy is written against:
@@ -125,6 +125,21 @@ foundation every policy is written against:
 `npm run test:rls` ([test-rls.ts](../scripts/test-rls.ts)) signs in as org A and asserts every
 table returns zero org-B rows. It needs a running, seeded Supabase and is the gate the whole
 product rests on — treat a failure here as a release blocker, not a flaky test.
+
+---
+
+## Organisation lifecycle
+
+`orgs.status` is `active` or `archived`. Platform admins provision an organisation together with
+its first site and owner, then manage it at `/admin/organisations/[orgId]`.
+
+Archival is deliberately reversible: operational rows and auth users remain intact, while
+`auth_org_ids()`, `auth_site_ids()` and role checks stop returning access for organisation
+members. `is_platform_admin()` remains independent of organisation status so the platform can
+inspect and restore archived organisations. The service-role Edge Functions bypass RLS, so both
+the expiry engine and daily digest explicitly query active organisation IDs. Normal application
+users have no `DELETE` policy on `orgs`; permanent deletion is break-glass maintenance, not a UI
+operation.
 
 ---
 
@@ -155,8 +170,8 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
   Not one row per threshold crossed. This pairs with a partial unique index on `(batch_id) where
   state = 'open'`.
 - `planRotationChecks(fixtures, today)` emits one check per fixture per site per day.
-- The wrapper is thin: authenticate the cron call (`x-cron-secret`, else 403), read active
-  batches, **delete all `open` `expiry_actions` and re-insert** (full recompute — correct by
+- The wrapper is thin: authenticate the cron call (`x-cron-secret`, else 403), scope to active
+  organisations, read active batches, **delete their `open` `expiry_actions` and re-insert** (full recompute — correct by
   construction, no incremental diffing to get wrong; done/dismissed rows are history and stay),
   then upsert rotation checks (`ignoreDuplicates`, so a same-day re-run never wipes staff ticks).
 - "Today" is computed in `Australia/Melbourne`, not UTC — a 02:00 Melbourne run is still
@@ -166,7 +181,7 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
   that has not reported in 36 hours.
 
 The 06:00 [daily-digest](../supabase/functions/daily-digest/index.ts) shares the same shape:
-authenticate, build per-site summary text via `_shared/digest.ts`, Web Push to live
+authenticate, scope to active organisations, build per-site summary text via `_shared/digest.ts`, Web Push to live
 subscriptions (pruning 404/410 dead ones), email the owner. A site with nothing outstanding
 sends nothing.
 
@@ -218,7 +233,7 @@ Config shared between the seed and the login buttons lives in
 four `DEMO_LOGINS`) so the two can never offer a login that was never seeded.
 
 `NEXT_PUBLIC_DEMO_MODE=true` enables the one-click logins and the **jump-N-days** button. The
-jump moves only the demo tenant's dates so a visitor can watch the engine fire; the engine is
+jump moves only the demo organisation's dates so a visitor can watch the engine fire; the engine is
 never told it is a demo, and `demo_jump_days()` refuses on any org not flagged `is_demo`. Leave
 the flag unset anywhere real.
 
@@ -226,7 +241,9 @@ the flag unset anywhere real.
 
 ## Data model
 
-16 tables, all with `org_id` + RLS, created across the migrations:
+16 tables, all with `org_id` + RLS, created across the migrations. The schema calls a customer
+organisation an `org`; “tenant” appears only where describing the standard multi-tenant
+architecture:
 
 `orgs`, `sites`, `profiles`, `memberships`, `suppliers`, `products` (global catalogue keyed by
 barcode), `site_products` (per-site overrides incl. `tracking_mode_override`), `deliveries`,
@@ -245,7 +262,7 @@ and cron agree on what counts as `rotation`.
 | Command | Needs a DB? | Covers |
 |---|---|---|
 | `npm test` | no | pure logic — GTIN check digits, tracking resolution, expiry ladder, digest text, intake proposal, outbox queue |
-| `npm run test:rls` | **yes** (seeded) | cross-tenant isolation — the release gate |
+| `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |
 

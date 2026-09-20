@@ -2,9 +2,10 @@
 
 ## Overview
 
-ShelfLife is a multi-tenant back-of-house operations system for convenience retail. It records
-what arrives from suppliers, tracks expiry dates on the stock that needs it, and surfaces a daily
-action list so product is pulled or marked down before it becomes a write-off.
+ShelfLife is a multi-tenant back-of-house operations system for convenience retail. Each customer
+company is an **organisation** with one or more sites. ShelfLife records what arrives from
+suppliers, tracks expiry dates on the stock that needs it, and surfaces a daily action list so
+product is pulled or marked down before it becomes a write-off.
 
 Built servo-first for the Australian market. Applicable to any small-format retailer that takes
 supplier deliveries and carries dated stock.
@@ -39,7 +40,7 @@ ShelfLife exists to be that mechanism, while asking as little of staff as possib
 | **Console staff** | Phone in hand, mid-shift, often in a store room or cool room with poor signal | Receive a delivery fast; be told what to pull today; record waste in seconds |
 | **Site manager** | Desktop or tablet in the back office | See what is expiring, what was received, what was written off and why |
 | **Owner / multi-site** | Owns or franchises several sites | Compare sites, see waste in dollars, spot which site or supplier is the problem |
-| **Platform admin** | Operating the service | Support tenants, moderate the shared product catalogue, monitor scheduled jobs |
+| **Platform admin** | Operating the service | Support organisations, moderate the shared product catalogue, monitor scheduled jobs |
 
 ---
 
@@ -97,9 +98,9 @@ split by how much was avoidable.
 
 ## Roles and access
 
-Four roles, enforced at the database level so tenant isolation does not depend on UI correctness:
+Four roles, enforced at the database level so organisation isolation does not depend on UI correctness:
 
-- **`platform_admin`** — cross-tenant; support impersonation, all of it audit-logged
+- **`platform_admin`** — across organisations; provision, archive and restore organisations; support access is audit-logged
 - **`owner`** — every site in their organisation; analytics and user management
 - **`manager`** — one site; deliveries, expiry board, waste, product settings
 - **`staff`** — one site, phone only; receive, action list, waste, rotation checks
@@ -133,7 +134,7 @@ and not an accounting integration. It records what arrives and what is thrown aw
 - **Staff turnover is high and training time is near zero.** Any flow that cannot be learned by
   watching it once will not be used.
 - **There is no free, comprehensive Australian product barcode database.** The product catalogue is
-  shared across tenants and grows as sites scan unknown barcodes, so each product is identified once
+  shared across organisations and grows as sites scan unknown barcodes, so each product is identified once
   for everybody.
 - **Dockets are paper.** The photograph is the record until OCR arrives in v3.
 

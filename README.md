@@ -37,7 +37,7 @@ See [docs/PLAN.md](docs/PLAN.md) for the full build plan, and
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · Supabase (Postgres, Auth,
-Realtime, Storage, Edge Functions) · Postgres RLS for tenant isolation
+Realtime, Storage, Edge Functions) · Postgres RLS for organisation isolation
 
 ## Local development
 
@@ -47,7 +47,7 @@ Requires Node 22 (see `.nvmrc`), the Supabase CLI, and Docker.
 nvm use
 npm install
 supabase start          # local Postgres/Auth/Storage on ports 544xx
-npm run seed            # two orgs, so tenant isolation is testable
+npm run seed            # two organisations, so isolation is testable
 npm run dev
 ```
 
@@ -59,7 +59,7 @@ local Supabase project.
 
 ```bash
 npm test                # pure logic — barcode check digits, tracking-mode resolution
-npm run test:rls        # cross-tenant isolation must pass before anything ships
+npm run test:rls        # cross-organisation isolation must pass before anything ships
 npx tsc --noEmit
 npm run build
 ```
@@ -122,7 +122,7 @@ why when something cannot be sent rather than dropping it.
 Intake is deliberately **not** queued. It is a multi-step flow whose draft lives on the
 server, and pretending otherwise would be a bigger promise than this outbox can keep.
 
-### The demo tenant
+### The demo organisation
 
 ```bash
 npm run seed:demo       # 3 sites, ~400 products, 8 months of history
@@ -131,11 +131,18 @@ npm run seed:demo       # 3 sites, ~400 products, 8 months of history
 Deterministic: a seeded PRNG, so a rebuild produces the same numbers and a screenshot in
 the case study keeps matching the live site. Set `NEXT_PUBLIC_DEMO_MODE=true` on the
 public deployment to enable the four one-click role logins and the **jump 7 days**
-button, which moves the demo tenant's dates so a visitor can watch the expiry engine fire
+button, which moves the demo organisation's dates so a visitor can watch the expiry engine fire
 without waiting a week. The engine is never told it is a demo — only the data moves —
 and `demo_jump_days()` refuses outright on any org not flagged `is_demo`.
 
 Leave `NEXT_PUBLIC_DEMO_MODE` unset anywhere real.
+
+### Organisation administration
+
+The platform-admin portal creates each organisation with its first site and owner account.
+Archiving an organisation preserves its users and operational history while blocking member
+access and pausing expiry processing and notifications. Platform admins can continue to inspect
+and restore it. The UI never permanently deletes an organisation.
 
 ## Deploying
 
@@ -169,4 +176,4 @@ Seed logins (all share the password printed by `npm run seed`):
 | `owner@northside.test` | owner | all three Northside sites |
 | `manager@northside.test` | manager | Brunswick |
 | `staff@northside.test` | staff | Brunswick |
-| `owner@bayside.test` | owner | St Kilda (separate tenant) |
+| `owner@bayside.test` | owner | St Kilda (separate organisation) |
