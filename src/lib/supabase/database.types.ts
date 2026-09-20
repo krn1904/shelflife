@@ -879,6 +879,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      archive_organisation: {
+        Args: { p_confirm_slug: string; p_org_id: string }
+        Returns: undefined
+      }
       auth_org_ids: { Args: never; Returns: string[] }
       auth_site_ids: { Args: never; Returns: string[] }
       can_manage_org: { Args: { org: string }; Returns: boolean }
@@ -902,6 +906,10 @@ export type Database = {
           p_reason: Database["public"]["Enums"]["waste_reason"]
         }
         Returns: string
+      }
+      restore_organisation: {
+        Args: { p_org_id: string }
+        Returns: undefined
       }
       shares_org_with: { Args: { other_user: string }; Returns: boolean }
       write_audit: {

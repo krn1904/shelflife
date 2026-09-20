@@ -67,7 +67,9 @@ accepts those events only from a platform admin, validates the organisation and 
 and does not accept arbitrary authenticated callers.
 
 Archived organisations are read-only in the admin UI except for Restore. Service-role server
-actions independently re-authorize every call because the service key bypasses RLS.
+actions independently re-authorize every call because the service key bypasses RLS. Archive and
+restore run through database RPCs that update lifecycle state and write the audit event in one
+transaction. Database triggers serialize site and membership changes against archival.
 
 ## Implementation map
 
@@ -80,6 +82,7 @@ actions independently re-authorize every call because the service key bypasses R
   - `supabase/migrations/20260920000001_org_lifecycle.sql`
   - `supabase/migrations/20260920000002_archived_account_guard.sql`
   - `supabase/migrations/20260920000003_archived_identity_audit.sql`
+  - `supabase/migrations/20260920000004_lifecycle_review_hardening.sql`
 - Background-job lifecycle filters: `supabase/functions/expiry-engine/index.ts`,
   `supabase/functions/daily-digest/index.ts`
 - RLS verification: `scripts/test-rls.ts`

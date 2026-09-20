@@ -1,5 +1,6 @@
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
+import type { User } from '@supabase/supabase-js';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
@@ -11,6 +12,17 @@ import { PeopleAdmin, type Person } from './people-admin';
 import { OrganisationLifecycleAdmin } from './lifecycle-admin';
 
 const AUDIT_LIMIT = 20;
+
+async function listAllAuthUsers(admin: ReturnType<typeof createAdminClient>): Promise<User[]> {
+  const users: User[] = [];
+  const perPage = 1000;
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw error;
+    users.push(...data.users);
+    if (data.users.length < perPage) return users;
+  }
+}
 
 async function removableSiteIds(
   supabase: Awaited<ReturnType<typeof createClient>>,
@@ -66,9 +78,9 @@ export default async function OrganisationPage(
     ]);
 
   const admin = createAdminClient();
-  const { data: userList } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  const userList = await listAllAuthUsers(admin);
   const userById = new Map(
-    (userList?.users ?? []).map((user) => [
+    userList.map((user) => [
       user.id,
       {
         email: user.email ?? '—',
@@ -148,8 +160,11 @@ export default async function OrganisationPage(
 
       <section>
         <SectionTitle>Sites</SectionTitle>
-        {archived ? (
-          <ReadOnlyList items={managedSites.map((site) => site.name)} empty="No sites recorded." />
+        {archived || visitAuditError ? (
+          <ReadOnlyList
+            items={managedSites.map((site) => ({ id: site.id, label: site.name }))}
+            empty="No sites recorded."
+          />
         ) : (
           <SiteAdmin orgId={org.id} sites={managedSites} />
         )}
@@ -157,9 +172,12 @@ export default async function OrganisationPage(
 
       <section>
         <SectionTitle>People</SectionTitle>
-        {archived ? (
+        {archived || visitAuditError ? (
           <ReadOnlyList
-            items={people.map((person) => `${person.fullName || person.email} · ${person.role}`)}
+            items={people.map((person) => ({
+              id: person.membershipId,
+              label: `${person.fullName || person.email} · ${person.role}`,
+            }))}
             empty="No people recorded."
           />
         ) : (
@@ -190,16 +208,28 @@ export default async function OrganisationPage(
 
       <section>
         <SectionTitle>Organisation lifecycle</SectionTitle>
-        <OrganisationLifecycleAdmin orgId={org.id} slug={org.slug} archived={archived} />
+        {visitAuditError ? (
+          <p className="card px-4 py-3 text-sm text-muted">
+            Lifecycle controls are unavailable until audit logging is restored.
+          </p>
+        ) : (
+          <OrganisationLifecycleAdmin orgId={org.id} slug={org.slug} archived={archived} />
+        )}
       </section>
     </div>
   );
 }
 
-function ReadOnlyList({ items, empty }: { items: string[]; empty: string }) {
+function ReadOnlyList({
+  items,
+  empty,
+}: {
+  items: { id: string; label: string }[];
+  empty: string;
+}) {
   return (
     <ul className="card divide-y divide-line overflow-hidden">
-      {items.map((item) => <li key={item} className="px-4 py-2.5 text-sm">{item}</li>)}
+      {items.map((item) => <li key={item.id} className="px-4 py-2.5 text-sm">{item.label}</li>)}
       {items.length === 0 && <li className="px-4 py-6 text-center text-sm text-muted">{empty}</li>}
     </ul>
   );

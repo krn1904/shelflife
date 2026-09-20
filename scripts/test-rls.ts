@@ -233,6 +233,28 @@ async function main() {
     check('platform admin sees every organisation',
       visible?.length === orgs!.length, `got ${visible?.length}`);
 
+    const { data: baysideSite } = await admin
+      .from('sites')
+      .select('id')
+      .eq('org_id', bayside.id)
+      .limit(1)
+      .single();
+    const endpoint = `https://push.test/${Date.now()}`;
+    const { data: subscription, error: subscriptionError } = await other
+      .from('push_subscriptions')
+      .insert({
+        user_id: otherUser!.id,
+        org_id: bayside.id,
+        site_id: baysideSite!.id,
+        endpoint,
+        p256dh: 'test-p256dh',
+        auth: 'test-auth',
+      })
+      .select('id')
+      .single();
+    check('owner can create a subscription in an active organisation',
+      subscriptionError === null, subscriptionError?.message ?? '');
+
     const { data: ownerMutation } = await other
       .from('orgs')
       .update({
@@ -253,16 +275,24 @@ async function main() {
     check('platform admin cannot hard-delete an organisation',
       (deleted?.length ?? 0) === 0, `deleted ${deleted?.length} rows`);
 
-    const { data: { user: platformUser } } = await platform.auth.getUser();
-    const { error: archiveError } = await platform
+    const { data: directAdminMutation } = await platform
       .from('orgs')
       .update({
         status: 'archived',
         archived_at: new Date().toISOString(),
-        archived_by: platformUser!.id,
+        archived_by: (await platform.auth.getUser()).data.user!.id,
       })
-      .eq('id', bayside.id);
-    check('platform admin can archive an organisation', archiveError === null,
+      .eq('id', bayside.id)
+      .select('id');
+    check('platform admin cannot bypass audited lifecycle RPCs',
+      (directAdminMutation?.length ?? 0) === 0,
+      `updated ${directAdminMutation?.length} rows`);
+
+    const { error: archiveError } = await platform.rpc('archive_organisation', {
+      p_org_id: bayside.id,
+      p_confirm_slug: 'bayside',
+    });
+    check('platform admin can archive through the audited RPC', archiveError === null,
       archiveError?.message ?? '');
 
     const [
@@ -293,8 +323,45 @@ async function main() {
       .insert({ name: 'Archived account write', tracking_mode: 'none' });
     check('archived owner cannot add to the shared catalogue', archivedProductWrite !== null,
       archivedProductWrite ? '' : 'insert unexpectedly succeeded');
-    check('archived owner cannot read or update its profile through the app API',
+    check('archived owner cannot read its profile through the app API',
       archivedProfile?.length === 0, `got ${archivedProfile?.length} profiles`);
+
+    const { data: profileUpdate } = await other
+      .from('profiles')
+      .update({ full_name: 'Archived profile mutation' })
+      .eq('id', otherUser!.id)
+      .select('id');
+    check('archived owner cannot update its profile through the app API',
+      (profileUpdate?.length ?? 0) === 0, `updated ${profileUpdate?.length} profiles`);
+
+    const { data: archivedSubscriptions } = await other
+      .from('push_subscriptions')
+      .select('id')
+      .eq('id', subscription!.id);
+    check('archived organisation subscription is hidden',
+      archivedSubscriptions?.length === 0, `got ${archivedSubscriptions?.length} subscriptions`);
+
+    const { data: subscriptionUpdate } = await other
+      .from('push_subscriptions')
+      .update({ user_agent: 'archived mutation' })
+      .eq('id', subscription!.id)
+      .select('id');
+    check('archived organisation subscription cannot be updated',
+      (subscriptionUpdate?.length ?? 0) === 0, `updated ${subscriptionUpdate?.length} subscriptions`);
+
+    const { data: subscriptionDelete } = await other
+      .from('push_subscriptions')
+      .delete()
+      .eq('id', subscription!.id)
+      .select('id');
+    check('archived organisation subscription cannot be deleted',
+      (subscriptionDelete?.length ?? 0) === 0, `deleted ${subscriptionDelete?.length} subscriptions`);
+
+    const { error: archivedServiceWrite } = await admin
+      .from('sites')
+      .insert({ org_id: bayside.id, name: 'Post-archive service write' });
+    check('service role cannot add a site after archival', archivedServiceWrite !== null,
+      archivedServiceWrite ? '' : 'insert unexpectedly succeeded');
 
     const { error: forgedAudit } = await other.rpc('write_audit', {
       p_action: 'platform_admin.forged',
@@ -313,17 +380,30 @@ async function main() {
     check('platform admin can inspect an archived organisation',
       adminView?.status === 'archived', `got ${adminView?.status}`);
 
-    const { error: restoreError } = await platform
-      .from('orgs')
-      .update({ status: 'active', archived_at: null, archived_by: null })
-      .eq('id', bayside.id);
-    check('platform admin can restore an organisation', restoreError === null,
+    const { error: restoreError } = await platform.rpc('restore_organisation', {
+      p_org_id: bayside.id,
+    });
+    check('platform admin can restore through the audited RPC', restoreError === null,
       restoreError?.message ?? '');
 
     const { data: restored } = await other.from('orgs').select('id');
     check('owner access returns after restore',
       restored?.length === 1 && restored[0].id === bayside.id,
       `got ${restored?.length} orgs`);
+
+    await other.from('push_subscriptions').delete().eq('id', subscription!.id);
+
+    await admin.from('orgs').update({ is_demo: true }).eq('id', bayside.id);
+    const { error: demoAuditError } = await other.rpc('write_audit', {
+      p_action: 'demo.jump_days',
+      p_org_id: bayside.id,
+      p_subject_type: 'org',
+      p_subject_id: bayside.id,
+      p_detail: { days: 7, test: true },
+    });
+    check('authorised demo audit events remain available', demoAuditError === null,
+      demoAuditError?.message ?? '');
+    await admin.from('orgs').update({ is_demo: false }).eq('id', bayside.id);
   }
 
   console.log('\nanonymous (no session):');

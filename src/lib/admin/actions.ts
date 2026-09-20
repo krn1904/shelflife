@@ -230,61 +230,34 @@ export type OrganisationLifecycleState =
 
 const OrganisationLifecycle = z.object({
   org_id: z.string().uuid(),
-  confirm_slug: z.string().trim().toLowerCase(),
+  confirm_slug: z.string().trim(),
 });
 
 export async function archiveOrganisation(
   _prev: OrganisationLifecycleState,
   formData: FormData,
 ): Promise<OrganisationLifecycleState> {
-  const { session, admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
   const parsed = OrganisationLifecycle.safeParse({
     org_id: String(formData.get('org_id') ?? ''),
     confirm_slug: String(formData.get('confirm_slug') ?? ''),
   });
   if (!parsed.success) return { status: 'error', message: 'The confirmation was not valid.' };
 
-  const { data: org } = await admin
-    .from('orgs')
-    .select('id, slug, status')
-    .eq('id', parsed.data.org_id)
-    .maybeSingle();
-  if (!org) return { status: 'error', message: 'That organisation no longer exists.' };
-  if (org.status === 'archived') return { status: 'archived' };
-  if (parsed.data.confirm_slug !== org.slug) {
-    return { status: 'error', message: `Type ${org.slug} exactly to confirm.` };
-  }
-
-  const { error } = await admin
-    .from('orgs')
-    .update({
-      status: 'archived',
-      archived_at: new Date().toISOString(),
-      archived_by: session.userId,
-    })
-    .eq('id', org.id);
-  if (error) return { status: 'error', message: `Could not archive the organisation (${error.code}).` };
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: 'platform_admin.archived_organisation',
-    p_org_id: org.id,
-    p_subject_type: 'org',
-    p_subject_id: org.id,
+  const { error } = await user.rpc('archive_organisation', {
+    p_org_id: parsed.data.org_id,
+    p_confirm_slug: parsed.data.confirm_slug,
   });
-  if (auditError) {
-    const { error: rollbackError } = await admin
-      .from('orgs')
-      .update({ status: 'active', archived_at: null, archived_by: null })
-      .eq('id', org.id);
+  if (error) {
     return {
       status: 'error',
-      message: rollbackError
-        ? 'The organisation was archived, but its audit entry failed. Contact support before retrying.'
-        : 'The required audit entry failed, so the archive was reversed.',
+      message: error.message.includes('slug did not match')
+        ? 'The organisation slug did not match exactly.'
+        : `Could not archive the organisation (${error.code ?? 'unknown'}).`,
     };
   }
 
-  revalidateOrganisation(org.id);
+  revalidateOrganisation(parsed.data.org_id);
   return { status: 'archived' };
 }
 
@@ -292,48 +265,16 @@ export async function restoreOrganisation(
   _prev: OrganisationLifecycleState,
   formData: FormData,
 ): Promise<OrganisationLifecycleState> {
-  const { admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
   const orgId = z.string().uuid().safeParse(String(formData.get('org_id') ?? ''));
   if (!orgId.success) return { status: 'error', message: 'The organisation was not valid.' };
 
-  const { data: org } = await admin
-    .from('orgs')
-    .select('id, status, archived_at, archived_by')
-    .eq('id', orgId.data)
-    .maybeSingle();
-  if (!org) return { status: 'error', message: 'That organisation no longer exists.' };
-  if (org.status === 'active') return { status: 'restored' };
-
-  const { error } = await admin
-    .from('orgs')
-    .update({ status: 'active', archived_at: null, archived_by: null })
-    .eq('id', org.id);
-  if (error) return { status: 'error', message: `Could not restore the organisation (${error.code}).` };
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: 'platform_admin.restored_organisation',
-    p_org_id: org.id,
-    p_subject_type: 'org',
-    p_subject_id: org.id,
+  const { error } = await user.rpc('restore_organisation', {
+    p_org_id: orgId.data,
   });
-  if (auditError) {
-    const { error: rollbackError } = await admin
-      .from('orgs')
-      .update({
-        status: 'archived',
-        archived_at: org.archived_at ?? new Date().toISOString(),
-        archived_by: org.archived_by,
-      })
-      .eq('id', org.id);
-    return {
-      status: 'error',
-      message: rollbackError
-        ? 'The organisation was restored, but its audit entry failed. Contact support before retrying.'
-        : 'The required audit entry failed, so the restore was reversed.',
-    };
-  }
+  if (error) return { status: 'error', message: `Could not restore the organisation (${error.code ?? 'unknown'}).` };
 
-  revalidateOrganisation(org.id);
+  revalidateOrganisation(orgId.data);
   return { status: 'restored' };
 }
 
@@ -369,13 +310,17 @@ export async function createSite(_prev: SiteFormState, formData: FormData): Prom
   const { data, error } = await admin.from('sites').insert(parsed.data).select('id').single();
   if (error) return { status: 'error', message: `Could not create the site (${error.code ?? 'unknown'}).` };
 
-  await user.rpc('write_audit', {
+  const { error: auditError } = await user.rpc('write_audit', {
     p_action: 'platform_admin.created_site',
     p_org_id: parsed.data.org_id,
     p_subject_type: 'site',
     p_subject_id: data.id,
     p_detail: { name: parsed.data.name },
   });
+  if (auditError) {
+    await admin.from('sites').delete().eq('id', data.id);
+    return { status: 'error', message: 'The site was not created because audit logging is unavailable.' };
+  }
 
   revalidateOrganisation(parsed.data.org_id);
   return { status: 'created', siteId: data.id };
@@ -406,15 +351,16 @@ export async function removeSite(formData: FormData): Promise<void> {
   // A site with any recorded activity is kept. The button is for sites added by mistake.
   if ((deliveries ?? 0) + (batches ?? 0) + (waste ?? 0) > 0) return;
 
-  const { error } = await admin.from('sites').delete().eq('id', site.id);
-  if (error) return;
-
-  await user.rpc('write_audit', {
-    p_action: 'platform_admin.removed_site',
+  const { error: auditError } = await user.rpc('write_audit', {
+    p_action: 'platform_admin.remove_site_requested',
     p_org_id: site.org_id,
     p_subject_type: 'site',
     p_subject_id: site.id,
   });
+  if (auditError) return;
+
+  const { error } = await admin.from('sites').delete().eq('id', site.id);
+  if (error) return;
 
   revalidateOrganisation(site.org_id);
 }
@@ -511,6 +457,7 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
     .insert({ user_id: userId!, org_id, site_id: site.siteId, role: parsed.data.role });
 
   if (error) {
+    if (isNew && userId) await admin.auth.admin.deleteUser(userId);
     // unique (user_id, org_id, site_id) — they already hold this exact membership.
     if (error.code === '23505') {
       return { status: 'error', message: 'That person already has this role here.' };
@@ -518,13 +465,24 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
     return { status: 'error', message: `Could not add the membership (${error.code ?? 'unknown'}).` };
   }
 
-  await user.rpc('write_audit', {
+  const { error: auditError } = await user.rpc('write_audit', {
     p_action: isNew ? 'platform_admin.created_user' : 'platform_admin.linked_user',
     p_org_id: org_id,
     p_site_id: site.siteId ?? undefined,
     p_subject_type: 'membership',
     p_detail: { email, role: parsed.data.role },
   });
+  if (auditError) {
+    const cleanup = admin
+      .from('memberships')
+      .delete()
+      .eq('user_id', userId!)
+      .eq('org_id', org_id);
+    if (site.siteId === null) await cleanup.is('site_id', null);
+    else await cleanup.eq('site_id', site.siteId);
+    if (isNew) await admin.auth.admin.deleteUser(userId!);
+    return { status: 'error', message: 'The person was not added because audit logging is unavailable.' };
+  }
 
   revalidateOrganisation(org_id);
   return isNew
@@ -553,6 +511,16 @@ export async function resetMemberPassword(
   if (!membership) return { status: 'error', message: 'That person is no longer a member.' };
   if (!(await isActiveOrganisation(admin, membership.org_id))) {
     return { status: 'error', message: 'Passwords cannot be reset for an archived organisation.' };
+  }
+
+  const { error: auditPreflightError } = await user.rpc('write_audit', {
+    p_action: 'platform_admin.password_reset_requested',
+    p_org_id: membership.org_id,
+    p_subject_type: 'membership',
+    p_subject_id: membership.id,
+  });
+  if (auditPreflightError) {
+    return { status: 'error', message: 'The password was not changed because audit logging is unavailable.' };
   }
 
   const password = tempPassword();
@@ -601,7 +569,10 @@ export async function updateMemberRole(formData: FormData): Promise<void> {
   if (!parsed.success) return;
 
   const { data: membership } = await admin
-    .from('memberships').select('id, org_id').eq('id', parsed.data.membership_id).maybeSingle();
+    .from('memberships')
+    .select('id, org_id, role, site_id')
+    .eq('id', parsed.data.membership_id)
+    .maybeSingle();
   if (!membership) return;
   if (!(await isActiveOrganisation(admin, membership.org_id))) return;
 
@@ -615,7 +586,7 @@ export async function updateMemberRole(formData: FormData): Promise<void> {
     .eq('id', membership.id);
   if (error) return;
 
-  await user.rpc('write_audit', {
+  const { error: auditError } = await user.rpc('write_audit', {
     p_action: 'platform_admin.updated_role',
     p_org_id: membership.org_id,
     p_site_id: site.siteId ?? undefined,
@@ -623,6 +594,13 @@ export async function updateMemberRole(formData: FormData): Promise<void> {
     p_subject_id: membership.id,
     p_detail: { role: parsed.data.role },
   });
+  if (auditError) {
+    await admin
+      .from('memberships')
+      .update({ role: membership.role, site_id: membership.site_id })
+      .eq('id', membership.id);
+    return;
+  }
 
   revalidateOrganisation(membership.org_id);
 }
@@ -639,15 +617,16 @@ export async function removeMember(formData: FormData): Promise<void> {
   if (!membership) return;
   if (!(await isActiveOrganisation(admin, membership.org_id))) return;
 
-  const { error } = await admin.from('memberships').delete().eq('id', membership.id);
-  if (error) return;
-
-  await user.rpc('write_audit', {
-    p_action: 'platform_admin.removed_member',
+  const { error: auditError } = await user.rpc('write_audit', {
+    p_action: 'platform_admin.remove_member_requested',
     p_org_id: membership.org_id,
     p_subject_type: 'membership',
     p_subject_id: membership.id,
   });
+  if (auditError) return;
+
+  const { error } = await admin.from('memberships').delete().eq('id', membership.id);
+  if (error) return;
 
   revalidateOrganisation(membership.org_id);
 }
