@@ -228,6 +228,7 @@ async function main() {
   console.log('\norganisation lifecycle:');
   {
     const platform = await signIn('admin@shelflife.test');
+    const { data: { user: otherUser } } = await other.auth.getUser();
     const { data: visible } = await platform.from('orgs').select('id, status');
     check('platform admin sees every organisation',
       visible?.length === orgs!.length, `got ${visible?.length}`);
@@ -237,7 +238,7 @@ async function main() {
       .update({
         status: 'archived',
         archived_at: new Date().toISOString(),
-        archived_by: (await other.auth.getUser()).data.user!.id,
+        archived_by: otherUser!.id,
       })
       .eq('id', bayside.id)
       .select('id');
@@ -269,12 +270,14 @@ async function main() {
       { data: archivedSites },
       { data: archivedMemberships },
       { data: archivedProducts },
+      { data: archivedProfile },
     ] =
       await Promise.all([
         other.from('orgs').select('id'),
         other.from('sites').select('id'),
         other.from('memberships').select('id'),
         other.from('products').select('id'),
+        other.from('profiles').select('id').eq('id', otherUser!.id),
       ]);
     check('archived organisation is hidden from its owner', archivedOrg?.length === 0,
       `got ${archivedOrg?.length} orgs`);
@@ -290,6 +293,17 @@ async function main() {
       .insert({ name: 'Archived account write', tracking_mode: 'none' });
     check('archived owner cannot add to the shared catalogue', archivedProductWrite !== null,
       archivedProductWrite ? '' : 'insert unexpectedly succeeded');
+    check('archived owner cannot read or update its profile through the app API',
+      archivedProfile?.length === 0, `got ${archivedProfile?.length} profiles`);
+
+    const { error: forgedAudit } = await other.rpc('write_audit', {
+      p_action: 'platform_admin.forged',
+      p_org_id: northside.id,
+      p_subject_type: 'org',
+      p_subject_id: northside.id,
+    });
+    check('non-admin cannot forge platform audit entries', forgedAudit !== null,
+      forgedAudit ? '' : 'audit write unexpectedly succeeded');
 
     const { data: adminView } = await platform
       .from('orgs')

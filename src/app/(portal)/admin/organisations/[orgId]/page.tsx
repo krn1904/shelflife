@@ -94,7 +94,7 @@ export default async function OrganisationPage(
     siteId: membership.site_id,
   }));
 
-  await supabase.rpc('write_audit', {
+  const { error: visitAuditError } = await supabase.rpc('write_audit', {
     p_action: 'platform_admin.viewed_organisation',
     p_org_id: org.id,
     p_subject_type: 'org',
@@ -123,7 +123,11 @@ export default async function OrganisationPage(
             }
           />
         </div>
-        {archived ? (
+        {visitAuditError ? (
+          <p className="mt-3 rounded-xl border border-critical/30 bg-critical-soft px-4 py-2.5 text-sm text-critical">
+            This support visit could not be written to the audit log. Do not make changes until audit logging is restored.
+          </p>
+        ) : archived ? (
           <p className="mt-3 rounded-xl border border-critical/30 bg-critical-soft px-4 py-2.5 text-sm text-critical">
             Archived {org.archived_at ? new Date(org.archived_at).toLocaleString('en-AU') : ''}.
             Member access, scheduled processing and notifications are paused.

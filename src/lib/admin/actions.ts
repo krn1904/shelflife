@@ -137,18 +137,25 @@ export async function createOrganisation(
     .select('id')
     .single();
   if (orgError || !org) {
-    if (createdUser) await admin.auth.admin.deleteUser(userId);
+    const cleanup = createdUser ? await admin.auth.admin.deleteUser(userId) : null;
     return {
       status: 'error',
-      message: orgError?.code === '23505'
+      message: `${orgError?.code === '23505'
         ? 'That organisation slug is already in use.'
-        : `Could not create the organisation (${orgError?.code ?? 'unknown'}).`,
+        : `Could not create the organisation (${orgError?.code ?? 'unknown'}).`
+      }${cleanup?.error ? ` The unused owner account also needs manual cleanup: ${cleanup.error.message}` : ''}`,
     };
   }
 
   const rollback = async () => {
-    await admin.from('orgs').delete().eq('id', org.id);
-    if (createdUser) await admin.auth.admin.deleteUser(userId!);
+    const failures: string[] = [];
+    const { error: orgCleanup } = await admin.from('orgs').delete().eq('id', org.id);
+    if (orgCleanup) failures.push(`organisation cleanup failed (${orgCleanup.code})`);
+    if (createdUser) {
+      const { error: userCleanup } = await admin.auth.admin.deleteUser(userId!);
+      if (userCleanup) failures.push(`owner cleanup failed (${userCleanup.message})`);
+    }
+    return failures.length > 0 ? failures.join('; ') : null;
   };
 
   const { data: site, error: siteError } = await admin
@@ -162,10 +169,12 @@ export async function createOrganisation(
     .select('id')
     .single();
   if (siteError || !site) {
-    await rollback();
+    const cleanupFailure = await rollback();
     return {
       status: 'error',
-      message: `Could not create the first site (${siteError?.code ?? 'unknown'}).`,
+      message: `Could not create the first site (${siteError?.code ?? 'unknown'}).${
+        cleanupFailure ? ` Manual cleanup required: ${cleanupFailure}.` : ''
+      }`,
     };
   }
 
@@ -176,14 +185,16 @@ export async function createOrganisation(
     role: 'owner',
   });
   if (membershipError) {
-    await rollback();
+    const cleanupFailure = await rollback();
     return {
       status: 'error',
-      message: `Could not assign the owner (${membershipError.code ?? 'unknown'}).`,
+      message: `Could not assign the owner (${membershipError.code ?? 'unknown'}).${
+        cleanupFailure ? ` Manual cleanup required: ${cleanupFailure}.` : ''
+      }`,
     };
   }
 
-  await user.rpc('write_audit', {
+  const { error: auditError } = await user.rpc('write_audit', {
     p_action: 'platform_admin.created_organisation',
     p_org_id: org.id,
     p_site_id: site.id,
@@ -191,6 +202,15 @@ export async function createOrganisation(
     p_subject_id: org.id,
     p_detail: { name: input.name, slug: input.slug, owner_email: input.owner_email },
   });
+  if (auditError) {
+    const cleanupFailure = await rollback();
+    return {
+      status: 'error',
+      message: `The required audit entry failed, so organisation creation was reversed.${
+        cleanupFailure ? ` Manual cleanup required: ${cleanupFailure}.` : ''
+      }`,
+    };
+  }
 
   revalidateOrganisation(org.id);
   return {
@@ -245,12 +265,24 @@ export async function archiveOrganisation(
     .eq('id', org.id);
   if (error) return { status: 'error', message: `Could not archive the organisation (${error.code}).` };
 
-  await user.rpc('write_audit', {
+  const { error: auditError } = await user.rpc('write_audit', {
     p_action: 'platform_admin.archived_organisation',
     p_org_id: org.id,
     p_subject_type: 'org',
     p_subject_id: org.id,
   });
+  if (auditError) {
+    const { error: rollbackError } = await admin
+      .from('orgs')
+      .update({ status: 'active', archived_at: null, archived_by: null })
+      .eq('id', org.id);
+    return {
+      status: 'error',
+      message: rollbackError
+        ? 'The organisation was archived, but its audit entry failed. Contact support before retrying.'
+        : 'The required audit entry failed, so the archive was reversed.',
+    };
+  }
 
   revalidateOrganisation(org.id);
   return { status: 'archived' };
@@ -266,7 +298,7 @@ export async function restoreOrganisation(
 
   const { data: org } = await admin
     .from('orgs')
-    .select('id, status')
+    .select('id, status, archived_at, archived_by')
     .eq('id', orgId.data)
     .maybeSingle();
   if (!org) return { status: 'error', message: 'That organisation no longer exists.' };
@@ -278,12 +310,28 @@ export async function restoreOrganisation(
     .eq('id', org.id);
   if (error) return { status: 'error', message: `Could not restore the organisation (${error.code}).` };
 
-  await user.rpc('write_audit', {
+  const { error: auditError } = await user.rpc('write_audit', {
     p_action: 'platform_admin.restored_organisation',
     p_org_id: org.id,
     p_subject_type: 'org',
     p_subject_id: org.id,
   });
+  if (auditError) {
+    const { error: rollbackError } = await admin
+      .from('orgs')
+      .update({
+        status: 'archived',
+        archived_at: org.archived_at ?? new Date().toISOString(),
+        archived_by: org.archived_by,
+      })
+      .eq('id', org.id);
+    return {
+      status: 'error',
+      message: rollbackError
+        ? 'The organisation was restored, but its audit entry failed. Contact support before retrying.'
+        : 'The required audit entry failed, so the restore was reversed.',
+    };
+  }
 
   revalidateOrganisation(org.id);
   return { status: 'restored' };
@@ -411,8 +459,14 @@ async function findUserByEmail(
   admin: ReturnType<typeof createAdminClient>,
   email: string,
 ): Promise<string | null> {
-  const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  return data?.users.find((u) => u.email?.toLowerCase() === email)?.id ?? null;
+  const perPage = 1000;
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) return null;
+    const match = data.users.find((user) => user.email?.toLowerCase() === email);
+    if (match) return match.id;
+    if (data.users.length < perPage) return null;
+  }
 }
 
 export async function addPerson(_prev: PersonFormState, formData: FormData): Promise<PersonFormState> {

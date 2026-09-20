@@ -62,8 +62,7 @@ Deno.serve(async (request: Request) => {
       ? activeOrgIds
       : ['00000000-0000-0000-0000-000000000000'];
 
-    const [{ data: sites }, { data: actions }, { data: checks }, { data: subscriptions }] =
-      await Promise.all([
+    const [sitesResult, actionsResult, checksResult, subscriptionsResult] = await Promise.all([
         supabase.from('sites').select('id, org_id, name').in('org_id', scopedOrgIds),
         supabase
           .from('expiry_actions')
@@ -82,6 +81,17 @@ Deno.serve(async (request: Request) => {
           .in('org_id', scopedOrgIds)
           .is('failed_at', null),
       ]);
+    const queryError =
+      sitesResult.error
+      ?? actionsResult.error
+      ?? checksResult.error
+      ?? subscriptionsResult.error;
+    if (queryError) throw queryError;
+
+    const sites = sitesResult.data;
+    const actions = actionsResult.data;
+    const checks = checksResult.data;
+    const subscriptions = subscriptionsResult.data;
 
     for (const site of sites ?? []) {
       const siteActions = (actions ?? [])
