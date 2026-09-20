@@ -1,26 +1,191 @@
 @import "tailwindcss";
 
+/*
+ * ShelfLife design system — a warm, paper-toned palette with a clay accent.
+ * Tokens live on :root (light) and are overridden for dark mode; @theme maps them
+ * to Tailwind utilities so `bg-surface`, `text-muted`, `border-line`, `bg-brand` work.
+ */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
+  --paper: #f7f6f1;        /* page background */
+  --surface: #ffffff;      /* cards, inputs */
+  --surface-2: #f1efe8;    /* subtle fills, hovers */
+  --ink: #23221f;          /* primary text */
+  --ink-muted: #6b6862;    /* secondary text */
+  --ink-faint: #97938a;    /* hints, timestamps */
+  --line: #e6e3da;         /* borders */
+  --line-strong: #d8d4c8;
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --brand: #c4633f;        /* clay accent */
+  --brand-hover: #ad5432;
+  --brand-ink: #ffffff;    /* text on brand */
+  --brand-soft: #f6e8e1;   /* soft brand fill */
+  --brand-soft-ink: #8f4326;
+
+  --good: #0ca30c;
+  --good-soft: #e6f4e6;
+  --warning: #b7791f;
+  --warning-soft: #f8efdc;
+  --serious: #c05a34;
+  --serious-soft: #f7e7df;
+  --critical: #d03b3b;
+  --critical-soft: #f9e3e3;
+  --critical-ink: #a51f1f;
+
+  --ring: color-mix(in srgb, var(--brand) 45%, transparent);
+  --shadow: 0 1px 2px rgb(35 34 31 / 0.04), 0 4px 16px -8px rgb(35 34 31 / 0.10);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --paper: #1a1917;
+    --surface: #232220;
+    --surface-2: #2c2a27;
+    --ink: #ece9e2;
+    --ink-muted: #a8a49b;
+    --ink-faint: #7c786f;
+    --line: #38352f;
+    --line-strong: #464339;
+
+    --brand: #db7d57;
+    --brand-hover: #e68c68;
+    --brand-ink: #1a1917;
+    --brand-soft: #38271f;
+    --brand-soft-ink: #e6a382;
+
+    --good: #4ec24e;
+    --good-soft: #1e2e1e;
+    --warning: #d9a441;
+    --warning-soft: #322a1a;
+    --serious: #e0895f;
+    --serious-soft: #33221a;
+    --critical: #e46a6a;
+    --critical-soft: #341f1f;
+    --critical-ink: #f0a3a3;
+
+    --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 8px 24px -12px rgb(0 0 0 / 0.5);
   }
 }
 
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-ink: var(--ink);
+  --color-muted: var(--ink-muted);
+  --color-faint: var(--ink-faint);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);
+  --color-brand-hover: var(--brand-hover);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-soft-ink: var(--brand-soft-ink);
+  --color-good: var(--good);
+  --color-good-soft: var(--good-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-serious: var(--serious);
+  --color-serious-soft: var(--serious-soft);
+  --color-critical: var(--critical);
+  --color-critical-soft: var(--critical-soft);
+  --color-critical-ink: var(--critical-ink);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --radius: 0.625rem;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+::selection {
+  background: var(--brand-soft);
+  color: var(--brand-soft-ink);
+}
+
+/* Consistent, visible keyboard focus everywhere. */
+:focus-visible {
+  outline: 2px solid var(--brand);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+@layer components {
+  /* Buttons — used on <button> and <a> alike, so they are classes not a component. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: var(--radius);
+    padding: 0.5rem 0.9rem;
+    font-size: 0.875rem;
+    font-weight: 500;
+    line-height: 1.25rem;
+    white-space: nowrap;
+    transition: background-color 0.15s, border-color 0.15s, color 0.15s, box-shadow 0.15s;
+    cursor: pointer;
+  }
+  .btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+  .btn-primary { background: var(--brand); color: var(--brand-ink); }
+  .btn-primary:hover:not(:disabled) { background: var(--brand-hover); }
+
+  .btn-outline {
+    background: var(--surface);
+    color: var(--ink);
+    border: 1px solid var(--line-strong);
+  }
+  .btn-outline:hover:not(:disabled) { background: var(--surface-2); }
+
+  .btn-ghost { background: transparent; color: var(--ink-muted); }
+  .btn-ghost:hover:not(:disabled) { background: var(--surface-2); color: var(--ink); }
+
+  .btn-danger { background: transparent; color: var(--critical-ink, var(--critical)); }
+  .btn-danger:hover:not(:disabled) { background: var(--critical-soft); }
+
+  /* Form fields */
+  .field {
+    width: 100%;
+    border-radius: var(--radius);
+    border: 1px solid var(--line-strong);
+    background: var(--surface);
+    color: var(--ink);
+    padding: 0.5rem 0.75rem;
+    font-size: 0.875rem;
+  }
+  .field::placeholder { color: var(--ink-faint); }
+  .field:focus-visible { outline: 2px solid var(--brand); outline-offset: 0; border-color: var(--brand); }
+  .field:disabled { background: var(--surface-2); color: var(--ink-faint); }
+
+  /* Surfaces */
+  .card {
+    border-radius: 0.875rem;
+    border: 1px solid var(--line);
+    background: var(--surface);
+    box-shadow: var(--shadow);
+  }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.3rem;
+    border-radius: 9999px;
+    padding: 0.125rem 0.6rem;
+    font-size: 0.75rem;
+    font-weight: 500;
+  }
+  .badge-neutral { background: var(--surface-2); color: var(--ink-muted); }
+  .badge-brand { background: var(--brand-soft); color: var(--brand-soft-ink); }
+
+  .section-title {
+    font-size: 0.75rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--ink-faint);
+  }
 }

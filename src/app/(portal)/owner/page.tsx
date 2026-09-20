@@ -9,6 +9,7 @@ import { formatAud } from '@/lib/charts/tokens';
 import { HorizontalBars } from '@/components/charts/bar-chart';
 import { TrendChart } from '@/components/charts/trend-chart';
 import { Stat } from '@/components/stat';
+import { PageHeader, SectionTitle } from '@/components/ui';
 
 const WINDOW_MONTHS = 6;
 
@@ -46,32 +47,29 @@ export default async function OwnerPage() {
   const thisMonth = byMonth[byMonth.length - 1]?.valueAud ?? 0;
 
   return (
-    <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Group</h1>
-        <p className="text-sm text-neutral-500">
-          {session.memberships[0]?.orgName} · {sites?.length ?? 0}{' '}
-          {sites?.length === 1 ? 'site' : 'sites'}
-        </p>
-      </div>
+    <div className="space-y-8">
+      <PageHeader
+        title="Group"
+        subtitle={`${session.memberships[0]?.orgName} · ${sites?.length ?? 0} ${
+          sites?.length === 1 ? 'site' : 'sites'
+        }`}
+        actions={
+          <Link href="/owner/export" prefetch={false} className="btn btn-outline">
+            Download CSV
+          </Link>
+        }
+      />
 
-      <div className="mt-6 grid gap-3 sm:grid-cols-4">
-        <Stat label="Waste this month" value={formatAud(thisMonth)} />
+      <div className="grid gap-3 sm:grid-cols-4">
+        <Stat label="Waste this month" value={formatAud(thisMonth)} tone={thisMonth ? 'brand' : 'default'} />
         <Stat label={`Last ${WINDOW_MONTHS} months`} value={formatAud(total)} />
         <Stat label="Active batches" value={activeBatches ?? 0} hint="dated stock on shelf" />
         <Stat label="Open actions" value={openActions ?? 0} hint="across all sites" />
       </div>
 
-      <section className="mt-8">
-        <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-            Waste across the group
-          </h2>
-          <Link href="/owner/export" prefetch={false} className="text-sm underline">
-            Download CSV
-          </Link>
-        </div>
-        <div className="mt-2 rounded border border-neutral-200 p-3">
+      <section>
+        <SectionTitle>Waste across the group</SectionTitle>
+        <div className="card p-4">
           <TrendChart
             data={byMonth.map((m) => ({ label: m.label, value: m.valueAud }))}
             emptyNote="No waste recorded across any site in this window."
@@ -79,15 +77,13 @@ export default async function OwnerPage() {
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          By site
-        </h2>
-        <p className="mt-1 text-xs text-neutral-500">
+      <section>
+        <SectionTitle>By site</SectionTitle>
+        <p className="-mt-1 mb-2 text-xs text-muted">
           Every site is listed, including those that wasted nothing — a missing site would
           read as unmeasured rather than as doing well.
         </p>
-        <div className="mt-2 rounded border border-neutral-200 p-3">
+        <div className="card p-4">
           <HorizontalBars
             data={league.map((s) => ({ label: s.name, value: s.valueAud }))}
             emptyNote="No sites to compare yet."
@@ -95,11 +91,9 @@ export default async function OwnerPage() {
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          By reason
-        </h2>
-        <div className="mt-2 rounded border border-neutral-200 p-3">
+      <section>
+        <SectionTitle>By reason</SectionTitle>
+        <div className="card p-4">
           <HorizontalBars
             data={byReason.map((r) => ({
               label: WASTE_REASON_LABEL[r.reason],
