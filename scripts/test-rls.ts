@@ -229,6 +229,7 @@ async function main() {
   {
     const platform = await signIn('admin@shelflife.test');
     const { data: { user: otherUser } } = await other.auth.getUser();
+    const { data: { user: platformUser } } = await platform.auth.getUser();
     const { data: visible } = await platform.from('orgs').select('id, status');
     check('platform admin sees every organisation',
       visible?.length === orgs!.length, `got ${visible?.length}`);
@@ -238,6 +239,54 @@ async function main() {
       .insert({ name: 'Bypassed onboarding', slug: `bypass-${Date.now()}` });
     check('platform admin cannot bypass audited organisation provisioning',
       directOrgInsert !== null, directOrgInsert ? '' : 'insert unexpectedly succeeded');
+
+    const provisionSlug = `provision-${Date.now()}`;
+    const { data: provisioned, error: provisionError } = await platform.rpc(
+      'provision_organisation',
+      {
+        p_name: 'Atomic provision check',
+        p_slug: provisionSlug,
+        p_site_name: 'First site',
+        p_site_timezone: 'Australia/Melbourne',
+        p_site_address: null,
+        p_owner_user_id: otherUser!.id,
+        p_owner_email: 'owner@bayside.test',
+      },
+    );
+    const provisionResult = provisioned as { org_id?: string; site_id?: string } | null;
+    check('organisation, first site, owner and audit provision atomically',
+      provisionError === null && Boolean(provisionResult?.org_id) && Boolean(provisionResult?.site_id),
+      provisionError?.message ?? '');
+
+    const { data: provisionAudit } = await admin
+      .from('audit_log')
+      .select('id')
+      .eq('org_id', provisionResult!.org_id!)
+      .eq('action', 'platform_admin.created_organisation');
+    check('provisioning writes its audit entry',
+      provisionAudit?.length === 1, `got ${provisionAudit?.length} audit rows`);
+
+    const { data: aggregateProduct } = await admin.from('products').select('id').limit(1).single();
+    const wasteRows = Array.from({ length: 1_001 }, () => ({
+      org_id: provisionResult!.org_id!,
+      site_id: provisionResult!.site_id!,
+      product_id: aggregateProduct!.id,
+      qty: 1,
+      reason: 'expired' as const,
+      value_aud: 1,
+    }));
+    for (let index = 0; index < wasteRows.length; index += 500) {
+      const { error } = await admin.from('waste_events').insert(wasteRows.slice(index, index + 500));
+      if (error) throw error;
+    }
+    const { data: wasteTotal, error: wasteTotalError } = await platform.rpc(
+      'organisation_waste_total',
+      { p_org_id: provisionResult!.org_id! },
+    );
+    check('database waste aggregate includes rows beyond the 1,000-row API cap',
+      wasteTotalError === null && Number(wasteTotal) === 1_001,
+      `got ${wasteTotal}; ${wasteTotalError?.message ?? ''}`);
+    await admin.from('orgs').delete().eq('id', provisionResult!.org_id!);
 
     const cascadeSlug = `cascade-${Date.now()}`;
     const { data: cascadeOrg } = await admin
@@ -272,6 +321,104 @@ async function main() {
       .eq('org_id', northside.id)
       .limit(1)
       .single();
+
+    const { error: directSiteWrite } = await platform
+      .from('sites')
+      .insert({ org_id: bayside.id, name: 'Unaudited site' });
+    check('platform admin cannot bypass audited site creation',
+      directSiteWrite !== null, directSiteWrite ? '' : 'insert unexpectedly succeeded');
+
+    const { data: directSiteUpdate } = await platform
+      .from('sites')
+      .update({ name: 'Unaudited rename' })
+      .eq('id', baysideSite!.id)
+      .select('id');
+    check('platform admin cannot bypass audited site updates',
+      (directSiteUpdate?.length ?? 0) === 0, `updated ${directSiteUpdate?.length} sites`);
+
+    const { error: directMembershipInsert } = await platform.from('memberships').insert({
+      org_id: bayside.id,
+      user_id: platformUser!.id,
+      site_id: null,
+      role: 'owner',
+    });
+    check('platform admin cannot bypass audited membership creation',
+      directMembershipInsert !== null, directMembershipInsert ? '' : 'insert unexpectedly succeeded');
+
+    const { data: rpcSite, error: rpcSiteError } = await platform.rpc('create_organisation_site', {
+      p_org_id: bayside.id,
+      p_name: 'RPC lifecycle site',
+      p_timezone: 'Australia/Melbourne',
+      p_address: null,
+    });
+    check('platform admin can create a site through the audited RPC',
+      rpcSiteError === null && Boolean(rpcSite), rpcSiteError?.message ?? '');
+
+    const { data: rpcMembership, error: rpcMembershipError } = await platform.rpc(
+      'add_organisation_member',
+      {
+        p_org_id: bayside.id,
+        p_user_id: otherUser!.id,
+        p_site_id: rpcSite!,
+        p_role: 'manager',
+        p_email: 'owner@bayside.test',
+      },
+    );
+    check('platform admin can add a member through the audited RPC',
+      rpcMembershipError === null && Boolean(rpcMembership), rpcMembershipError?.message ?? '');
+
+    const { data: orgWideMembership, error: orgWideMembershipError } = await platform.rpc(
+      'add_organisation_member',
+      {
+        p_org_id: bayside.id,
+        p_user_id: platformUser!.id,
+        p_site_id: null,
+        p_role: 'owner',
+        p_email: 'admin@shelflife.test',
+      },
+    );
+    check('organisation-wide membership RPC accepts an explicit null site',
+      orgWideMembershipError === null && Boolean(orgWideMembership),
+      orgWideMembershipError?.message ?? '');
+    await platform.rpc('remove_organisation_member', {
+      p_membership_id: orgWideMembership!,
+    });
+
+    const { error: assignedSiteRemoval } = await platform.rpc('remove_empty_site', {
+      p_site_id: rpcSite!,
+    });
+    check('site with an assigned member cannot be removed',
+      assignedSiteRemoval !== null, assignedSiteRemoval ? '' : 'removal unexpectedly succeeded');
+
+    const { data: directMembershipUpdate } = await platform
+      .from('memberships')
+      .update({ role: 'staff' })
+      .eq('id', rpcMembership!)
+      .select('id');
+    check('platform admin cannot bypass audited membership updates',
+      (directMembershipUpdate?.length ?? 0) === 0,
+      `updated ${directMembershipUpdate?.length} memberships`);
+
+    const { error: rpcRoleError } = await platform.rpc('update_organisation_member', {
+      p_membership_id: rpcMembership!,
+      p_site_id: rpcSite!,
+      p_role: 'staff',
+    });
+    check('platform admin can update a member through the audited RPC',
+      rpcRoleError === null, rpcRoleError?.message ?? '');
+
+    const { error: rpcMemberRemoval } = await platform.rpc('remove_organisation_member', {
+      p_membership_id: rpcMembership!,
+    });
+    check('platform admin can remove a member through the audited RPC',
+      rpcMemberRemoval === null, rpcMemberRemoval?.message ?? '');
+
+    const { error: rpcSiteRemoval } = await platform.rpc('remove_empty_site', {
+      p_site_id: rpcSite!,
+    });
+    check('platform admin can remove an unassigned empty site through the audited RPC',
+      rpcSiteRemoval === null, rpcSiteRemoval?.message ?? '');
+
     const endpoint = `https://push.test/${Date.now()}`;
     const { error: crossOrgSubscription } = await other
       .from('push_subscriptions')

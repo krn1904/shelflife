@@ -26,7 +26,8 @@ organisation.
 If the email is new, ShelfLife creates a confirmed Auth account and displays its generated password
 once. If the email already exists, ShelfLife links the existing account without changing its
 password. Creation succeeds only after the organisation, first site and owner membership exist;
-failed onboarding attempts clean up newly created records.
+those rows and their audit entry are one database transaction. Failed onboarding attempts remove
+only a newly created, otherwise-unused Auth account.
 
 The owner signs in through `/login` and is routed to `/owner`.
 
@@ -72,6 +73,8 @@ restore run through database RPCs that update lifecycle state and write the audi
 transaction. Database triggers serialize site and membership changes against archival.
 Site and membership removal use locked, audited RPCs so normal deletes cannot race an archive;
 cascade deletion remains available for explicit break-glass maintenance.
+Site creation and membership creation/role changes use the same transactional RPC pattern, so
+platform admins cannot bypass audit through direct PostgREST writes.
 
 ## Implementation map
 
@@ -86,6 +89,9 @@ cascade deletion remains available for explicit break-glass maintenance.
   - `supabase/migrations/20260920000003_archived_identity_audit.sql`
   - `supabase/migrations/20260920000004_lifecycle_review_hardening.sql`
   - `supabase/migrations/20260920000005_review_followup.sql`
+  - `supabase/migrations/20260920000006_audited_admin_writes.sql`
+  - `supabase/migrations/20260920000007_atomic_organisation_provisioning.sql`
 - Background-job lifecycle filters: `supabase/functions/expiry-engine/index.ts`,
-  `supabase/functions/daily-digest/index.ts`
+  `supabase/functions/daily-digest/index.ts` (both page all active data rather than relying on
+  PostgREST's 1,000-row default response limit)
 - RLS verification: `scripts/test-rls.ts`

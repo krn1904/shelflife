@@ -131,91 +131,35 @@ export async function createOrganisation(
     createdUser = true;
   }
 
-  const { data: org, error: orgError } = await admin
-    .from('orgs')
-    .insert({ name: input.name, slug: input.slug })
-    .select('id')
-    .single();
-  if (orgError || !org) {
+  const { data: provisioned, error: provisionError } = await user.rpc('provision_organisation', {
+    p_name: input.name,
+    p_slug: input.slug,
+    p_site_name: input.site_name,
+    p_site_timezone: input.timezone,
+    p_site_address: input.address,
+    p_owner_user_id: userId,
+    p_owner_email: input.owner_email,
+  });
+  if (provisionError || !provisioned || Array.isArray(provisioned) || typeof provisioned !== 'object') {
     const cleanup = createdUser ? await admin.auth.admin.deleteUser(userId) : null;
     return {
       status: 'error',
-      message: `${orgError?.code === '23505'
+      message: `${provisionError?.code === '23505'
         ? 'That organisation slug is already in use.'
-        : `Could not create the organisation (${orgError?.code ?? 'unknown'}).`
+        : `Could not create the organisation (${provisionError?.code ?? 'unknown'}).`
       }${cleanup?.error ? ` The unused owner account also needs manual cleanup: ${cleanup.error.message}` : ''}`,
     };
   }
 
-  const rollback = async () => {
-    const failures: string[] = [];
-    const { error: orgCleanup } = await admin.from('orgs').delete().eq('id', org.id);
-    if (orgCleanup) failures.push(`organisation cleanup failed (${orgCleanup.code})`);
-    if (createdUser) {
-      const { error: userCleanup } = await admin.auth.admin.deleteUser(userId!);
-      if (userCleanup) failures.push(`owner cleanup failed (${userCleanup.message})`);
-    }
-    return failures.length > 0 ? failures.join('; ') : null;
-  };
+  const orgId = 'org_id' in provisioned && typeof provisioned.org_id === 'string'
+    ? provisioned.org_id
+    : null;
+  if (!orgId) return { status: 'error', message: 'Organisation creation returned an invalid result.' };
 
-  const { data: site, error: siteError } = await admin
-    .from('sites')
-    .insert({
-      org_id: org.id,
-      name: input.site_name,
-      timezone: input.timezone,
-      address: input.address,
-    })
-    .select('id')
-    .single();
-  if (siteError || !site) {
-    const cleanupFailure = await rollback();
-    return {
-      status: 'error',
-      message: `Could not create the first site (${siteError?.code ?? 'unknown'}).${
-        cleanupFailure ? ` Manual cleanup required: ${cleanupFailure}.` : ''
-      }`,
-    };
-  }
-
-  const { error: membershipError } = await admin.from('memberships').insert({
-    user_id: userId,
-    org_id: org.id,
-    site_id: null,
-    role: 'owner',
-  });
-  if (membershipError) {
-    const cleanupFailure = await rollback();
-    return {
-      status: 'error',
-      message: `Could not assign the owner (${membershipError.code ?? 'unknown'}).${
-        cleanupFailure ? ` Manual cleanup required: ${cleanupFailure}.` : ''
-      }`,
-    };
-  }
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: 'platform_admin.created_organisation',
-    p_org_id: org.id,
-    p_site_id: site.id,
-    p_subject_type: 'org',
-    p_subject_id: org.id,
-    p_detail: { name: input.name, slug: input.slug, owner_email: input.owner_email },
-  });
-  if (auditError) {
-    const cleanupFailure = await rollback();
-    return {
-      status: 'error',
-      message: `The required audit entry failed, so organisation creation was reversed.${
-        cleanupFailure ? ` Manual cleanup required: ${cleanupFailure}.` : ''
-      }`,
-    };
-  }
-
-  revalidateOrganisation(org.id);
+  revalidateOrganisation(orgId);
   return {
     status: 'created',
-    orgId: org.id,
+    orgId,
     email: input.owner_email,
     tempPassword: createdUser ? password : null,
     linkedExisting: !createdUser,
@@ -293,7 +237,7 @@ const NewSite = z.object({
 });
 
 export async function createSite(_prev: SiteFormState, formData: FormData): Promise<SiteFormState> {
-  const { admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
 
   const parsed = NewSite.safeParse({
     org_id: String(formData.get('org_id') ?? ''),
@@ -303,27 +247,16 @@ export async function createSite(_prev: SiteFormState, formData: FormData): Prom
   });
   if (!parsed.success) return { status: 'error', message: firstIssue(parsed.error) };
 
-  if (!(await isActiveOrganisation(admin, parsed.data.org_id))) {
-    return { status: 'error', message: 'That organisation is archived or no longer exists.' };
-  }
-
-  const { data, error } = await admin.from('sites').insert(parsed.data).select('id').single();
-  if (error) return { status: 'error', message: `Could not create the site (${error.code ?? 'unknown'}).` };
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: 'platform_admin.created_site',
+  const { data: siteId, error } = await user.rpc('create_organisation_site', {
     p_org_id: parsed.data.org_id,
-    p_subject_type: 'site',
-    p_subject_id: data.id,
-    p_detail: { name: parsed.data.name },
+    p_name: parsed.data.name,
+    p_timezone: parsed.data.timezone,
+    p_address: parsed.data.address,
   });
-  if (auditError) {
-    await admin.from('sites').delete().eq('id', data.id);
-    return { status: 'error', message: 'The site was not created because audit logging is unavailable.' };
-  }
+  if (error || !siteId) return { status: 'error', message: `Could not create the site (${error?.code ?? 'unknown'}).` };
 
   revalidateOrganisation(parsed.data.org_id);
-  return { status: 'created', siteId: data.id };
+  return { status: 'created', siteId };
 }
 
 /**
@@ -431,9 +364,13 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
     if (!userId) return { status: 'error', message: `Could not create the account: ${created.error.message}` };
   }
 
-  const { error } = await admin
-    .from('memberships')
-    .insert({ user_id: userId!, org_id, site_id: site.siteId, role: parsed.data.role });
+  const { error } = await user.rpc('add_organisation_member', {
+    p_user_id: userId!,
+    p_org_id: org_id,
+    p_site_id: site.siteId,
+    p_role: parsed.data.role,
+    p_email: email,
+  });
 
   if (error) {
     if (isNew && userId) await admin.auth.admin.deleteUser(userId);
@@ -442,25 +379,6 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
       return { status: 'error', message: 'That person already has this role here.' };
     }
     return { status: 'error', message: `Could not add the membership (${error.code ?? 'unknown'}).` };
-  }
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: isNew ? 'platform_admin.created_user' : 'platform_admin.linked_user',
-    p_org_id: org_id,
-    p_site_id: site.siteId ?? undefined,
-    p_subject_type: 'membership',
-    p_detail: { email, role: parsed.data.role },
-  });
-  if (auditError) {
-    const cleanup = admin
-      .from('memberships')
-      .delete()
-      .eq('user_id', userId!)
-      .eq('org_id', org_id);
-    if (site.siteId === null) await cleanup.is('site_id', null);
-    else await cleanup.eq('site_id', site.siteId);
-    if (isNew) await admin.auth.admin.deleteUser(userId!);
-    return { status: 'error', message: 'The person was not added because audit logging is unavailable.' };
   }
 
   revalidateOrganisation(org_id);
@@ -559,27 +477,12 @@ export async function updateMemberRole(formData: FormData): Promise<void> {
   const site = await resolveSite(admin, membership.org_id, parsed.data.role, parsed.data.site_id);
   if (!site.ok) return;
 
-  const { error } = await admin
-    .from('memberships')
-    .update({ role: parsed.data.role, site_id: site.siteId })
-    .eq('id', membership.id);
-  if (error) return;
-
-  const { error: auditError } = await user.rpc('write_audit', {
-    p_action: 'platform_admin.updated_role',
-    p_org_id: membership.org_id,
-    p_site_id: site.siteId ?? undefined,
-    p_subject_type: 'membership',
-    p_subject_id: membership.id,
-    p_detail: { role: parsed.data.role },
+  const { error } = await user.rpc('update_organisation_member', {
+    p_membership_id: membership.id,
+    p_role: parsed.data.role,
+    p_site_id: site.siteId,
   });
-  if (auditError) {
-    await admin
-      .from('memberships')
-      .update({ role: membership.role, site_id: membership.site_id })
-      .eq('id', membership.id);
-    return;
-  }
+  if (error) return;
 
   revalidateOrganisation(membership.org_id);
 }

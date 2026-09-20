@@ -17,9 +17,19 @@ import {
   type JobResult,
 } from '../_shared/engine.ts';
 import { effectiveTrackingMode } from '../_shared/tracking.ts';
+import { fetchAllPages } from '../_shared/pagination.ts';
 
 const JOB = 'expiry-engine';
 const SITE_TIMEZONE = 'Australia/Melbourne';
+const WRITE_CHUNK_SIZE = 500;
+
+function chunks<T>(rows: T[], size = WRITE_CHUNK_SIZE): T[][] {
+  const result: T[][] = [];
+  for (let index = 0; index < rows.length; index += size) {
+    result.push(rows.slice(index, index + size));
+  }
+  return result;
+}
 
 /**
  * "Today" has to be the store's today, not UTC's. A run at 02:00 Melbourne is still the
@@ -56,27 +66,26 @@ Deno.serve(async (request: Request) => {
   try {
     const today = todayAt(SITE_TIMEZONE);
 
-    // Service-role clients bypass RLS, so lifecycle scope must be explicit here.
-    const { data: activeOrgs, error: orgError } = await supabase
-      .from('orgs')
-      .select('id')
-      .eq('status', 'active');
-    if (orgError) throw orgError;
-    const activeOrgIds = (activeOrgs ?? []).map((org) => org.id);
-    const scopedOrgIds = activeOrgIds.length > 0
-      ? activeOrgIds
-      : ['00000000-0000-0000-0000-000000000000'];
+    // Service-role clients bypass RLS. Join lifecycle scope in the database and page
+    // every result so PostgREST's max_rows cap cannot silently omit organisations.
+    const batches = await fetchAllPages<{
+      id: string;
+      org_id: string;
+      site_id: string;
+      expiry_date: string | null;
+    }>((from, to) =>
+      supabase
+        .from('stock_batches')
+        .select('id, org_id, site_id, expiry_date, orgs!inner(status)')
+        .eq('orgs.status', 'active')
+        .eq('status', 'active')
+        .gt('qty_remaining', 0)
+        .not('expiry_date', 'is', null)
+        .order('id')
+        .range(from, to)
+    );
 
-    const { data: batches, error: batchError } = await supabase
-      .from('stock_batches')
-      .select('id, org_id, site_id, expiry_date')
-      .in('org_id', scopedOrgIds)
-      .eq('status', 'active')
-      .gt('qty_remaining', 0)
-      .not('expiry_date', 'is', null);
-    if (batchError) throw batchError;
-
-    const rows: BatchRow[] = (batches ?? []).map((b) => ({
+    const rows: BatchRow[] = batches.map((b) => ({
       id: b.id,
       orgId: b.org_id,
       siteId: b.site_id,
@@ -90,39 +99,50 @@ Deno.serve(async (request: Request) => {
     // milliseconds and the result is always correct; incremental flag-juggling is where
     // this kind of job goes quietly wrong. Only OPEN rows go — done and dismissed rows
     // are history, and the partial unique index means a survivor would block its batch.
-    const { error: clearError } = await supabase
-      .from('expiry_actions')
-      .delete()
-      .in('org_id', scopedOrgIds)
-      .eq('state', 'open');
+    const { error: clearError } = await supabase.rpc('clear_active_expiry_actions');
     if (clearError) throw clearError;
 
     if (planned.length > 0) {
-      const { error: insertError } = await supabase.from('expiry_actions').insert(
-        planned.map((p) => ({
+      for (const page of chunks(planned)) {
+        const { error: insertError } = await supabase.from('expiry_actions').insert(
+          page.map((p) => ({
           org_id: p.orgId,
           site_id: p.siteId,
           batch_id: p.batchId,
           action: p.action,
           due_date: p.dueDate,
-        })),
-      );
-      if (insertError) throw insertError;
+          })),
+        );
+        if (insertError) throw insertError;
+      }
     }
     result.processed = planned.length;
 
     // Rotation stock carries no dates, so its whole mechanism is the daily fixture list.
-    const { data: ranged, error: rangedError } = await supabase
-      .from('site_products')
-      .select('org_id, site_id, fixture, tracking_mode_override, products(tracking_mode)')
-      .in('org_id', scopedOrgIds)
-      .eq('active', true)
-      .not('fixture', 'is', null);
-    if (rangedError) throw rangedError;
+    const ranged = await fetchAllPages<{
+      org_id: string;
+      site_id: string;
+      fixture: string | null;
+      tracking_mode_override: 'rotation' | 'batch' | 'none' | null;
+      products:
+        | { tracking_mode: 'rotation' | 'batch' | 'none' }
+        | { tracking_mode: 'rotation' | 'batch' | 'none' }[]
+        | null;
+    }>((from, to) =>
+      supabase
+        .from('site_products')
+        .select('org_id, site_id, fixture, tracking_mode_override, products(tracking_mode), orgs!inner(status)')
+        .eq('orgs.status', 'active')
+        .eq('active', true)
+        .not('fixture', 'is', null)
+        .order('id')
+        .range(from, to)
+    );
 
-    const fixtures: FixtureRow[] = (ranged ?? [])
+    const fixtures: FixtureRow[] = ranged
       .filter((r) => {
-        const catalogueMode = r.products?.tracking_mode;
+        const product = Array.isArray(r.products) ? r.products[0] : r.products;
+        const catalogueMode = product?.tracking_mode;
         if (!catalogueMode) return false;
         return effectiveTrackingMode(catalogueMode, r.tracking_mode_override) === 'rotation';
       })
@@ -132,16 +152,18 @@ Deno.serve(async (request: Request) => {
     if (checks.length > 0) {
       // Upsert, not insert: a re-run on the same day must not wipe the ticks staff have
       // already made, and the unique index on (site_id, fixture, check_date) enforces it.
-      const { error: checkError } = await supabase.from('rotation_checks').upsert(
-        checks.map((c) => ({
-          org_id: c.orgId,
-          site_id: c.siteId,
-          fixture: c.fixture,
-          check_date: c.checkDate,
-        })),
-        { onConflict: 'site_id,fixture,check_date', ignoreDuplicates: true },
-      );
-      if (checkError) throw checkError;
+      for (const page of chunks(checks)) {
+        const { error: checkError } = await supabase.from('rotation_checks').upsert(
+          page.map((c) => ({
+            org_id: c.orgId,
+            site_id: c.siteId,
+            fixture: c.fixture,
+            check_date: c.checkDate,
+          })),
+          { onConflict: 'site_id,fixture,check_date', ignoreDuplicates: true },
+        );
+        if (checkError) throw checkError;
+      }
     }
 
     result.reason = `${planned.length} actions, ${checks.length} rotation checks, horizon ${HORIZON_DAYS}d`;

@@ -879,6 +879,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_organisation_member: {
+        Args: {
+          p_email: string
+          p_org_id: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_site_id: string | null
+          p_user_id: string
+        }
+        Returns: string
+      }
       archive_organisation: {
         Args: { p_confirm_slug: string; p_org_id: string }
         Returns: undefined
@@ -887,6 +897,16 @@ export type Database = {
       auth_site_ids: { Args: never; Returns: string[] }
       can_manage_org: { Args: { org: string }; Returns: boolean }
       can_manage_site: { Args: { org: string }; Returns: boolean }
+      clear_active_expiry_actions: { Args: never; Returns: number }
+      create_organisation_site: {
+        Args: {
+          p_address: string | null
+          p_name: string
+          p_org_id: string
+          p_timezone: string
+        }
+        Returns: string
+      }
       demo_jump_days: {
         Args: { p_days: number; p_org_id: string }
         Returns: number
@@ -907,9 +927,33 @@ export type Database = {
         }
         Returns: string
       }
+      organisation_waste_total: {
+        Args: { p_org_id: string }
+        Returns: number
+      }
+      provision_organisation: {
+        Args: {
+          p_name: string
+          p_owner_email: string
+          p_owner_user_id: string
+          p_site_address: string | null
+          p_site_name: string
+          p_site_timezone: string
+          p_slug: string
+        }
+        Returns: Json
+      }
       restore_organisation: {
         Args: { p_org_id: string }
         Returns: undefined
+      }
+      update_organisation_member: {
+        Args: {
+          p_membership_id: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_site_id: string | null
+        }
+        Returns: string
       }
       remove_empty_site: {
         Args: { p_site_id: string }

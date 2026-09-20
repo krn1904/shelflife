@@ -11,6 +11,7 @@ import webpush from 'web-push';
 import { buildDigest } from '../_shared/digest.ts';
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import type { JobResult } from '../_shared/engine.ts';
+import { fetchAllPages } from '../_shared/pagination.ts';
 
 const JOB = 'daily-digest';
 const SITE_TIMEZONE = 'Australia/Melbourne';
@@ -50,51 +51,56 @@ Deno.serve(async (request: Request) => {
 
     const today = todayAt(SITE_TIMEZONE);
 
-    // The service role bypasses lifecycle-aware RLS, so archived organisations must be
-    // excluded explicitly before any notification targets are assembled.
-    const { data: activeOrgs, error: orgError } = await supabase
-      .from('orgs')
-      .select('id')
-      .eq('status', 'active');
-    if (orgError) throw orgError;
-    const activeOrgIds = (activeOrgs ?? []).map((org) => org.id);
-    const scopedOrgIds = activeOrgIds.length > 0
-      ? activeOrgIds
-      : ['00000000-0000-0000-0000-000000000000'];
-
-    const [sitesResult, actionsResult, checksResult, subscriptionsResult] = await Promise.all([
-        supabase.from('sites').select('id, org_id, name').in('org_id', scopedOrgIds),
+    // The service role bypasses RLS. Join active lifecycle scope into every query and
+    // page results so PostgREST's max_rows cap cannot skip later organisations.
+    const [sites, actions, checks, subscriptions] = await Promise.all([
+      fetchAllPages<{ id: string; org_id: string; name: string }>((from, to) =>
+        supabase
+          .from('sites')
+          .select('id, org_id, name, orgs!inner(status)')
+          .eq('orgs.status', 'active')
+          .order('id')
+          .range(from, to)
+      ),
+      fetchAllPages<{ site_id: string; action: 'check' | 'markdown' | 'pull'; due_date: string }>((from, to) =>
         supabase
           .from('expiry_actions')
-          .select('site_id, action, due_date')
-          .in('org_id', scopedOrgIds)
-          .eq('state', 'open'),
+          .select('site_id, action, due_date, orgs!inner(status)')
+          .eq('orgs.status', 'active')
+          .eq('state', 'open')
+          .order('id')
+          .range(from, to)
+      ),
+      fetchAllPages<{ site_id: string }>((from, to) =>
         supabase
           .from('rotation_checks')
-          .select('site_id')
-          .in('org_id', scopedOrgIds)
+          .select('site_id, orgs!inner(status)')
+          .eq('orgs.status', 'active')
           .eq('check_date', today)
-          .eq('state', 'open'),
+          .eq('state', 'open')
+          .order('id')
+          .range(from, to)
+      ),
+      fetchAllPages<{
+        id: string;
+        endpoint: string;
+        p256dh: string;
+        auth: string;
+        site_id: string | null;
+        org_id: string;
+      }>((from, to) =>
         supabase
           .from('push_subscriptions')
-          .select('id, endpoint, p256dh, auth, site_id, org_id')
-          .in('org_id', scopedOrgIds)
-          .is('failed_at', null),
-      ]);
-    const queryError =
-      sitesResult.error
-      ?? actionsResult.error
-      ?? checksResult.error
-      ?? subscriptionsResult.error;
-    if (queryError) throw queryError;
+          .select('id, endpoint, p256dh, auth, site_id, org_id, orgs!inner(status)')
+          .eq('orgs.status', 'active')
+          .is('failed_at', null)
+          .order('id')
+          .range(from, to)
+      ),
+    ]);
 
-    const sites = sitesResult.data;
-    const actions = actionsResult.data;
-    const checks = checksResult.data;
-    const subscriptions = subscriptionsResult.data;
-
-    for (const site of sites ?? []) {
-      const siteActions = (actions ?? [])
+    for (const site of sites) {
+      const siteActions = actions
         .filter((a) => a.site_id === site.id)
         .map((a) => ({
           action: a.action,
@@ -104,7 +110,7 @@ Deno.serve(async (request: Request) => {
       const digest = buildDigest({
         siteName: site.name,
         actions: siteActions,
-        rotationFixtures: (checks ?? []).filter((c) => c.site_id === site.id).length,
+        rotationFixtures: checks.filter((c) => c.site_id === site.id).length,
       });
 
       if (!digest.worthSending) {
@@ -114,7 +120,7 @@ Deno.serve(async (request: Request) => {
 
       // A subscription with a null site_id belongs to someone who sees the whole org —
       // an owner — so they get every site's digest.
-      const targets = (subscriptions ?? []).filter(
+      const targets = subscriptions.filter(
         (s) => s.site_id === site.id || (s.site_id === null && s.org_id === site.org_id),
       );
 
