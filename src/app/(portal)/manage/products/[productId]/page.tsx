@@ -56,7 +56,7 @@ export default async function ProductDetailPage(props: PageProps<'/manage/produc
         </p>
         <p className="mt-1 text-xs text-neutral-500">{TRACKING_HINT[product.tracking_mode]}</p>
         <p className="mt-2 text-xs text-neutral-500">
-          Shared with every tenant. Change it at your site below rather than here.
+          Shared with every organisation. Change it at your site below rather than here.
         </p>
       </section>
 

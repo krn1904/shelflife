@@ -37,6 +37,191 @@ async function requireAdmin() {
   return { session, admin: createAdminClient(), user: await createClient() };
 }
 
+function revalidateOrganisation(orgId: string) {
+  revalidatePath('/admin');
+  revalidatePath(`/admin/organisations/${orgId}`);
+}
+
+async function isActiveOrganisation(
+  admin: ReturnType<typeof createAdminClient>,
+  orgId: string,
+): Promise<boolean> {
+  const { data } = await admin
+    .from('orgs')
+    .select('id')
+    .eq('id', orgId)
+    .eq('status', 'active')
+    .maybeSingle();
+  return Boolean(data);
+}
+
+// ── Organisations ────────────────────────────────────────────────────────
+
+export type OrganisationFormState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  | {
+      status: 'created';
+      orgId: string;
+      email: string;
+      tempPassword: string | null;
+      linkedExisting: boolean;
+    };
+
+const NewOrganisation = z.object({
+  name: z.string().trim().min(2, { message: 'Give the organisation a name.' }).max(120),
+  slug: z
+    .string()
+    .trim()
+    .toLowerCase()
+    .min(2, { message: 'Give the organisation a short slug.' })
+    .max(60)
+    .regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/, {
+      message: 'Use lowercase letters, numbers and single hyphens only.',
+    }),
+  site_name: z.string().trim().min(2, { message: 'Give the first site a name.' }).max(120),
+  timezone: z.string().trim().min(1).max(60),
+  address: z.union([z.null(), z.string().max(200)]),
+  owner_name: z.string().trim().min(2, { message: 'Enter the owner’s name.' }).max(120),
+  owner_email: z.string().trim().toLowerCase().email({ message: 'Enter a valid owner email.' }),
+});
+
+export async function createOrganisation(
+  _prev: OrganisationFormState,
+  formData: FormData,
+): Promise<OrganisationFormState> {
+  const { admin, user } = await requireAdmin();
+  const parsed = NewOrganisation.safeParse({
+    name: String(formData.get('name') ?? ''),
+    slug: String(formData.get('slug') ?? ''),
+    site_name: String(formData.get('site_name') ?? ''),
+    timezone: blank(formData.get('timezone')) ?? 'Australia/Melbourne',
+    address: blank(formData.get('address')),
+    owner_name: String(formData.get('owner_name') ?? ''),
+    owner_email: String(formData.get('owner_email') ?? ''),
+  });
+  if (!parsed.success) return { status: 'error', message: firstIssue(parsed.error) };
+
+  const input = parsed.data;
+  const { data: existingOrg } = await admin
+    .from('orgs')
+    .select('id')
+    .eq('slug', input.slug)
+    .maybeSingle();
+  if (existingOrg) return { status: 'error', message: 'That organisation slug is already in use.' };
+
+  let userId = await findUserByEmail(admin, input.owner_email);
+  let createdUser = false;
+  const password = tempPassword();
+
+  if (!userId) {
+    const created = await admin.auth.admin.createUser({
+      email: input.owner_email,
+      password,
+      email_confirm: true,
+      user_metadata: { full_name: input.owner_name },
+    });
+    userId = created.data.user?.id ?? null;
+    if (created.error || !userId) {
+      return {
+        status: 'error',
+        message: `Could not create the owner account: ${created.error?.message ?? 'unknown error'}`,
+      };
+    }
+    createdUser = true;
+  }
+
+  const { data: provisioned, error: provisionError } = await user.rpc('provision_organisation', {
+    p_name: input.name,
+    p_slug: input.slug,
+    p_site_name: input.site_name,
+    p_site_timezone: input.timezone,
+    p_site_address: input.address,
+    p_owner_user_id: userId,
+    p_owner_email: input.owner_email,
+  });
+  if (provisionError || !provisioned || Array.isArray(provisioned) || typeof provisioned !== 'object') {
+    const cleanup = createdUser ? await admin.auth.admin.deleteUser(userId) : null;
+    return {
+      status: 'error',
+      message: `${provisionError?.code === '23505'
+        ? 'That organisation slug is already in use.'
+        : `Could not create the organisation (${provisionError?.code ?? 'unknown'}).`
+      }${cleanup?.error ? ` The unused owner account also needs manual cleanup: ${cleanup.error.message}` : ''}`,
+    };
+  }
+
+  const orgId = 'org_id' in provisioned && typeof provisioned.org_id === 'string'
+    ? provisioned.org_id
+    : null;
+  if (!orgId) return { status: 'error', message: 'Organisation creation returned an invalid result.' };
+
+  revalidateOrganisation(orgId);
+  return {
+    status: 'created',
+    orgId,
+    email: input.owner_email,
+    tempPassword: createdUser ? password : null,
+    linkedExisting: !createdUser,
+  };
+}
+
+export type OrganisationLifecycleState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  | { status: 'archived' }
+  | { status: 'restored' };
+
+const OrganisationLifecycle = z.object({
+  org_id: z.string().uuid(),
+  confirm_slug: z.string().trim(),
+});
+
+export async function archiveOrganisation(
+  _prev: OrganisationLifecycleState,
+  formData: FormData,
+): Promise<OrganisationLifecycleState> {
+  const { user } = await requireAdmin();
+  const parsed = OrganisationLifecycle.safeParse({
+    org_id: String(formData.get('org_id') ?? ''),
+    confirm_slug: String(formData.get('confirm_slug') ?? ''),
+  });
+  if (!parsed.success) return { status: 'error', message: 'The confirmation was not valid.' };
+
+  const { error } = await user.rpc('archive_organisation', {
+    p_org_id: parsed.data.org_id,
+    p_confirm_slug: parsed.data.confirm_slug,
+  });
+  if (error) {
+    return {
+      status: 'error',
+      message: error.message.includes('slug did not match')
+        ? 'The organisation slug did not match exactly.'
+        : `Could not archive the organisation (${error.code ?? 'unknown'}).`,
+    };
+  }
+
+  revalidateOrganisation(parsed.data.org_id);
+  return { status: 'archived' };
+}
+
+export async function restoreOrganisation(
+  _prev: OrganisationLifecycleState,
+  formData: FormData,
+): Promise<OrganisationLifecycleState> {
+  const { user } = await requireAdmin();
+  const orgId = z.string().uuid().safeParse(String(formData.get('org_id') ?? ''));
+  if (!orgId.success) return { status: 'error', message: 'The organisation was not valid.' };
+
+  const { error } = await user.rpc('restore_organisation', {
+    p_org_id: orgId.data,
+  });
+  if (error) return { status: 'error', message: `Could not restore the organisation (${error.code ?? 'unknown'}).` };
+
+  revalidateOrganisation(orgId.data);
+  return { status: 'restored' };
+}
+
 // ── Sites ────────────────────────────────────────────────────────────────
 
 export type SiteFormState =
@@ -52,7 +237,7 @@ const NewSite = z.object({
 });
 
 export async function createSite(_prev: SiteFormState, formData: FormData): Promise<SiteFormState> {
-  const { admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
 
   const parsed = NewSite.safeParse({
     org_id: String(formData.get('org_id') ?? ''),
@@ -62,22 +247,16 @@ export async function createSite(_prev: SiteFormState, formData: FormData): Prom
   });
   if (!parsed.success) return { status: 'error', message: firstIssue(parsed.error) };
 
-  const { data: org } = await admin.from('orgs').select('id').eq('id', parsed.data.org_id).maybeSingle();
-  if (!org) return { status: 'error', message: 'That tenant no longer exists.' };
-
-  const { data, error } = await admin.from('sites').insert(parsed.data).select('id').single();
-  if (error) return { status: 'error', message: `Could not create the site (${error.code ?? 'unknown'}).` };
-
-  await user.rpc('write_audit', {
-    p_action: 'platform_admin.created_site',
+  const { data: siteId, error } = await user.rpc('create_organisation_site', {
     p_org_id: parsed.data.org_id,
-    p_subject_type: 'site',
-    p_subject_id: data.id,
-    p_detail: { name: parsed.data.name },
+    p_name: parsed.data.name,
+    p_timezone: parsed.data.timezone,
+    p_address: parsed.data.address,
   });
+  if (error || !siteId) return { status: 'error', message: `Could not create the site (${error?.code ?? 'unknown'}).` };
 
-  revalidatePath(`/admin/tenants/${parsed.data.org_id}`);
-  return { status: 'created', siteId: data.id };
+  revalidateOrganisation(parsed.data.org_id);
+  return { status: 'created', siteId };
 }
 
 /**
@@ -86,35 +265,16 @@ export async function createSite(_prev: SiteFormState, formData: FormData): Prom
  * product exists to keep — so this refuses and names what stands in the way instead.
  */
 export async function removeSite(formData: FormData): Promise<void> {
-  const { admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
 
   const siteId = z.string().uuid().safeParse(String(formData.get('site_id') ?? ''));
   if (!siteId.success) return;
 
-  const { data: site } = await admin
-    .from('sites').select('id, org_id').eq('id', siteId.data).maybeSingle();
-  if (!site) return;
-
-  const [{ count: deliveries }, { count: batches }, { count: waste }] = await Promise.all([
-    admin.from('deliveries').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
-    admin.from('stock_batches').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
-    admin.from('waste_events').select('*', { count: 'exact', head: true }).eq('site_id', site.id),
-  ]);
-
-  // A site with any recorded activity is kept. The button is for sites added by mistake.
-  if ((deliveries ?? 0) + (batches ?? 0) + (waste ?? 0) > 0) return;
-
-  const { error } = await admin.from('sites').delete().eq('id', site.id);
-  if (error) return;
-
-  await user.rpc('write_audit', {
-    p_action: 'platform_admin.removed_site',
-    p_org_id: site.org_id,
-    p_subject_type: 'site',
-    p_subject_id: site.id,
+  const { data: orgId, error } = await user.rpc('remove_empty_site', {
+    p_site_id: siteId.data,
   });
-
-  revalidatePath(`/admin/tenants/${site.org_id}`);
+  if (error) return;
+  if (orgId) revalidateOrganisation(orgId);
 }
 
 // ── People ───────────────────────────────────────────────────────────────
@@ -148,7 +308,7 @@ async function resolveSite(
 
   const { data: site } = await admin
     .from('sites').select('id').eq('id', siteId).eq('org_id', orgId).maybeSingle();
-  if (!site) return { ok: false, message: 'That site is not part of this tenant.' };
+  if (!site) return { ok: false, message: 'That site is not part of this organisation.' };
   return { ok: true, siteId };
 }
 
@@ -157,8 +317,14 @@ async function findUserByEmail(
   admin: ReturnType<typeof createAdminClient>,
   email: string,
 ): Promise<string | null> {
-  const { data } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  return data?.users.find((u) => u.email?.toLowerCase() === email)?.id ?? null;
+  const perPage = 1000;
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) return null;
+    const match = data.users.find((user) => user.email?.toLowerCase() === email);
+    if (match) return match.id;
+    if (data.users.length < perPage) return null;
+  }
 }
 
 export async function addPerson(_prev: PersonFormState, formData: FormData): Promise<PersonFormState> {
@@ -174,8 +340,9 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
   if (!parsed.success) return { status: 'error', message: firstIssue(parsed.error) };
   const { org_id, email, full_name } = parsed.data;
 
-  const { data: org } = await admin.from('orgs').select('id').eq('id', org_id).maybeSingle();
-  if (!org) return { status: 'error', message: 'That tenant no longer exists.' };
+  if (!(await isActiveOrganisation(admin, org_id))) {
+    return { status: 'error', message: 'That organisation is archived or no longer exists.' };
+  }
 
   const site = await resolveSite(admin, org_id, parsed.data.role, parsed.data.site_id);
   if (!site.ok) return { status: 'error', message: site.message };
@@ -197,11 +364,16 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
     if (!userId) return { status: 'error', message: `Could not create the account: ${created.error.message}` };
   }
 
-  const { error } = await admin
-    .from('memberships')
-    .insert({ user_id: userId!, org_id, site_id: site.siteId, role: parsed.data.role });
+  const { error } = await user.rpc('add_organisation_member', {
+    p_user_id: userId!,
+    p_org_id: org_id,
+    p_site_id: site.siteId,
+    p_role: parsed.data.role,
+    p_email: email,
+  });
 
   if (error) {
+    if (isNew && userId) await admin.auth.admin.deleteUser(userId);
     // unique (user_id, org_id, site_id) — they already hold this exact membership.
     if (error.code === '23505') {
       return { status: 'error', message: 'That person already has this role here.' };
@@ -209,18 +381,72 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
     return { status: 'error', message: `Could not add the membership (${error.code ?? 'unknown'}).` };
   }
 
-  await user.rpc('write_audit', {
-    p_action: isNew ? 'platform_admin.created_user' : 'platform_admin.linked_user',
-    p_org_id: org_id,
-    p_site_id: site.siteId ?? undefined,
-    p_subject_type: 'membership',
-    p_detail: { email, role: parsed.data.role },
-  });
-
-  revalidatePath(`/admin/tenants/${org_id}`);
+  revalidateOrganisation(org_id);
   return isNew
     ? { status: 'created', email, tempPassword: password }
     : { status: 'linked', email };
+}
+
+export type PasswordResetState =
+  | { status: 'idle' }
+  | { status: 'error'; message: string }
+  | { status: 'reset'; email: string; tempPassword: string; auditWarning: boolean };
+
+export async function resetMemberPassword(
+  _prev: PasswordResetState,
+  formData: FormData,
+): Promise<PasswordResetState> {
+  const { admin, user } = await requireAdmin();
+  const membershipId = z.string().uuid().safeParse(String(formData.get('membership_id') ?? ''));
+  if (!membershipId.success) return { status: 'error', message: 'That membership was not valid.' };
+
+  const { data: membership } = await admin
+    .from('memberships')
+    .select('id, user_id, org_id')
+    .eq('id', membershipId.data)
+    .maybeSingle();
+  if (!membership) return { status: 'error', message: 'That person is no longer a member.' };
+  if (!(await isActiveOrganisation(admin, membership.org_id))) {
+    return { status: 'error', message: 'Passwords cannot be reset for an archived organisation.' };
+  }
+
+  const { error: auditPreflightError } = await user.rpc('write_audit', {
+    p_action: 'platform_admin.password_reset_requested',
+    p_org_id: membership.org_id,
+    p_subject_type: 'membership',
+    p_subject_id: membership.id,
+  });
+  if (auditPreflightError) {
+    return { status: 'error', message: 'The password was not changed because audit logging is unavailable.' };
+  }
+
+  const password = tempPassword();
+  const { data, error } = await admin.auth.admin.updateUserById(
+    membership.user_id,
+    { password },
+  );
+  if (error || !data.user) {
+    return {
+      status: 'error',
+      message: `Could not reset the password: ${error?.message ?? 'unknown error'}`,
+    };
+  }
+
+  const { error: auditError } = await user.rpc('write_audit', {
+    p_action: 'platform_admin.reset_password',
+    p_org_id: membership.org_id,
+    p_subject_type: 'membership',
+    p_subject_id: membership.id,
+    p_detail: { email: data.user.email ?? null },
+  });
+
+  revalidateOrganisation(membership.org_id);
+  return {
+    status: 'reset',
+    email: data.user.email ?? 'the member',
+    tempPassword: password,
+    auditWarning: Boolean(auditError),
+  };
 }
 
 const UpdateRole = z.object({
@@ -240,51 +466,37 @@ export async function updateMemberRole(formData: FormData): Promise<void> {
   if (!parsed.success) return;
 
   const { data: membership } = await admin
-    .from('memberships').select('id, org_id').eq('id', parsed.data.membership_id).maybeSingle();
+    .from('memberships')
+    .select('id, org_id, role, site_id')
+    .eq('id', parsed.data.membership_id)
+    .maybeSingle();
   if (!membership) return;
+  if (!(await isActiveOrganisation(admin, membership.org_id))) return;
 
   // The site rule applies on update too: a promotion to an org-wide role nulls the pin.
   const site = await resolveSite(admin, membership.org_id, parsed.data.role, parsed.data.site_id);
   if (!site.ok) return;
 
-  const { error } = await admin
-    .from('memberships')
-    .update({ role: parsed.data.role, site_id: site.siteId })
-    .eq('id', membership.id);
+  const { error } = await user.rpc('update_organisation_member', {
+    p_membership_id: membership.id,
+    p_role: parsed.data.role,
+    p_site_id: site.siteId,
+  });
   if (error) return;
 
-  await user.rpc('write_audit', {
-    p_action: 'platform_admin.updated_role',
-    p_org_id: membership.org_id,
-    p_site_id: site.siteId ?? undefined,
-    p_subject_type: 'membership',
-    p_subject_id: membership.id,
-    p_detail: { role: parsed.data.role },
-  });
-
-  revalidatePath(`/admin/tenants/${membership.org_id}`);
+  revalidateOrganisation(membership.org_id);
 }
 
-/** Unlinks a person from the tenant. The auth login itself is left intact. */
+/** Unlinks a person from the organisation. The auth login itself is left intact. */
 export async function removeMember(formData: FormData): Promise<void> {
-  const { admin, user } = await requireAdmin();
+  const { user } = await requireAdmin();
 
   const membershipId = z.string().uuid().safeParse(String(formData.get('membership_id') ?? ''));
   if (!membershipId.success) return;
 
-  const { data: membership } = await admin
-    .from('memberships').select('id, org_id').eq('id', membershipId.data).maybeSingle();
-  if (!membership) return;
-
-  const { error } = await admin.from('memberships').delete().eq('id', membership.id);
-  if (error) return;
-
-  await user.rpc('write_audit', {
-    p_action: 'platform_admin.removed_member',
-    p_org_id: membership.org_id,
-    p_subject_type: 'membership',
-    p_subject_id: membership.id,
+  const { data: orgId, error } = await user.rpc('remove_organisation_member', {
+    p_membership_id: membershipId.data,
   });
-
-  revalidatePath(`/admin/tenants/${membership.org_id}`);
+  if (error) return;
+  if (orgId) revalidateOrganisation(orgId);
 }

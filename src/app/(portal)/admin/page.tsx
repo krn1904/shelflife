@@ -1,8 +1,11 @@
 import Link from 'next/link';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
+import type { Tables } from '@/lib/supabase/database.types';
+import { fetchAllPages } from '@/lib/pagination';
 import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle } from '@/components/ui';
+import { AddOrganisationForm } from './organisation-admin';
 
 const RUN_LIMIT = 15;
 
@@ -18,15 +21,36 @@ function isStale(lastRunAt: string | undefined): boolean {
   return Date.now() - new Date(lastRunAt).getTime() > STALE_AFTER_MS;
 }
 
+type OrganisationListRow = Pick<
+  Tables<'orgs'>,
+  'id' | 'name' | 'slug' | 'status' | 'archived_at' | 'created_at'
+>;
+
+async function listAllOrganisations(
+  supabase: Awaited<ReturnType<typeof createClient>>,
+): Promise<OrganisationListRow[]> {
+  return fetchAllPages<OrganisationListRow>((from, to) =>
+    supabase
+      .from('orgs')
+      .select('id, name, slug, status, archived_at, created_at')
+      .order('name')
+      .order('id')
+      .range(from, to)
+  );
+}
+
 export default async function AdminPage() {
   await requireRole('platform_admin');
   const supabase = await createClient();
 
-  // is_platform_admin() widens every policy, so these reads are already cross-tenant.
-  const [{ data: orgs }, { count: sites }, { count: products }, { data: runs }] =
+  // is_platform_admin() widens every policy, so these reads are already cross-organisation.
+  const [orgs, { count: activeSiteCount }, { count: products }, { data: runs }] =
     await Promise.all([
-      supabase.from('orgs').select('id, name, slug, created_at').order('name'),
-      supabase.from('sites').select('*', { count: 'exact', head: true }),
+      listAllOrganisations(supabase),
+      supabase
+        .from('sites')
+        .select('orgs!inner(status)', { count: 'exact', head: true })
+        .eq('orgs.status', 'active'),
       supabase.from('products').select('*', { count: 'exact', head: true }),
       supabase
         .from('job_runs')
@@ -37,15 +61,17 @@ export default async function AdminPage() {
 
   const lastEngineRun = (runs ?? []).find((r) => r.job === 'expiry-engine');
   const engineStale = isStale(lastEngineRun?.ran_at);
+  const activeOrgs = orgs.filter((org) => org.status === 'active');
+  const archivedOrgs = orgs.filter((org) => org.status === 'archived');
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Platform" subtitle="Every tenant, and the jobs that keep them fed." />
+      <PageHeader title="Platform" subtitle="Every organisation, and the jobs that keep them fed." />
 
       <div className="grid gap-3 sm:grid-cols-3">
-        <Stat label="Tenants" value={orgs?.length ?? 0} />
-        <Stat label="Sites" value={sites ?? 0} />
-        <Stat label="Catalogue products" value={products ?? 0} hint="shared across tenants" />
+        <Stat label="Active organisations" value={activeOrgs.length} />
+        <Stat label="Active sites" value={activeSiteCount ?? 0} />
+        <Stat label="Catalogue products" value={products ?? 0} hint="shared across organisations" />
       </div>
 
       {/* A cron that stopped firing looks like nothing at all until stock is gone, so it
@@ -60,23 +86,51 @@ export default async function AdminPage() {
         </p>
       )}
 
-      <div>
-        <SectionTitle>Tenants</SectionTitle>
+      <section>
+        <SectionTitle>Add organisation</SectionTitle>
+        <AddOrganisationForm />
+      </section>
+
+      <section>
+        <SectionTitle>Active organisations</SectionTitle>
         <ul className="card divide-y divide-line overflow-hidden">
-          {(orgs ?? []).map((org) => (
+          {activeOrgs.map((org) => (
             <li key={org.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
               <span className="font-medium">{org.name}</span>
               <span className="badge badge-neutral font-mono">{org.slug}</span>
-              <Link href={`/admin/tenants/${org.id}`} className="btn btn-outline ml-auto px-3 py-1.5 text-xs">
+              <Link href={`/admin/organisations/${org.id}`} className="btn btn-outline ml-auto px-3 py-1.5 text-xs">
                 Manage
               </Link>
             </li>
           ))}
-          {(orgs ?? []).length === 0 && (
-            <li className="px-4 py-6 text-center text-sm text-muted">No tenants yet.</li>
+          {activeOrgs.length === 0 && (
+            <li className="px-4 py-6 text-center text-sm text-muted">No active organisations.</li>
           )}
         </ul>
-      </div>
+      </section>
+
+      {archivedOrgs.length > 0 && (
+        <section>
+          <SectionTitle>Archived organisations</SectionTitle>
+          <ul className="card divide-y divide-line overflow-hidden">
+            {archivedOrgs.map((org) => (
+              <li key={org.id} className="flex flex-wrap items-center gap-3 px-4 py-3 text-sm">
+                <span className="font-medium text-muted">{org.name}</span>
+                <span className="badge badge-neutral font-mono">{org.slug}</span>
+                <span className="text-xs text-faint">
+                  {org.archived_at ? new Date(org.archived_at).toLocaleDateString('en-AU') : ''}
+                </span>
+                <Link
+                  href={`/admin/organisations/${org.id}`}
+                  className="btn btn-outline ml-auto px-3 py-1.5 text-xs"
+                >
+                  Review
+                </Link>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <div>
         <SectionTitle>Scheduled job history</SectionTitle>

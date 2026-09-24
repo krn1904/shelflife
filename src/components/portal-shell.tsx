@@ -21,6 +21,9 @@ const ROLE_LABEL: Record<AppRole, string> = {
 export function PortalShell({ session, children }: { session: Session; children: React.ReactNode }) {
   const links = NAV.filter((n) => roleAtLeast(session.primaryRole, n.bar));
   const org = session.memberships[0];
+  const contextName = session.primaryRole === 'platform_admin'
+    ? 'ShelfLife Platform'
+    : org?.orgName;
 
   return (
     <div className="min-h-dvh">
@@ -36,7 +39,7 @@ export function PortalShell({ session, children }: { session: Session; children:
 
           <div className="ml-auto flex items-center gap-3 text-sm">
             <div className="hidden text-right leading-tight sm:block">
-              <div className="font-medium text-ink">{org?.orgName}</div>
+              <div className="font-medium text-ink">{contextName}</div>
               <div className="text-xs text-faint">{ROLE_LABEL[session.primaryRole]}</div>
             </div>
             <form action={signOut}>

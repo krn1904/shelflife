@@ -8,6 +8,29 @@ import type { ExpiryActionKind } from './engine.ts';
  * eleven need pulling is worse than naming none.
  */
 
+export type DigestSubscription = {
+  org_id: string;
+  site_id: string | null;
+};
+
+export type DigestSite = {
+  id: string;
+  org_id: string;
+};
+
+/**
+ * A site-scoped subscription must name this site in this organisation. A null
+ * site_id is organisation-wide and still has to match the site's org_id, so a
+ * legacy or break-glass row cannot pull another organisation's digest.
+ */
+export function subscriptionTargetsSite(
+  subscription: DigestSubscription,
+  site: DigestSite,
+): boolean {
+  if (subscription.org_id !== site.org_id) return false;
+  return subscription.site_id === null || subscription.site_id === site.id;
+}
+
 export type DigestInput = {
   siteName: string;
   actions: { action: ExpiryActionKind; daysLeft: number }[];

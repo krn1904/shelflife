@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { buildDigest } from './digest';
+import { buildDigest, subscriptionTargetsSite } from './digest';
 
 test('leads with the pull count, which is the number that costs money', () => {
   const digest = buildDigest({
@@ -38,6 +38,30 @@ test('fixtures alone are worth sending', () => {
   const digest = buildDigest({ siteName: 'Preston', actions: [], rotationFixtures: 3 });
   assert.equal(digest.worthSending, true);
   assert.equal(digest.title, "Preston: today's list");
+});
+
+test('subscriptions only match sites in the same organisation', () => {
+  const site = { id: 'site-a', org_id: 'org-a' };
+  assert.equal(
+    subscriptionTargetsSite({ org_id: 'org-a', site_id: 'site-a' }, site),
+    true,
+  );
+  assert.equal(
+    subscriptionTargetsSite({ org_id: 'org-a', site_id: null }, site),
+    true,
+  );
+  assert.equal(
+    subscriptionTargetsSite({ org_id: 'org-b', site_id: 'site-a' }, site),
+    false,
+  );
+  assert.equal(
+    subscriptionTargetsSite({ org_id: 'org-b', site_id: null }, site),
+    false,
+  );
+  assert.equal(
+    subscriptionTargetsSite({ org_id: 'org-a', site_id: 'site-b' }, site),
+    false,
+  );
 });
 
 test('no overdue stock means no overdue clause', () => {

@@ -44,6 +44,6 @@ export const DEMO_LOGINS: DemoLogin[] = [
     fullName: 'Platform (demo admin)',
     role: 'platform_admin',
     label: 'Platform admin',
-    blurb: 'Cross-tenant: the catalogue, the audit trail and scheduled job history.',
+    blurb: 'Across organisations: the catalogue, audit trail and scheduled job history.',
   },
 ];

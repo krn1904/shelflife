@@ -11,16 +11,18 @@
  * to undefined in the browser however correct it looks here.
  */
 
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? '';
+// `||` rather than `??`: a variable that exists but is blank (easy to do when copying
+// .env.example) must fall through to the other name instead of shadowing it.
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 
 export const SUPABASE_ANON_KEY =
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ??
-  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ??
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+  process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
   '';
 
 /** Server-only. Bypasses RLS, so it must never reach a client bundle. */
 export const SUPABASE_SERVICE_KEY =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ?? process.env.SUPABASE_SECRET_KEY ?? '';
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.SUPABASE_SECRET_KEY || '';
 
 /**
  * Fails with the names to set rather than letting the Supabase client construct itself

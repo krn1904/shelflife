@@ -360,27 +360,36 @@ export type Database = {
       }
       orgs: {
         Row: {
+          archived_at: string | null
+          archived_by: string | null
           created_at: string
           id: string
           is_demo: boolean
           name: string
           slug: string
+          status: Database["public"]["Enums"]["org_status"]
           updated_at: string
         }
         Insert: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           id?: string
           is_demo?: boolean
           name: string
           slug: string
+          status?: Database["public"]["Enums"]["org_status"]
           updated_at?: string
         }
         Update: {
+          archived_at?: string | null
+          archived_by?: string | null
           created_at?: string
           id?: string
           is_demo?: boolean
           name?: string
           slug?: string
+          status?: Database["public"]["Enums"]["org_status"]
           updated_at?: string
         }
         Relationships: []
@@ -870,10 +879,34 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_organisation_member: {
+        Args: {
+          p_email: string
+          p_org_id: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_site_id: string | null
+          p_user_id: string
+        }
+        Returns: string
+      }
+      archive_organisation: {
+        Args: { p_confirm_slug: string; p_org_id: string }
+        Returns: undefined
+      }
       auth_org_ids: { Args: never; Returns: string[] }
       auth_site_ids: { Args: never; Returns: string[] }
       can_manage_org: { Args: { org: string }; Returns: boolean }
       can_manage_site: { Args: { org: string }; Returns: boolean }
+      clear_active_expiry_actions: { Args: never; Returns: number }
+      create_organisation_site: {
+        Args: {
+          p_address: string | null
+          p_name: string
+          p_org_id: string
+          p_timezone: string
+        }
+        Returns: string
+      }
       demo_jump_days: {
         Args: { p_days: number; p_org_id: string }
         Returns: number
@@ -882,6 +915,11 @@ export type Database = {
         Args: { org: string; roles: Database["public"]["Enums"]["app_role"][] }
         Returns: boolean
       }
+      insert_active_expiry_actions: {
+        Args: { p_actions: Json }
+        Returns: number
+      }
+      has_active_membership: { Args: never; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       record_waste: {
         Args: {
@@ -891,6 +929,46 @@ export type Database = {
           p_qty: number
           p_reason: Database["public"]["Enums"]["waste_reason"]
         }
+        Returns: string
+      }
+      organisation_waste_total: {
+        Args: { p_org_id: string }
+        Returns: number
+      }
+      provision_organisation: {
+        Args: {
+          p_name: string
+          p_owner_email: string
+          p_owner_user_id: string
+          p_site_address: string | null
+          p_site_name: string
+          p_site_timezone: string
+          p_slug: string
+        }
+        Returns: Json
+      }
+      restore_organisation: {
+        Args: { p_org_id: string }
+        Returns: undefined
+      }
+      update_organisation_member: {
+        Args: {
+          p_membership_id: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_site_id: string | null
+        }
+        Returns: string
+      }
+      upsert_active_rotation_checks: {
+        Args: { p_checks: Json }
+        Returns: number
+      }
+      remove_empty_site: {
+        Args: { p_site_id: string }
+        Returns: string
+      }
+      remove_organisation_member: {
+        Args: { p_membership_id: string }
         Returns: string
       }
       shares_org_with: { Args: { other_user: string }; Returns: boolean }
@@ -913,6 +991,7 @@ export type Database = {
       delivery_status: "draft" | "closed"
       expiry_action_kind: "check" | "markdown" | "pull"
       expiry_source: "predicted" | "confirmed" | "manual"
+      org_status: "active" | "archived"
       tracking_mode: "rotation" | "batch" | "none"
       waste_reason:
         | "expired"
@@ -1057,6 +1136,7 @@ export const Constants = {
       delivery_status: ["draft", "closed"],
       expiry_action_kind: ["check", "markdown", "pull"],
       expiry_source: ["predicted", "confirmed", "manual"],
+      org_status: ["active", "archived"],
       tracking_mode: ["rotation", "batch", "none"],
       waste_reason: [
         "expired",
