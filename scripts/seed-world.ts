@@ -223,7 +223,7 @@ const demoKey = (role: AppRole) => `demo-${role === 'platform_admin' ? 'admin' :
 
 const ORGS: OrgConfig[] = [
   {
-    key: 'demo', name: 'Demo Servo Group', slug: DEMO_ORG_SLUG, isDemo: true,
+    key: 'demo', name: 'BP Melbourne North (Demo)', slug: DEMO_ORG_SLUG, isDemo: true,
     createdDaysAgo: 250, historyDays: 240, adoptedDaysAgo: 90, rangeShare: 1,
     archivedDaysAgo: null, admin: 'demo-admin',
     sites: [
@@ -244,7 +244,7 @@ const ORGS: OrgConfig[] = [
     suppliers: SUPPLIERS,
   },
   {
-    key: 'northside', name: 'Northside Fuel Co', slug: 'northside', isDemo: false,
+    key: 'northside', name: 'Metro Petroleum', slug: 'northside', isDemo: false,
     createdDaysAgo: 200, historyDays: 180, adoptedDaysAgo: 60, rangeShare: 0.85,
     archivedDaysAgo: null, admin: 'platform-admin',
     // test-rls expects exactly three sites here and staff pinned to the first.
@@ -266,7 +266,7 @@ const ORGS: OrgConfig[] = [
     suppliers: SUPPLIERS.filter((s) => s.name !== 'PFD Food Services'),
   },
   {
-    key: 'bayside', name: 'Bayside Servos', slug: 'bayside', isDemo: false,
+    key: 'bayside', name: 'United Petroleum', slug: 'bayside', isDemo: false,
     createdDaysAgo: 120, historyDays: 90, adoptedDaysAgo: 45, rangeShare: 0.6,
     archivedDaysAgo: null, admin: 'platform-admin',
     sites: [{ key: 'st-kilda', name: 'St Kilda', address: '88 Fitzroy St, St Kilda VIC 3182' }],
@@ -279,7 +279,7 @@ const ORGS: OrgConfig[] = [
   },
   {
     // Archived: the platform-admin portal's "Archived organisations" list and Restore.
-    key: 'westgate', name: 'Westgate Petroleum', slug: 'westgate', isDemo: false,
+    key: 'westgate', name: 'Liberty Oil', slug: 'westgate', isDemo: false,
     createdDaysAgo: 170, historyDays: 150, adoptedDaysAgo: 90, rangeShare: 0.5,
     archivedDaysAgo: 18, admin: 'platform-admin',
     sites: [
@@ -295,7 +295,7 @@ const ORGS: OrgConfig[] = [
   },
   {
     // Just onboarded: every empty state, and a site the admin can still remove.
-    key: 'eastern', name: 'Eastern Express Fuels', slug: 'eastern-express', isDemo: false,
+    key: 'eastern', name: 'Ampol Eastern', slug: 'eastern-express', isDemo: false,
     createdDaysAgo: 2, historyDays: 0, adoptedDaysAgo: 0, rangeShare: 0,
     archivedDaysAgo: null, admin: 'platform-admin',
     sites: [{ key: 'ringwood', name: 'Ringwood', address: '55 Maroondah Hwy, Ringwood VIC 3134' }],

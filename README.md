@@ -202,11 +202,11 @@ same data. `npm test` checks the world's invariants without a database.
 
 | Organisation | State | What it shows |
 |---|---|---|
-| Demo Servo Group (`demo-servo`) | active, `is_demo` | 3 sites, 8 months of deliveries, stock and waste; expired write-offs build up, then fall sharply once the site starts acting on the list (~3 months ago) |
-| Northside Fuel Co (`northside`) | active | 3 sites, 6 months of history, the RLS suite's org A, role change and password-reset audit trail |
-| Bayside Servos (`bayside`) | active | 1 site, 3 months, a smaller range; archived and restored once (audit trail); the RLS suite's org B |
-| Westgate Petroleum (`westgate`) | **archived** 18 days ago | Archived list and Restore; its members are locked out |
-| Eastern Express Fuels (`eastern-express`) | active, new | Onboarded 2 days ago: every empty state, a removable site |
+| BP Melbourne North (Demo) (`demo-servo`) | active, `is_demo` | 3 sites, 8 months of deliveries, stock and waste; expired write-offs build up, then fall sharply once the site starts acting on the list (~3 months ago) |
+| Metro Petroleum (`northside`) | active | 3 sites, 6 months of history, the RLS suite's org A, role change and password-reset audit trail |
+| United Petroleum (`bayside`) | active | 1 site, 3 months, a smaller range; archived and restored once (audit trail); the RLS suite's org B |
+| Liberty Oil (`westgate`) | **archived** 18 days ago | Archived list and Restore; its members are locked out |
+| Ampol Eastern (`eastern-express`) | active, new | Onboarded 2 days ago: every empty state, a removable site |
 
 Across them: every waste reason (including a supplier recall), short deliveries
 (`qty_received` < `qty_docketed`), site tracking-mode overrides, ranged-off lines, an
