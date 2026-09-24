@@ -523,6 +523,18 @@ async function main() {
     check('organisation-wide membership RPC accepts an explicit null site',
       orgWideMembershipError === null && Boolean(orgWideMembership),
       orgWideMembershipError?.message ?? '');
+
+    // NULL site_ids must collide: unique nulls not distinct (user_id, org_id, site_id).
+    const { error: duplicateOrgWideError } = await platform.rpc('add_organisation_member', {
+      p_org_id: united.id,
+      p_user_id: platformUser!.id,
+      p_site_id: null,
+      p_role: 'owner',
+      p_email: 'admin@shelflife.test',
+    });
+    check('duplicate organisation-wide membership is a unique violation',
+      duplicateOrgWideError?.code === '23505',
+      duplicateOrgWideError ? `got ${duplicateOrgWideError.code}` : 'insert unexpectedly succeeded');
     await platform.rpc('remove_organisation_member', {
       p_membership_id: orgWideMembership!,
     });
