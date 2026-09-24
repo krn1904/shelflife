@@ -260,6 +260,11 @@ barcode), `site_products` (per-site overrides incl. `tracking_mode_override`), `
 makes v2 reconciliation need no migration), `stock_batches`, `expiry_actions`, `rotation_checks`,
 `waste_events`, `job_runs`, `push_subscriptions`, `audit_log`.
 
+`memberships` is `unique nulls not distinct (user_id, org_id, site_id)`. Organisation-wide
+roles (owner, platform admin) store `site_id = null`, and a plain unique constraint lets NULLs
+repeat, so those rows could be duplicated and `onConflict: 'user_id,org_id,site_id'` upserts
+never matched them.
+
 Tracking mode is resolved from the catalogue default plus the optional per-site override via
 `effectiveTrackingMode(...)` in `products/tracking.ts` — the engine uses the same function so app
 and cron agree on what counts as `rotation`.

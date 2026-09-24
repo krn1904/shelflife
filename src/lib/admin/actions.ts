@@ -374,7 +374,8 @@ export async function addPerson(_prev: PersonFormState, formData: FormData): Pro
 
   if (error) {
     if (isNew && userId) await admin.auth.admin.deleteUser(userId);
-    // unique (user_id, org_id, site_id) — they already hold this exact membership.
+    // unique nulls not distinct (user_id, org_id, site_id) — they already hold a membership
+    // at this scope (this site, or organisation-wide when site_id is null).
     if (error.code === '23505') {
       return { status: 'error', message: 'That person already has this role here.' };
     }
