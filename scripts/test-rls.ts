@@ -100,11 +100,17 @@ async function main() {
     check('cannot update another org', (updated?.length ?? 0) === 0,
       `updated ${updated?.length} rows`);
 
-    const { data: createdSite, error: ownerSiteInsert } = await owner
+    // No .select() on the insert: RETURNING is checked against sites_select, whose
+    // auth_site_ids() snapshot predates the new row, so it would fail a valid insert.
+    const ownerSiteName = `Owner site ${Date.now()}`;
+    const { error: ownerSiteInsert } = await owner
       .from('sites')
-      .insert({ org_id: northside.id, name: `Owner site ${Date.now()}` })
+      .insert({ org_id: northside.id, name: ownerSiteName });
+    const { data: createdSite } = await owner
+      .from('sites')
       .select('id')
-      .single();
+      .eq('name', ownerSiteName)
+      .maybeSingle();
     check('owner can create a site in their organisation',
       ownerSiteInsert === null && Boolean(createdSite?.id),
       ownerSiteInsert?.message ?? '');
