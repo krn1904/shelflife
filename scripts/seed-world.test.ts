@@ -103,11 +103,11 @@ test('the demo organisation uses every waste reason and every login', () => {
 });
 
 test('the RLS suite finds the organisations it expects', () => {
-  const northside = world.orgs.find((o) => o.org.slug === 'northside')!;
+  const northside = world.orgs.find((o) => o.org.slug === 'metro-petroleum')!;
   assert.equal(northside.sites.length, 3);
   const staff = world.users.find((u) => u.email === 'staff@northside.test')!;
   assert.equal(world.orgs.flatMap((o) => o.memberships).filter((m) => m.user_id === staff.key).length, 1);
-  assert.ok(world.orgs.some((o) => o.org.slug === 'bayside' && !o.archive));
+  assert.ok(world.orgs.some((o) => o.org.slug === 'united-petroleum' && !o.archive));
   for (const email of ['admin@shelflife.test', 'owner@northside.test', 'owner@bayside.test']) {
     assert.ok(world.users.some((u) => u.email === email), email);
   }

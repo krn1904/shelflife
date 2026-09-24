@@ -32,6 +32,9 @@ const URL = URL_;
 const ANON = ANON_KEY;
 const SERVICE = SERVICE_KEY;
 const PASSWORD = 'shelflife-dev-password';
+// Org A and org B of the seed world (scripts/seed-world.ts).
+const ORG_A_SLUG = 'metro-petroleum';
+const ORG_B_SLUG = 'united-petroleum';
 
 type Db = SupabaseClient<Database>;
 
@@ -56,8 +59,8 @@ async function main() {
   });
 
   const { data: orgs } = await admin.from('orgs').select('id, slug');
-  const northside = orgs!.find((o) => o.slug === 'northside')!;
-  const bayside = orgs!.find((o) => o.slug === 'bayside')!;
+  const northside = orgs!.find((o) => o.slug === ORG_A_SLUG)!;
+  const bayside = orgs!.find((o) => o.slug === ORG_B_SLUG)!;
 
   const { count: totalSites } = await admin
     .from('sites').select('*', { count: 'exact', head: true });
@@ -67,7 +70,7 @@ async function main() {
   const staff = await signIn('staff@northside.test');
   {
     const { data: o } = await staff.from('orgs').select('slug');
-    check('sees exactly its own org', o?.length === 1 && o[0].slug === 'northside',
+    check('sees exactly its own org', o?.length === 1 && o[0].slug === ORG_A_SLUG,
       `got ${JSON.stringify(o?.map((x) => x.slug))}`);
 
     const { data: s } = await staff.from('sites').select('name, org_id');
@@ -164,7 +167,7 @@ async function main() {
   const other = await signIn('owner@bayside.test');
   {
     const { data: o } = await other.from('orgs').select('slug');
-    check('sees exactly its own org', o?.length === 1 && o[0].slug === 'bayside',
+    check('sees exactly its own org', o?.length === 1 && o[0].slug === ORG_B_SLUG,
       `got ${JSON.stringify(o?.map((x) => x.slug))}`);
 
     const { data: s } = await other.from('sites').select('org_id');
@@ -685,7 +688,7 @@ async function main() {
 
     const { error: archiveError } = await platform.rpc('archive_organisation', {
       p_org_id: bayside.id,
-      p_confirm_slug: 'bayside',
+      p_confirm_slug: ORG_B_SLUG,
     });
     check('platform admin can archive through the audited RPC', archiveError === null,
       archiveError?.message ?? '');
