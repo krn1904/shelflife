@@ -202,11 +202,11 @@ same data. `npm test` checks the world's invariants without a database.
 
 | Organisation | State | What it shows |
 |---|---|---|
-| BP Melbourne North (Demo) (`demo-servo`) | active, `is_demo` | 3 sites, 8 months of deliveries, stock and waste; expired write-offs build up, then fall sharply once the site starts acting on the list (~3 months ago) |
-| Metro Petroleum (`northside`) | active | 3 sites, 6 months of history, the RLS suite's org A, role change and password-reset audit trail |
-| United Petroleum (`bayside`) | active | 1 site, 3 months, a smaller range; archived and restored once (audit trail); the RLS suite's org B |
-| Liberty Oil (`westgate`) | **archived** 18 days ago | Archived list and Restore; its members are locked out |
-| Ampol Eastern (`eastern-express`) | active, new | Onboarded 2 days ago: every empty state, a removable site |
+| BP Melbourne North (Demo) (`bp-melbourne-north-demo`) | active, `is_demo` | 3 sites, 8 months of deliveries, stock and waste; expired write-offs build up, then fall sharply once the site starts acting on the list (~3 months ago) |
+| Metro Petroleum (`metro-petroleum`) | active | 3 sites, 6 months of history, the RLS suite's org A, role change and password-reset audit trail |
+| United Petroleum (`united-petroleum`) | active | 1 site, 3 months, a smaller range; archived and restored once (audit trail); the RLS suite's org B |
+| Liberty Oil (`liberty-oil`) | **archived** 18 days ago | Archived list and Restore; its members are locked out |
+| Ampol Eastern (`ampol-eastern`) | active, new | Onboarded 2 days ago: every empty state, a removable site |
 
 Across them: every waste reason (including a supplier recall), short deliveries
 (`qty_received` < `qty_docketed`), site tracking-mode overrides, ranged-off lines, an
@@ -223,9 +223,9 @@ No push subscriptions are seeded — those belong to real devices.
 | `admin@demo.shelflife.app` | `shelflife-demo` | platform admin | every organisation |
 | `coburg.manager@demo.shelflife.app`, `coburg.staff@…`, `preston.staff@…` | `shelflife-demo` | manager / staff | their demo site |
 | `admin@shelflife.test` | `shelflife-dev-password` | platform admin | every organisation |
-| `owner@northside.test` | `shelflife-dev-password` | owner | all three Northside sites |
-| `manager@northside.test` / `staff@northside.test` | `shelflife-dev-password` | manager / staff | Northside · Brunswick |
-| `coburg.manager@northside.test` / `preston.staff@northside.test` | `shelflife-dev-password` | manager / staff | their Northside site |
-| `owner@bayside.test` / `staff@bayside.test` | `shelflife-dev-password` | owner / staff | St Kilda (separate organisation) |
-| `owner@westgate.test` / `manager@westgate.test` | `shelflife-dev-password` | owner / manager | nothing — organisation archived |
-| `owner@eastern.test` | `shelflife-dev-password` | owner | Ringwood (empty) |
+| `owner@metro-petroleum.test` | `shelflife-dev-password` | owner | all three Metro Petroleum sites |
+| `manager@metro-petroleum.test` / `staff@metro-petroleum.test` | `shelflife-dev-password` | manager / staff | Metro Petroleum · Brunswick |
+| `coburg.manager@metro-petroleum.test` / `preston.staff@metro-petroleum.test` | `shelflife-dev-password` | manager / staff | their Metro Petroleum site |
+| `owner@united-petroleum.test` / `staff@united-petroleum.test` | `shelflife-dev-password` | owner / staff | St Kilda (separate organisation) |
+| `owner@liberty-oil.test` / `manager@liberty-oil.test` | `shelflife-dev-password` | owner / manager | nothing — organisation archived |
+| `owner@ampol-eastern.test` | `shelflife-dev-password` | owner | Ringwood (empty) |

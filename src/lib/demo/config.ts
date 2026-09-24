@@ -4,7 +4,7 @@ import type { AppRole } from '@/lib/supabase/types';
  * Shared between the demo seed and the app's one-click login buttons, so the two can
  * never drift into offering a login that was never created.
  */
-export const DEMO_ORG_SLUG = 'demo-servo';
+export const DEMO_ORG_SLUG = 'bp-melbourne-north-demo';
 
 // Public on purpose: these accounts exist to be signed into from a portfolio page.
 export const DEMO_PASSWORD = 'shelflife-demo';

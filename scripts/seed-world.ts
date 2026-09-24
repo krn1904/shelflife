@@ -144,7 +144,7 @@ const SCANNED_PRODUCTS = [
   { name: 'Ultra Tune Tyre Shine 500ml', brand: 'Ultra Tune', size: '500ml',
     category: 'Accessories', shelf: null, tracking: 'none' as const, by: 'demo-manager', daysAgo: 3 },
   { name: 'Farmers Union Iced Coffee 600ml', brand: 'Farmers Union', size: '600ml',
-    category: 'Dairy', shelf: 14, tracking: 'rotation' as const, by: 'northside-staff', daysAgo: 1 },
+    category: 'Dairy', shelf: 14, tracking: 'rotation' as const, by: 'metro-staff', daysAgo: 1 },
 ];
 
 export type CatalogueProduct = {
@@ -244,7 +244,7 @@ const ORGS: OrgConfig[] = [
     suppliers: SUPPLIERS,
   },
   {
-    key: 'northside', name: 'Metro Petroleum', slug: 'northside', isDemo: false,
+    key: 'metro', name: 'Metro Petroleum', slug: 'metro-petroleum', isDemo: false,
     createdDaysAgo: 200, historyDays: 180, adoptedDaysAgo: 60, rangeShare: 0.85,
     archivedDaysAgo: null, admin: 'platform-admin',
     // test-rls expects exactly three sites here and staff pinned to the first.
@@ -254,11 +254,11 @@ const ORGS: OrgConfig[] = [
       { key: 'preston', name: 'Preston', address: '600 Plenty Rd, Preston VIC 3072' },
     ],
     members: [
-      { user: 'northside-owner', role: 'owner', site: null },
-      { user: 'northside-manager', role: 'manager', site: 'brunswick' },
-      { user: 'northside-staff', role: 'staff', site: 'brunswick' },
-      { user: 'northside-coburg-manager', role: 'manager', site: 'coburg' },
-      { user: 'northside-preston-staff', role: 'staff', site: 'preston' },
+      { user: 'metro-owner', role: 'owner', site: null },
+      { user: 'metro-manager', role: 'manager', site: 'brunswick' },
+      { user: 'metro-staff', role: 'staff', site: 'brunswick' },
+      { user: 'metro-coburg-manager', role: 'manager', site: 'coburg' },
+      { user: 'metro-preston-staff', role: 'staff', site: 'preston' },
       // A platform admin still needs an org row (org_id is NOT NULL); is_platform_admin()
       // then widens every policy regardless of which org that row points at.
       { user: 'platform-admin', role: 'platform_admin', site: null },
@@ -266,20 +266,20 @@ const ORGS: OrgConfig[] = [
     suppliers: SUPPLIERS.filter((s) => s.name !== 'PFD Food Services'),
   },
   {
-    key: 'bayside', name: 'United Petroleum', slug: 'bayside', isDemo: false,
+    key: 'united', name: 'United Petroleum', slug: 'united-petroleum', isDemo: false,
     createdDaysAgo: 120, historyDays: 90, adoptedDaysAgo: 45, rangeShare: 0.6,
     archivedDaysAgo: null, admin: 'platform-admin',
     sites: [{ key: 'st-kilda', name: 'St Kilda', address: '88 Fitzroy St, St Kilda VIC 3182' }],
     members: [
-      { user: 'bayside-owner', role: 'owner', site: null },
-      { user: 'bayside-staff', role: 'staff', site: 'st-kilda' },
+      { user: 'united-owner', role: 'owner', site: null },
+      { user: 'united-staff', role: 'staff', site: 'st-kilda' },
     ],
     suppliers: SUPPLIERS.filter((s) =>
       ['Metcash', 'Coca-Cola Europacific', 'Lion Dairy & Drinks', 'Bakers Delight DSD'].includes(s.name)),
   },
   {
     // Archived: the platform-admin portal's "Archived organisations" list and Restore.
-    key: 'westgate', name: 'Liberty Oil', slug: 'westgate', isDemo: false,
+    key: 'liberty', name: 'Liberty Oil', slug: 'liberty-oil', isDemo: false,
     createdDaysAgo: 170, historyDays: 150, adoptedDaysAgo: 90, rangeShare: 0.5,
     archivedDaysAgo: 18, admin: 'platform-admin',
     sites: [
@@ -287,19 +287,19 @@ const ORGS: OrgConfig[] = [
       { key: 'sunshine', name: 'Sunshine', address: '300 Hampshire Rd, Sunshine VIC 3020' },
     ],
     members: [
-      { user: 'westgate-owner', role: 'owner', site: null },
-      { user: 'westgate-manager', role: 'manager', site: 'footscray' },
+      { user: 'liberty-owner', role: 'owner', site: null },
+      { user: 'liberty-manager', role: 'manager', site: 'footscray' },
     ],
     suppliers: SUPPLIERS.filter((s) =>
       ['Metcash', 'Coca-Cola Europacific', 'Lion Dairy & Drinks'].includes(s.name)),
   },
   {
     // Just onboarded: every empty state, and a site the admin can still remove.
-    key: 'eastern', name: 'Ampol Eastern', slug: 'eastern-express', isDemo: false,
+    key: 'ampol', name: 'Ampol Eastern', slug: 'ampol-eastern', isDemo: false,
     createdDaysAgo: 2, historyDays: 0, adoptedDaysAgo: 0, rangeShare: 0,
     archivedDaysAgo: null, admin: 'platform-admin',
     sites: [{ key: 'ringwood', name: 'Ringwood', address: '55 Maroondah Hwy, Ringwood VIC 3134' }],
-    members: [{ user: 'eastern-owner', role: 'owner', site: null }],
+    members: [{ user: 'ampol-owner', role: 'owner', site: null }],
     suppliers: [],
   },
 ];
@@ -312,16 +312,16 @@ const USERS: SeedUser[] = [
   { key: 'demo-coburg-staff', email: 'coburg.staff@demo.shelflife.app', fullName: 'Casey (demo Coburg staff)', password: DEMO_PASSWORD },
   { key: 'demo-preston-staff', email: 'preston.staff@demo.shelflife.app', fullName: 'Jordan (demo Preston staff)', password: DEMO_PASSWORD },
   { key: 'platform-admin', email: 'admin@shelflife.test', fullName: 'Platform Admin', password: SEED_PASSWORD },
-  { key: 'northside-owner', email: 'owner@northside.test', fullName: 'Dana Owner', password: SEED_PASSWORD },
-  { key: 'northside-manager', email: 'manager@northside.test', fullName: 'Sam Manager', password: SEED_PASSWORD },
-  { key: 'northside-staff', email: 'staff@northside.test', fullName: 'Riley Staff', password: SEED_PASSWORD },
-  { key: 'northside-coburg-manager', email: 'coburg.manager@northside.test', fullName: 'Morgan Coburg', password: SEED_PASSWORD },
-  { key: 'northside-preston-staff', email: 'preston.staff@northside.test', fullName: 'Taylor Preston', password: SEED_PASSWORD },
-  { key: 'bayside-owner', email: 'owner@bayside.test', fullName: 'Jo Bayside', password: SEED_PASSWORD },
-  { key: 'bayside-staff', email: 'staff@bayside.test', fullName: 'Kai Bayside', password: SEED_PASSWORD },
-  { key: 'westgate-owner', email: 'owner@westgate.test', fullName: 'Pat Westgate', password: SEED_PASSWORD },
-  { key: 'westgate-manager', email: 'manager@westgate.test', fullName: 'Robin Westgate', password: SEED_PASSWORD },
-  { key: 'eastern-owner', email: 'owner@eastern.test', fullName: 'Ash Eastern', password: SEED_PASSWORD },
+  { key: 'metro-owner', email: 'owner@metro-petroleum.test', fullName: 'Dana Owner', password: SEED_PASSWORD },
+  { key: 'metro-manager', email: 'manager@metro-petroleum.test', fullName: 'Sam Manager', password: SEED_PASSWORD },
+  { key: 'metro-staff', email: 'staff@metro-petroleum.test', fullName: 'Riley Staff', password: SEED_PASSWORD },
+  { key: 'metro-coburg-manager', email: 'coburg.manager@metro-petroleum.test', fullName: 'Morgan Coburg', password: SEED_PASSWORD },
+  { key: 'metro-preston-staff', email: 'preston.staff@metro-petroleum.test', fullName: 'Taylor Preston', password: SEED_PASSWORD },
+  { key: 'united-owner', email: 'owner@united-petroleum.test', fullName: 'Jo Nguyen', password: SEED_PASSWORD },
+  { key: 'united-staff', email: 'staff@united-petroleum.test', fullName: 'Kai Walker', password: SEED_PASSWORD },
+  { key: 'liberty-owner', email: 'owner@liberty-oil.test', fullName: 'Pat O’Brien', password: SEED_PASSWORD },
+  { key: 'liberty-manager', email: 'manager@liberty-oil.test', fullName: 'Robin Singh', password: SEED_PASSWORD },
+  { key: 'ampol-owner', email: 'owner@ampol-eastern.test', fullName: 'Ash Taylor', password: SEED_PASSWORD },
 ];
 
 // ---------------------------------------------------------------------------------------
@@ -505,24 +505,24 @@ export function buildWorld(now: Date): World {
   });
 
   // The stories an operator would want to see in an audit trail.
-  const northside = orgs.find((o) => o.key === 'northside')!;
-  const northsideStaff = northside.memberships.find((m) => m.user_id === 'northside-staff')!;
-  const coburgManager = northside.memberships.find((m) => m.user_id === 'northside-coburg-manager')!;
-  audit(northside, 'platform-admin', 'platform_admin.updated_role', at(dayAgo(40), 9, 12),
+  const metro = orgs.find((o) => o.key === 'metro')!;
+  const metroStaff = metro.memberships.find((m) => m.user_id === 'metro-staff')!;
+  const coburgManager = metro.memberships.find((m) => m.user_id === 'metro-coburg-manager')!;
+  audit(metro, 'platform-admin', 'platform_admin.updated_role', at(dayAgo(40), 9, 12),
     { site_id: coburgManager.site_id, subject_type: 'membership', subject_id: coburgManager.id!,
       detail: { role: 'manager' } });
-  audit(northside, 'platform-admin', 'platform_admin.password_reset_requested', at(dayAgo(12), 15, 2),
-    { subject_type: 'membership', subject_id: northsideStaff.id! });
-  audit(northside, 'platform-admin', 'platform_admin.reset_password', at(dayAgo(12), 15, 2),
-    { subject_type: 'membership', subject_id: northsideStaff.id!, detail: { email: 'staff@northside.test' } });
-  audit(northside, 'platform-admin', 'platform_admin.viewed_organisation', at(dayAgo(1), 10, 45),
-    { subject_type: 'org', subject_id: northside.org.id! });
+  audit(metro, 'platform-admin', 'platform_admin.password_reset_requested', at(dayAgo(12), 15, 2),
+    { subject_type: 'membership', subject_id: metroStaff.id! });
+  audit(metro, 'platform-admin', 'platform_admin.reset_password', at(dayAgo(12), 15, 2),
+    { subject_type: 'membership', subject_id: metroStaff.id!, detail: { email: 'staff@metro-petroleum.test' } });
+  audit(metro, 'platform-admin', 'platform_admin.viewed_organisation', at(dayAgo(1), 10, 45),
+    { subject_type: 'org', subject_id: metro.org.id! });
 
-  const bayside = orgs.find((o) => o.key === 'bayside')!;
-  audit(bayside, 'platform-admin', 'platform_admin.archived_organisation', at(dayAgo(45), 17, 0),
-    { subject_type: 'org', subject_id: bayside.org.id! });
-  audit(bayside, 'platform-admin', 'platform_admin.restored_organisation', at(dayAgo(43), 9, 30),
-    { subject_type: 'org', subject_id: bayside.org.id! });
+  const united = orgs.find((o) => o.key === 'united')!;
+  audit(united, 'platform-admin', 'platform_admin.archived_organisation', at(dayAgo(45), 17, 0),
+    { subject_type: 'org', subject_id: united.org.id! });
+  audit(united, 'platform-admin', 'platform_admin.restored_organisation', at(dayAgo(43), 9, 30),
+    { subject_type: 'org', subject_id: united.org.id! });
 
   for (const plan of orgs.filter((o) => o.archive)) {
     audit(plan, plan.archive!.archived_by, 'platform_admin.archived_organisation', plan.archive!.archived_at,
