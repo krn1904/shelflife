@@ -45,17 +45,29 @@ Realtime, Storage, Edge Functions) · Postgres RLS for organisation isolation
 
 Requires Node 22 (see `.nvmrc`), the Supabase CLI, and Docker.
 
+Local and hosted Supabase are set up the same way — migrations first, then one seed
+command — and the only difference is which project `.env.local` points at:
+
+| Step | Local | Hosted |
+|---|---|---|
+| Database | `supabase start` (ports 544xx) | `supabase link --project-ref <ref>` |
+| Schema | `supabase migration up` | `supabase db push` |
+| Data | `npm run db:reset` | `npm run db:reset` |
+| `.env.local` | URL and keys printed by `supabase start` | the project's API settings |
+
 ```bash
 nvm use
 npm install
-supabase start          # local Postgres/Auth/Storage on ports 544xx
-npm run seed            # two organisations, so isolation is testable
+supabase start && supabase migration up
+npm run db:reset        # wipe and write the full seed world (see "The seed world")
 npm run dev
 ```
 
-`supabase start` prints the local URL and keys for `.env.local`. The project uses the
-544xx port range rather than Supabase's 543xx defaults, so it can run alongside another
-local Supabase project.
+The project uses the 544xx port range rather than Supabase's 543xx defaults, so it can run
+alongside another local Supabase project. `supabase db reset` applies migrations only; the
+SQL seed hook is off so there is exactly one seed, and it behaves the same everywhere.
+Scheduled Edge Functions exist only on the hosted project; locally their history in
+`job_runs` comes from the seed.
 
 ### Verification
 
@@ -128,12 +140,8 @@ server, and pretending otherwise would be a bigger promise than this outbox can 
 
 ### The demo organisation
 
-```bash
-npm run seed:demo       # 3 sites, ~400 products, 8 months of history
-```
-
-Deterministic: a seeded PRNG, so a rebuild produces the same numbers and a screenshot in
-the case study keeps matching the live site. Set `NEXT_PUBLIC_DEMO_MODE=true` on the
+The demo organisation is part of the seed world written by `npm run db:reset` (3 sites,
+~300 products, 8 months of history). Set `NEXT_PUBLIC_DEMO_MODE=true` on the
 public deployment to enable the four one-click role logins and the **jump 7 days**
 button, which moves the demo organisation's dates so a visitor can watch the expiry engine fire
 without waiting a week. The engine is never told it is a demo — only the data moves —
@@ -173,11 +181,51 @@ After deploying, regenerate the database types against the live schema:
 supabase gen types typescript --linked > src/lib/supabase/database.types.ts
 ```
 
-Seed logins (all share the password printed by `npm run seed`):
+## The seed world
 
-| Email | Role | Sees |
+```bash
+npm run db:reset                 # wipe everything, then write the seed world
+npm run db:reset -- --dry-run    # print what would be written, touch nothing
+```
+
+One command puts the database back into a known, complete state. It **deletes every
+organisation, auth user, catalogue product, job run, audit entry and docket photo** —
+including anything created through the UI or by `npm run test:rls` — then writes the
+world defined in [scripts/seed-world.ts](scripts/seed-world.ts). Run it whenever the data
+has drifted or gone stale. It refuses to run against a database that is behind on
+migrations; apply them first with `supabase db push`.
+
+Every date is relative to the day you run it (Melbourne time), so a fresh reset always has
+stock overdue, expiring today, this week and next month, today's fixture list half ticked,
+and a delivery still being counted in. The PRNG is seeded, so the same day produces the
+same data. `npm test` checks the world's invariants without a database.
+
+| Organisation | State | What it shows |
 |---|---|---|
-| `owner@northside.test` | owner | all three Northside sites |
-| `manager@northside.test` | manager | Brunswick |
-| `staff@northside.test` | staff | Brunswick |
-| `owner@bayside.test` | owner | St Kilda (separate organisation) |
+| BP Melbourne North (Demo) (`demo-servo`) | active, `is_demo` | 3 sites, 8 months of deliveries, stock and waste; expired write-offs build up, then fall sharply once the site starts acting on the list (~3 months ago) |
+| Metro Petroleum (`northside`) | active | 3 sites, 6 months of history, the RLS suite's org A, role change and password-reset audit trail |
+| United Petroleum (`bayside`) | active | 1 site, 3 months, a smaller range; archived and restored once (audit trail); the RLS suite's org B |
+| Liberty Oil (`westgate`) | **archived** 18 days ago | Archived list and Restore; its members are locked out |
+| Ampol Eastern (`eastern-express`) | active, new | Onboarded 2 days ago: every empty state, a removable site |
+
+Across them: every waste reason (including a supplier recall), short deliveries
+(`qty_received` < `qty_docketed`), site tracking-mode overrides, ranged-off lines, an
+inactive supplier, a supplier with no history yet (the manual-entry intake path),
+products added by staff scans, done/dismissed action history, three weeks of rotation
+checks, and three weeks of `expiry-engine` / `daily-digest` runs including one failure.
+No push subscriptions are seeded — those belong to real devices.
+
+| Email | Password | Role | Sees |
+|---|---|---|---|
+| `staff@demo.shelflife.app` | `shelflife-demo` | staff | Demo · Brunswick |
+| `manager@demo.shelflife.app` | `shelflife-demo` | manager | Demo · Brunswick |
+| `owner@demo.shelflife.app` | `shelflife-demo` | owner | all three demo sites |
+| `admin@demo.shelflife.app` | `shelflife-demo` | platform admin | every organisation |
+| `coburg.manager@demo.shelflife.app`, `coburg.staff@…`, `preston.staff@…` | `shelflife-demo` | manager / staff | their demo site |
+| `admin@shelflife.test` | `shelflife-dev-password` | platform admin | every organisation |
+| `owner@northside.test` | `shelflife-dev-password` | owner | all three Northside sites |
+| `manager@northside.test` / `staff@northside.test` | `shelflife-dev-password` | manager / staff | Northside · Brunswick |
+| `coburg.manager@northside.test` / `preston.staff@northside.test` | `shelflife-dev-password` | manager / staff | their Northside site |
+| `owner@bayside.test` / `staff@bayside.test` | `shelflife-dev-password` | owner / staff | St Kilda (separate organisation) |
+| `owner@westgate.test` / `manager@westgate.test` | `shelflife-dev-password` | owner / manager | nothing — organisation archived |
+| `owner@eastern.test` | `shelflife-dev-password` | owner | Ringwood (empty) |

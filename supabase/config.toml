@@ -51,8 +51,10 @@ max_client_conn = 100
 schema_paths = []
 
 [db.seed]
-# If enabled, seeds the database after migrations during a db reset.
-enabled = true
+# Off: local and hosted are seeded the same way, by `npm run db:reset` (scripts/reset-db.ts),
+# because the seed creates Auth users with passwords, which a SQL seed file cannot do the
+# same way on a hosted project. There is no seed.sql.
+enabled = false
 # Specifies an ordered list of seed files to load during db reset.
 # Supports glob patterns relative to supabase directory: "./seeds/*.sql"
 sql_paths = ["./seed.sql"]

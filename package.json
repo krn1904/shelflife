@@ -7,10 +7,9 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "seed": "tsx scripts/seed.ts",
+    "db:reset": "tsx scripts/reset-db.ts",
     "test": "node --import tsx --test \"src/**/*.test.ts\" \"scripts/**/*.test.ts\"",
-    "test:rls": "tsx scripts/test-rls.ts",
-    "seed:demo": "tsx scripts/seed-demo.ts"
+    "test:rls": "tsx scripts/test-rls.ts"
   },
   "dependencies": {
     "@supabase/ssr": "^0.12.6",

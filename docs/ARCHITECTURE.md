@@ -56,7 +56,7 @@ supabase/
     _shared/                   engine + digest + tracking logic (single source of truth)
     expiry-engine/             thin Deno wrapper, nightly
     daily-digest/              thin Deno wrapper, morning
-scripts/                       seed, seed-demo, test-rls
+scripts/                       seed-world (data) + reset-db (npm run db:reset), test-rls
 ```
 
 ---
