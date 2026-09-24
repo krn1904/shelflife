@@ -223,9 +223,9 @@ No push subscriptions are seeded — those belong to real devices.
 | `admin@demo.shelflife.app` | `shelflife-demo` | platform admin | every organisation |
 | `coburg.manager@demo.shelflife.app`, `coburg.staff@…`, `preston.staff@…` | `shelflife-demo` | manager / staff | their demo site |
 | `admin@shelflife.test` | `shelflife-dev-password` | platform admin | every organisation |
-| `owner@northside.test` | `shelflife-dev-password` | owner | all three Northside sites |
-| `manager@northside.test` / `staff@northside.test` | `shelflife-dev-password` | manager / staff | Northside · Brunswick |
-| `coburg.manager@northside.test` / `preston.staff@northside.test` | `shelflife-dev-password` | manager / staff | their Northside site |
-| `owner@bayside.test` / `staff@bayside.test` | `shelflife-dev-password` | owner / staff | St Kilda (separate organisation) |
-| `owner@westgate.test` / `manager@westgate.test` | `shelflife-dev-password` | owner / manager | nothing — organisation archived |
-| `owner@eastern.test` | `shelflife-dev-password` | owner | Ringwood (empty) |
+| `owner@metro-petroleum.test` | `shelflife-dev-password` | owner | all three Metro Petroleum sites |
+| `manager@metro-petroleum.test` / `staff@metro-petroleum.test` | `shelflife-dev-password` | manager / staff | Metro Petroleum · Brunswick |
+| `coburg.manager@metro-petroleum.test` / `preston.staff@metro-petroleum.test` | `shelflife-dev-password` | manager / staff | their Metro Petroleum site |
+| `owner@united-petroleum.test` / `staff@united-petroleum.test` | `shelflife-dev-password` | owner / staff | St Kilda (separate organisation) |
+| `owner@liberty-oil.test` / `manager@liberty-oil.test` | `shelflife-dev-password` | owner / manager | nothing — organisation archived |
+| `owner@ampol-eastern.test` | `shelflife-dev-password` | owner | Ringwood (empty) |

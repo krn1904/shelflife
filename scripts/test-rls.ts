@@ -59,15 +59,15 @@ async function main() {
   });
 
   const { data: orgs } = await admin.from('orgs').select('id, slug');
-  const northside = orgs!.find((o) => o.slug === ORG_A_SLUG)!;
-  const bayside = orgs!.find((o) => o.slug === ORG_B_SLUG)!;
+  const metro = orgs!.find((o) => o.slug === ORG_A_SLUG)!;
+  const united = orgs!.find((o) => o.slug === ORG_B_SLUG)!;
 
   const { count: totalSites } = await admin
     .from('sites').select('*', { count: 'exact', head: true });
   console.log(`\nservice role sees ${orgs!.length} orgs and ${totalSites} sites (RLS bypassed)\n`);
 
-  console.log('northside staff (pinned to one site):');
-  const staff = await signIn('staff@northside.test');
+  console.log('metro staff (pinned to one site):');
+  const staff = await signIn('staff@metro-petroleum.test');
   {
     const { data: o } = await staff.from('orgs').select('slug');
     check('sees exactly its own org', o?.length === 1 && o[0].slug === ORG_A_SLUG,
@@ -76,30 +76,30 @@ async function main() {
     const { data: s } = await staff.from('sites').select('name, org_id');
     check('sees only its assigned site', s?.length === 1,
       `got ${s?.length} sites: ${JSON.stringify(s?.map((x) => x.name))}`);
-    check('no site belongs to another org', (s ?? []).every((x) => x.org_id === northside.id));
+    check('no site belongs to another org', (s ?? []).every((x) => x.org_id === metro.id));
 
     const { data: sup } = await staff.from('suppliers').select('org_id');
-    check('sees no foreign suppliers', (sup ?? []).every((x) => x.org_id === northside.id),
+    check('sees no foreign suppliers', (sup ?? []).every((x) => x.org_id === metro.id),
       `got ${sup?.length} suppliers`);
 
     const { data: p } = await staff.from('products').select('id');
     check('global catalogue is readable', (p?.length ?? 0) > 0, `got ${p?.length}`);
   }
 
-  console.log('\nnorthside owner (null site_id = all sites):');
-  const owner = await signIn('owner@northside.test');
+  console.log('\nmetro owner (null site_id = all sites):');
+  const owner = await signIn('owner@metro-petroleum.test');
   {
     const { data: s } = await owner.from('sites').select('name');
     check('sees all three org sites', s?.length === 3,
       `got ${s?.length}: ${JSON.stringify(s?.map((x) => x.name))}`);
 
     const { error } = await owner.from('sites')
-      .insert({ org_id: bayside.id, name: 'Injected site' });
+      .insert({ org_id: united.id, name: 'Injected site' });
     check('cannot insert a site into another org', error !== null,
       error ? '' : 'insert unexpectedly succeeded');
 
     const { data: updated } = await owner.from('orgs')
-      .update({ name: 'Hijacked' }).eq('id', bayside.id).select();
+      .update({ name: 'Hijacked' }).eq('id', united.id).select();
     check('cannot update another org', (updated?.length ?? 0) === 0,
       `updated ${updated?.length} rows`);
 
@@ -108,7 +108,7 @@ async function main() {
     const ownerSiteName = `Owner site ${Date.now()}`;
     const { error: ownerSiteInsert } = await owner
       .from('sites')
-      .insert({ org_id: northside.id, name: ownerSiteName });
+      .insert({ org_id: metro.id, name: ownerSiteName });
     const { data: createdSite } = await owner
       .from('sites')
       .select('id')
@@ -133,7 +133,7 @@ async function main() {
       .from('memberships')
       .insert({
         user_id: staffUser!.id,
-        org_id: northside.id,
+        org_id: metro.id,
         site_id: extraSite!.id,
         role: 'staff',
       })
@@ -163,29 +163,29 @@ async function main() {
     await admin.from('sites').delete().eq('id', createdSite!.id);
   }
 
-  console.log('\nbayside owner (the other tenant):');
-  const other = await signIn('owner@bayside.test');
+  console.log('\nunited owner (the other tenant):');
+  const other = await signIn('owner@united-petroleum.test');
   {
     const { data: o } = await other.from('orgs').select('slug');
     check('sees exactly its own org', o?.length === 1 && o[0].slug === ORG_B_SLUG,
       `got ${JSON.stringify(o?.map((x) => x.slug))}`);
 
     const { data: s } = await other.from('sites').select('org_id');
-    check('sees no northside sites', (s ?? []).every((x) => x.org_id === bayside.id),
+    check('sees no metro sites', (s ?? []).every((x) => x.org_id === united.id),
       `got ${s?.length} sites`);
 
     const { data: sp } = await other.from('site_products').select('org_id');
-    check('sees no foreign site_products', (sp ?? []).every((x) => x.org_id === bayside.id));
+    check('sees no foreign site_products', (sp ?? []).every((x) => x.org_id === united.id));
 
     // Ranging is the first write path staff-facing UI exposes, and a Server Action is
     // reachable by direct POST — so the posted site_id must be rejected in the database,
     // not only by the application code that normally sets it.
     const { data: theirSite } = await admin
-      .from('sites').select('id').eq('org_id', northside.id).limit(1).single();
+      .from('sites').select('id').eq('org_id', metro.id).limit(1).single();
     const { data: someProduct } = await admin.from('products').select('id').limit(1).single();
 
     const { error: rangeError } = await other.from('site_products').insert({
-      org_id: northside.id,
+      org_id: metro.id,
       site_id: theirSite!.id,
       product_id: someProduct!.id,
       par_level: 99,
@@ -196,7 +196,7 @@ async function main() {
     // Claiming your own org_id while pointing at their site must fail too — the policy
     // has to check the site, not just the org column the caller supplies.
     const { error: spoofError } = await other.from('site_products').insert({
-      org_id: bayside.id,
+      org_id: united.id,
       site_id: theirSite!.id,
       product_id: someProduct!.id,
       par_level: 99,
@@ -221,15 +221,15 @@ async function main() {
   console.log('\nintake (deliveries, lines and stock batches):');
   {
     const { data: theirSite } = await admin
-      .from('sites').select('id, org_id').eq('org_id', northside.id).limit(1).single();
+      .from('sites').select('id, org_id').eq('org_id', metro.id).limit(1).single();
     const { data: theirSupplier } = await admin
-      .from('suppliers').select('id').eq('org_id', northside.id).limit(1).single();
+      .from('suppliers').select('id').eq('org_id', metro.id).limit(1).single();
     const { data: product } = await admin.from('products').select('id').limit(1).single();
 
     // A delivery is the first thing staff create, and it carries both org_id and site_id.
     // Supplying someone else's pair must fail on the site, not merely on the org column.
     const { error: foreignDelivery } = await other.from('deliveries').insert({
-      org_id: northside.id,
+      org_id: metro.id,
       site_id: theirSite!.id,
       supplier_id: theirSupplier!.id,
     });
@@ -243,7 +243,7 @@ async function main() {
     // stock_batches is what the expiry engine reads. A leak here would surface another
     // tenant's stock on this tenant's board.
     const { error: foreignBatch } = await other.from('stock_batches').insert({
-      org_id: northside.id,
+      org_id: metro.id,
       site_id: theirSite!.id,
       product_id: product!.id,
       qty_received: 1,
@@ -261,11 +261,11 @@ async function main() {
     // so this is checked against the parent's site rather than trusted.
     const { data: lines } = await other
       .from('delivery_lines').select('id, deliveries(site_id)');
-    const baysideSites = new Set(
+    const unitedSites = new Set(
       (await other.from('sites').select('id')).data?.map((s) => s.id) ?? [],
     );
     check('every visible delivery line belongs to a site this tenant can see',
-      (lines ?? []).every((l) => l.deliveries && baysideSites.has(l.deliveries.site_id)),
+      (lines ?? []).every((l) => l.deliveries && unitedSites.has(l.deliveries.site_id)),
       `got ${lines?.length} lines`);
   }
 
@@ -312,7 +312,7 @@ async function main() {
         p_site_timezone: 'Australia/Melbourne',
         p_site_address: null,
         p_owner_user_id: otherUser!.id,
-        p_owner_email: 'owner@bayside.test',
+        p_owner_email: 'owner@united-petroleum.test',
       },
     );
     const provisionResult = provisioned as { org_id?: string; site_id?: string } | null;
@@ -452,35 +452,35 @@ async function main() {
       platformJobWrite !== null, platformJobWrite ? '' : 'rpc unexpectedly succeeded');
     await admin.from('orgs').delete().eq('id', jobOrg!.id);
 
-    const { data: baysideSite } = await admin
+    const { data: unitedSite } = await admin
       .from('sites')
       .select('id')
-      .eq('org_id', bayside.id)
+      .eq('org_id', united.id)
       .limit(1)
       .single();
-    const { data: northsideSite } = await admin
+    const { data: metroSite } = await admin
       .from('sites')
       .select('id')
-      .eq('org_id', northside.id)
+      .eq('org_id', metro.id)
       .limit(1)
       .single();
 
     const { error: directSiteWrite } = await platform
       .from('sites')
-      .insert({ org_id: bayside.id, name: 'Unaudited site' });
+      .insert({ org_id: united.id, name: 'Unaudited site' });
     check('platform admin cannot bypass audited site creation',
       directSiteWrite !== null, directSiteWrite ? '' : 'insert unexpectedly succeeded');
 
     const { data: directSiteUpdate } = await platform
       .from('sites')
       .update({ name: 'Unaudited rename' })
-      .eq('id', baysideSite!.id)
+      .eq('id', unitedSite!.id)
       .select('id');
     check('platform admin cannot bypass audited site updates',
       (directSiteUpdate?.length ?? 0) === 0, `updated ${directSiteUpdate?.length} sites`);
 
     const { error: directMembershipInsert } = await platform.from('memberships').insert({
-      org_id: bayside.id,
+      org_id: united.id,
       user_id: platformUser!.id,
       site_id: null,
       role: 'owner',
@@ -489,7 +489,7 @@ async function main() {
       directMembershipInsert !== null, directMembershipInsert ? '' : 'insert unexpectedly succeeded');
 
     const { data: rpcSite, error: rpcSiteError } = await platform.rpc('create_organisation_site', {
-      p_org_id: bayside.id,
+      p_org_id: united.id,
       p_name: 'RPC lifecycle site',
       p_timezone: 'Australia/Melbourne',
       p_address: null,
@@ -500,11 +500,11 @@ async function main() {
     const { data: rpcMembership, error: rpcMembershipError } = await platform.rpc(
       'add_organisation_member',
       {
-        p_org_id: bayside.id,
+        p_org_id: united.id,
         p_user_id: otherUser!.id,
         p_site_id: rpcSite!,
         p_role: 'manager',
-        p_email: 'owner@bayside.test',
+        p_email: 'owner@united-petroleum.test',
       },
     );
     check('platform admin can add a member through the audited RPC',
@@ -513,7 +513,7 @@ async function main() {
     const { data: orgWideMembership, error: orgWideMembershipError } = await platform.rpc(
       'add_organisation_member',
       {
-        p_org_id: bayside.id,
+        p_org_id: united.id,
         p_user_id: platformUser!.id,
         p_site_id: null,
         p_role: 'owner',
@@ -567,8 +567,8 @@ async function main() {
       .from('push_subscriptions')
       .insert({
         user_id: otherUser!.id,
-        org_id: bayside.id,
-        site_id: northsideSite!.id,
+        org_id: united.id,
+        site_id: metroSite!.id,
         endpoint: `${endpoint}/cross-org`,
         p256dh: 'test-p256dh',
         auth: 'test-auth',
@@ -580,8 +580,8 @@ async function main() {
       .from('push_subscriptions')
       .insert({
         user_id: otherUser!.id,
-        org_id: bayside.id,
-        site_id: baysideSite!.id,
+        org_id: united.id,
+        site_id: unitedSite!.id,
         endpoint,
         p256dh: 'test-p256dh',
         auth: 'test-auth',
@@ -595,7 +595,7 @@ async function main() {
       .from('push_subscriptions')
       .insert({
         user_id: otherUser!.id,
-        org_id: bayside.id,
+        org_id: united.id,
         site_id: null,
         endpoint: `${endpoint}/org-wide`,
         p256dh: 'test-p256dh',
@@ -611,7 +611,7 @@ async function main() {
     const { data: staffSite } = await staff.from('sites').select('id').single();
     const { error: staffOrgWide } = await staff.from('push_subscriptions').insert({
       user_id: staffUserForPush!.id,
-      org_id: northside.id,
+      org_id: metro.id,
       site_id: null,
       endpoint: `${endpoint}/staff-org-wide`,
       p256dh: 'test-p256dh',
@@ -624,7 +624,7 @@ async function main() {
       .from('push_subscriptions')
       .insert({
         user_id: staffUserForPush!.id,
-        org_id: northside.id,
+        org_id: metro.id,
         site_id: staffSite!.id,
         endpoint: `${endpoint}/staff-site`,
         p256dh: 'test-p256dh',
@@ -647,7 +647,7 @@ async function main() {
 
     const { data: crossOrgUpdate } = await other
       .from('push_subscriptions')
-      .update({ site_id: northsideSite!.id })
+      .update({ site_id: metroSite!.id })
       .eq('id', subscription!.id)
       .select('id');
     check('subscription cannot be reassigned to another organisation site',
@@ -660,7 +660,7 @@ async function main() {
         archived_at: new Date().toISOString(),
         archived_by: otherUser!.id,
       })
-      .eq('id', bayside.id)
+      .eq('id', united.id)
       .select('id');
     check('owner cannot change organisation lifecycle',
       (ownerMutation?.length ?? 0) === 0, `updated ${ownerMutation?.length} rows`);
@@ -668,7 +668,7 @@ async function main() {
     const { data: deleted } = await platform
       .from('orgs')
       .delete()
-      .eq('id', bayside.id)
+      .eq('id', united.id)
       .select('id');
     check('platform admin cannot hard-delete an organisation',
       (deleted?.length ?? 0) === 0, `deleted ${deleted?.length} rows`);
@@ -680,14 +680,14 @@ async function main() {
         archived_at: new Date().toISOString(),
         archived_by: (await platform.auth.getUser()).data.user!.id,
       })
-      .eq('id', bayside.id)
+      .eq('id', united.id)
       .select('id');
     check('platform admin cannot bypass audited lifecycle RPCs',
       (directAdminMutation?.length ?? 0) === 0,
       `updated ${directAdminMutation?.length} rows`);
 
     const { error: archiveError } = await platform.rpc('archive_organisation', {
-      p_org_id: bayside.id,
+      p_org_id: united.id,
       p_confirm_slug: ORG_B_SLUG,
     });
     check('platform admin can archive through the audited RPC', archiveError === null,
@@ -757,15 +757,15 @@ async function main() {
 
     const { error: archivedServiceWrite } = await admin
       .from('sites')
-      .insert({ org_id: bayside.id, name: 'Post-archive service write' });
+      .insert({ org_id: united.id, name: 'Post-archive service write' });
     check('service role cannot add a site after archival', archivedServiceWrite !== null,
       archivedServiceWrite ? '' : 'insert unexpectedly succeeded');
 
     const { error: forgedAudit } = await other.rpc('write_audit', {
       p_action: 'platform_admin.forged',
-      p_org_id: northside.id,
+      p_org_id: metro.id,
       p_subject_type: 'org',
-      p_subject_id: northside.id,
+      p_subject_id: metro.id,
     });
     check('non-admin cannot forge platform audit entries', forgedAudit !== null,
       forgedAudit ? '' : 'audit write unexpectedly succeeded');
@@ -773,35 +773,35 @@ async function main() {
     const { data: adminView } = await platform
       .from('orgs')
       .select('status')
-      .eq('id', bayside.id)
+      .eq('id', united.id)
       .single();
     check('platform admin can inspect an archived organisation',
       adminView?.status === 'archived', `got ${adminView?.status}`);
 
     const { error: restoreError } = await platform.rpc('restore_organisation', {
-      p_org_id: bayside.id,
+      p_org_id: united.id,
     });
     check('platform admin can restore through the audited RPC', restoreError === null,
       restoreError?.message ?? '');
 
     const { data: restored } = await other.from('orgs').select('id');
     check('owner access returns after restore',
-      restored?.length === 1 && restored[0].id === bayside.id,
+      restored?.length === 1 && restored[0].id === united.id,
       `got ${restored?.length} orgs`);
 
     await other.from('push_subscriptions').delete().eq('id', subscription!.id);
 
-    await admin.from('orgs').update({ is_demo: true }).eq('id', bayside.id);
+    await admin.from('orgs').update({ is_demo: true }).eq('id', united.id);
     const { error: demoAuditError } = await other.rpc('write_audit', {
       p_action: 'demo.jump_days',
-      p_org_id: bayside.id,
+      p_org_id: united.id,
       p_subject_type: 'org',
-      p_subject_id: bayside.id,
+      p_subject_id: united.id,
       p_detail: { days: 7, test: true },
     });
     check('authorised demo audit events remain available', demoAuditError === null,
       demoAuditError?.message ?? '');
-    await admin.from('orgs').update({ is_demo: false }).eq('id', bayside.id);
+    await admin.from('orgs').update({ is_demo: false }).eq('id', united.id);
   }
 
   console.log('\nanonymous (no session):');

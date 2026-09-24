@@ -27,7 +27,7 @@ export function AddOrganisationForm() {
           </legend>
           <label className="block text-sm font-medium">
             Name
-            <input name="name" required maxLength={120} placeholder="Northside Fuel Co" className="field mt-1" />
+            <input name="name" required maxLength={120} placeholder="Metro Petroleum" className="field mt-1" />
           </label>
           <label className="block text-sm font-medium">
             Slug
@@ -36,7 +36,7 @@ export function AddOrganisationForm() {
               required
               maxLength={60}
               pattern="[a-z0-9]+(?:-[a-z0-9]+)*"
-              placeholder="northside"
+              placeholder="metro-petroleum"
               className="field mt-1 font-mono"
             />
             <span className="mt-1 block text-xs font-normal text-faint">
