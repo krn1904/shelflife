@@ -42,6 +42,13 @@ From `/admin/organisations/[orgId]`, a platform admin can:
 - Remove an organisation membership without deleting the Auth account
 - Reset a member's password
 
+An account can hold one membership per scope: one per site, and one organisation-wide
+(`owner` or `platform_admin`) per organisation. Adding a duplicate is rejected with "That person
+already has this role here." Uniqueness is by account, not name, so people who share a name are
+unaffected, and one account may be organisation-wide in several organisations. Changing an
+existing member into a scope they already hold also fails, but the admin UI does not yet show
+that error.
+
 A password reset requires confirmation, invalidates the current password and displays the new
 generated password once. The password itself is never written to the audit log. The current
 implementation does not force expiry or a first-login password change, so it must be shared
