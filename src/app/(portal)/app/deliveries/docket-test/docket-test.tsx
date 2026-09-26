@@ -2,6 +2,10 @@
 
 import { useState } from 'react';
 import { parseDocket, type CatalogueItem, type DocketParse } from '@/lib/intake/docket/parse';
+import type { TextractReading } from '@/lib/intake/docket/textract-shape';
+import { TextractView } from './textract-view';
+
+type Engine = 'free' | 'textract';
 
 type Stage = { status: 'idle' } | { status: 'reading'; progress: number } | { status: 'error'; message: string };
 
@@ -41,6 +45,28 @@ async function cleanUp(file: File): Promise<Blob> {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('could not prepare the photo'))), 'image/png'));
 }
 
+/** A JPEG small enough for Textract (5 MB) and the upload, big enough to read. */
+async function forUpload(file: File): Promise<Blob> {
+  const bitmap = await createImageBitmap(file);
+  const scale = Math.min(1, TARGET_WIDTH / bitmap.width);
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(bitmap.width * scale);
+  canvas.height = Math.round(bitmap.height * scale);
+  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  bitmap.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('could not prepare the photo'))), 'image/jpeg', 0.88));
+}
+
+async function readWithTextract(file: File): Promise<TextractReading> {
+  const form = new FormData();
+  form.set('photo', new File([await forUpload(file)], 'docket.jpg', { type: 'image/jpeg' }));
+  const response = await fetch('/app/deliveries/docket-test/textract', { method: 'POST', body: form });
+  const body = await response.json().catch(() => ({ error: `The server answered ${response.status}.` }));
+  if (!response.ok) throw new Error(body.error ?? `The server answered ${response.status}.`);
+  return body as TextractReading;
+}
+
 /** Tesseract reads the photo in the browser: free, and the image never leaves the device. */
 async function readText(file: File, onProgress: (p: number) => void): Promise<string[]> {
   const { createWorker } = await import('tesseract.js');
@@ -60,15 +86,22 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
   const [stage, setStage] = useState<Stage>({ status: 'idle' });
   const [photo, setPhoto] = useState<string | null>(null);
   const [result, setResult] = useState<(DocketParse & { ms: number }) | null>(null);
+  const [engine, setEngine] = useState<Engine>('textract');
+  const [textract, setTextract] = useState<{ reading: TextractReading; ms: number } | null>(null);
 
   async function run(file: File) {
     setResult(null);
+    setTextract(null);
     setPhoto((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
     setStage({ status: 'reading', progress: 0 });
     const started = performance.now();
     try {
-      const text = await readText(file, (progress) => setStage({ status: 'reading', progress }));
-      setResult({ ...parseDocket(text, catalogue), ms: Math.round(performance.now() - started) });
+      if (engine === 'textract') {
+        setTextract({ reading: await readWithTextract(file), ms: Math.round(performance.now() - started) });
+      } else {
+        const text = await readText(file, (progress) => setStage({ status: 'reading', progress }));
+        setResult({ ...parseDocket(text, catalogue), ms: Math.round(performance.now() - started) });
+      }
       setStage({ status: 'idle' });
     } catch (error) {
       setStage({ status: 'error', message: error instanceof Error ? error.message : String(error) });
@@ -79,6 +112,16 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
 
   return (
     <div className="space-y-6">
+      <fieldset className="flex flex-wrap gap-4 text-sm" disabled={stage.status === 'reading'}>
+        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">Read with</legend>
+        {([['textract', 'AWS Textract (tables as printed; about 2.5 cents a photo)'], ['free', 'Free OCR on this device']] as const).map(([value, label]) => (
+          <label key={value} className="flex items-center gap-2">
+            <input type="radio" name="engine" value={value} checked={engine === value} onChange={() => setEngine(value)} />
+            {label}
+          </label>
+        ))}
+      </fieldset>
+
       <label className="inline-block cursor-pointer rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white">
         {photo ? 'Try another photo' : 'Choose a docket photo'}
         <input
@@ -93,8 +136,10 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
 
       {stage.status === 'reading' && (
         <p className="text-sm text-neutral-600">
-          Reading the docket… {Math.round(stage.progress * 100)}%
-          <span className="text-neutral-400"> (the first run downloads the OCR engine, about 10 MB)</span>
+          {engine === 'textract' ? 'Sending the photo to AWS Textract…' : <>
+            Reading the docket… {Math.round(stage.progress * 100)}%
+            <span className="text-neutral-400"> (the first run downloads the OCR engine, about 10 MB)</span>
+          </>}
         </p>
       )}
       {stage.status === 'error' && (
@@ -102,6 +147,8 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
           Could not read the photo: {stage.message}
         </p>
       )}
+
+      {textract && <TextractView reading={textract.reading} ms={textract.ms} />}
 
       {result && (
         <>
@@ -145,7 +192,13 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
                       <td className="px-3 py-2 text-right tabular-nums">{line.ordered ?? '—'}</td>
                       <td className={`px-3 py-2 text-right tabular-nums ${
                         line.supplied === null || line.check === 'disagrees' || (line.ordered !== null && line.ordered !== line.supplied) ? 'bg-amber-50 font-semibold text-amber-800' : ''}`}>
-                        {line.supplied ?? '?'}
+                        <input
+                          defaultValue={line.supplied ?? ''}
+                          placeholder="?"
+                          inputMode="numeric"
+                          aria-label={`Supplied, line ${i + 1}`}
+                          className="w-14 rounded border border-transparent bg-transparent px-1 text-right hover:border-neutral-300 focus:border-neutral-400 focus:bg-white focus:outline-none"
+                        />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-xs">
                         {line.via === 'new product?' ? (
@@ -183,15 +236,15 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
               ))}
             </ol>
           </section>
-
-          {photo && (
-            <section>
-              <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Photo</h2>
-              {/* eslint-disable-next-line @next/next/no-img-element -- a local blob URL, not an optimisable asset */}
-              <img src={photo} alt="The docket photo that was read" className="mt-2 max-w-full rounded border border-neutral-200" />
-            </section>
-          )}
         </>
+      )}
+
+      {photo && (result || textract) && (
+        <section>
+          <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Photo</h2>
+          {/* eslint-disable-next-line @next/next/no-img-element -- a local blob URL, not an optimisable asset */}
+          <img src={photo} alt="The docket photo that was read" className="mt-2 max-w-full rounded border border-neutral-200" />
+        </section>
       )}
     </div>
   );
