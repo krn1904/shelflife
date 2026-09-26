@@ -113,7 +113,7 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
   return (
     <div className="space-y-6">
       <fieldset className="flex flex-wrap gap-4 text-sm" disabled={stage.status === 'reading'}>
-        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-neutral-500">Read with</legend>
+        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Read with</legend>
         {([['textract', 'AWS Textract (tables as printed; about 2.5 cents a photo)'], ['free', 'Free OCR on this device']] as const).map(([value, label]) => (
           <label key={value} className="flex items-center gap-2">
             <input type="radio" name="engine" value={value} checked={engine === value} onChange={() => setEngine(value)} />
@@ -122,7 +122,7 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
         ))}
       </fieldset>
 
-      <label className="inline-block cursor-pointer rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white">
+      <label className="inline-block cursor-pointer rounded btn btn-primary">
         {photo ? 'Try another photo' : 'Choose a docket photo'}
         <input
           type="file"
@@ -135,15 +135,15 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
       </label>
 
       {stage.status === 'reading' && (
-        <p className="text-sm text-neutral-600">
+        <p className="text-sm text-muted">
           {engine === 'textract' ? 'Sending the photo to AWS Textract…' : <>
             Reading the docket… {Math.round(stage.progress * 100)}%
-            <span className="text-neutral-400"> (the first run downloads the OCR engine, about 10 MB)</span>
+            <span className="text-faint"> (the first run downloads the OCR engine, about 10 MB)</span>
           </>}
         </p>
       )}
       {stage.status === 'error' && (
-        <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="rounded border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical-ink">
           Could not read the photo: {stage.message}
         </p>
       )}
@@ -152,16 +152,16 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
 
       {result && (
         <>
-          <p className="text-sm text-neutral-600">
+          <p className="text-sm text-muted">
             {result.lines.length} delivery lines from {result.verdicts.length} lines of text ·{' '}
             {dropped} dropped as not part of the delivery · {(result.ms / 1000).toFixed(1)}s
           </p>
 
           <section>
-            <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">What was delivered</h2>
-            <div className="mt-2 overflow-x-auto rounded border border-neutral-200">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">What was delivered</h2>
+            <div className="mt-2 overflow-x-auto rounded border border-line">
               <table className="w-full text-sm">
-                <thead className="bg-neutral-50 text-left text-xs text-neutral-500">
+                <thead className="bg-surface-2 text-left text-xs text-muted">
                   <tr>
                     <th className="px-3 py-2">Product</th>
                     <th className="px-3 py-2">Pack</th>
@@ -171,12 +171,12 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
                     <th className="px-3 py-2">Match</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-100">
+                <tbody className="divide-y divide-line">
                   {result.lines.map((line, i) => (
                     <tr key={i} className="align-top">
                       <td className="px-3 py-2">
                         <p className="font-medium">{line.productName ?? 'New product?'}</p>
-                        <p className="font-mono text-xs text-neutral-500">{line.text}</p>
+                        <p className="font-mono text-xs text-muted">{line.text}</p>
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap">
                         {line.pack ? `${line.pack} × ` : ''}{line.size ?? '—'}
@@ -184,27 +184,27 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
                       <td className="px-3 py-2 text-right whitespace-nowrap tabular-nums">
                         {line.cartons !== null || line.eaches !== null ? `${line.cartons ?? '?'} + ${line.eaches ?? '?'}` : '—'}
                         {line.check && (
-                          <p className={`text-xs ${line.check === 'agrees' ? 'text-green-700' : 'text-amber-700'}`}>
+                          <p className={`text-xs ${line.check === 'agrees' ? 'text-good' : 'text-warning'}`}>
                             {line.check === 'agrees' ? 'matches qty' : 'does not match qty'}
                           </p>
                         )}
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums">{line.ordered ?? '—'}</td>
                       <td className={`px-3 py-2 text-right tabular-nums ${
-                        line.supplied === null || line.check === 'disagrees' || (line.ordered !== null && line.ordered !== line.supplied) ? 'bg-amber-50 font-semibold text-amber-800' : ''}`}>
+                        line.supplied === null || line.check === 'disagrees' || (line.ordered !== null && line.ordered !== line.supplied) ? 'bg-warning-soft font-semibold text-warning' : ''}`}>
                         <input
                           defaultValue={line.supplied ?? ''}
                           placeholder="?"
                           inputMode="numeric"
                           aria-label={`Supplied, line ${i + 1}`}
-                          className="w-14 rounded border border-transparent bg-transparent px-1 text-right hover:border-neutral-300 focus:border-neutral-400 focus:bg-white focus:outline-none"
+                          className="w-14 rounded border border-transparent bg-transparent px-1 text-right hover:border-line-strong focus:border-brand focus:bg-surface focus:outline-none"
                         />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-xs">
                         {line.via === 'new product?' ? (
-                          <span className="text-red-700">not in catalogue</span>
+                          <span className="text-critical">not in catalogue</span>
                         ) : (
-                          <span className={line.confidence >= 0.8 ? 'text-green-700' : 'text-amber-700'}>
+                          <span className={line.confidence >= 0.8 ? 'text-good' : 'text-warning'}>
                             {line.via} · {Math.round(line.confidence * 100)}%
                           </span>
                         )}
@@ -212,23 +212,23 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
                     </tr>
                   ))}
                   {result.lines.length === 0 && (
-                    <tr><td colSpan={6} className="px-3 py-4 text-center text-neutral-500">No product lines found.</td></tr>
+                    <tr><td colSpan={6} className="px-3 py-4 text-center text-muted">No product lines found.</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
-            <p className="mt-1 text-xs text-neutral-500">Amber quantity: unreadable, ordered and supplied differ, or cartons × pack + each disagree — check it.
+            <p className="mt-1 text-xs text-muted">Amber quantity: unreadable, ordered and supplied differ, or cartons × pack + each disagree — check it.
               Quantities come from the printed columns; handwritten ticks are not read.</p>
           </section>
 
           <section>
-            <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Every line the OCR read</h2>
-            <ol className="mt-2 divide-y divide-neutral-100 rounded border border-neutral-200 font-mono text-xs">
+            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Every line the OCR read</h2>
+            <ol className="mt-2 divide-y divide-line rounded border border-line font-mono text-xs">
               {result.verdicts.map((v) => (
-                <li key={v.index} className={`flex gap-3 px-3 py-1.5 ${v.kept === false ? 'text-neutral-400' : ''}`}>
+                <li key={v.index} className={`flex gap-3 px-3 py-1.5 ${v.kept === false ? 'text-faint' : ''}`}>
                   <span className="w-40 shrink-0 font-sans">
-                    {v.kept === true && <span className="text-green-700">kept</span>}
-                    {v.kept === 'merged' && <span className="text-green-700">kept · {v.what} of line above</span>}
+                    {v.kept === true && <span className="text-good">kept</span>}
+                    {v.kept === 'merged' && <span className="text-good">kept · {v.what} of line above</span>}
                     {v.kept === false && <span>dropped · {v.reason}</span>}
                   </span>
                   <span className="whitespace-pre-wrap break-all">{v.text}</span>
@@ -241,9 +241,9 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
 
       {photo && (result || textract) && (
         <section>
-          <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">Photo</h2>
+          <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Photo</h2>
           {/* eslint-disable-next-line @next/next/no-img-element -- a local blob URL, not an optimisable asset */}
-          <img src={photo} alt="The docket photo that was read" className="mt-2 max-w-full rounded border border-neutral-200" />
+          <img src={photo} alt="The docket photo that was read" className="mt-2 max-w-full rounded border border-line" />
         </section>
       )}
     </div>
