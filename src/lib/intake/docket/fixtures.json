@@ -1,0 +1,947 @@
+{
+ "catalogue": [
+  {
+   "id": "coke-classic-375-can",
+   "name": "Coca-Cola Classic Can 375ml",
+   "barcode": null
+  },
+  {
+   "id": "coke-classic-500",
+   "name": "Coca-Cola Classic 500ml",
+   "barcode": null
+  },
+  {
+   "id": "coke-classic-600",
+   "name": "Coca-Cola Classic 600ml",
+   "barcode": null
+  },
+  {
+   "id": "coke-classic-125",
+   "name": "Coca-Cola Classic 1.25L",
+   "barcode": null
+  },
+  {
+   "id": "coke-zero-375-can",
+   "name": "Coca-Cola Zero Sugar Can 375ml",
+   "barcode": null
+  },
+  {
+   "id": "coke-zero-500",
+   "name": "Coca-Cola Zero Sugar 500ml",
+   "barcode": null
+  },
+  {
+   "id": "coke-zero-600",
+   "name": "Coca-Cola Zero Sugar 600ml",
+   "barcode": null
+  },
+  {
+   "id": "coke-zero-125",
+   "name": "Coca-Cola Zero Sugar 1.25L",
+   "barcode": null
+  },
+  {
+   "id": "diet-coke-375-can",
+   "name": "Diet Coke Can 375ml",
+   "barcode": null
+  },
+  {
+   "id": "sprite-125",
+   "name": "Sprite 1.25L",
+   "barcode": null
+  },
+  {
+   "id": "sprite-600",
+   "name": "Sprite 600ml",
+   "barcode": null
+  },
+  {
+   "id": "fanta-125",
+   "name": "Fanta Orange 1.25L",
+   "barcode": null
+  },
+  {
+   "id": "mf-water-600",
+   "name": "Mount Franklin Still Water 600ml",
+   "barcode": null
+  },
+  {
+   "id": "mf-water-15",
+   "name": "Mount Franklin Still Water 1.5L",
+   "barcode": null
+  },
+  {
+   "id": "monster-green-500",
+   "name": "Monster Energy Green 500ml",
+   "barcode": null
+  },
+  {
+   "id": "monster-ultra-500",
+   "name": "Monster Ultra White 500ml",
+   "barcode": null
+  },
+  {
+   "id": "redbull-250",
+   "name": "Red Bull Energy Drink 250ml",
+   "barcode": null
+  },
+  {
+   "id": "redbull-473",
+   "name": "Red Bull Energy Drink 473ml",
+   "barcode": null
+  },
+  {
+   "id": "redbull-sf-250",
+   "name": "Red Bull Sugarfree 250ml",
+   "barcode": null
+  },
+  {
+   "id": "v-green-500",
+   "name": "V Green Energy Drink 500ml",
+   "barcode": null
+  },
+  {
+   "id": "v-sf-500",
+   "name": "V Sugarfree 500ml",
+   "barcode": null
+  },
+  {
+   "id": "pura-fc-2l",
+   "name": "Pura Full Cream Milk 2L",
+   "barcode": null
+  },
+  {
+   "id": "pura-fc-1l",
+   "name": "Pura Full Cream Milk 1L",
+   "barcode": null
+  },
+  {
+   "id": "pura-light-2l",
+   "name": "Pura Light Start Milk 2L",
+   "barcode": null
+  },
+  {
+   "id": "df-iced-coffee-600",
+   "name": "Dairy Farmers Iced Coffee 600ml",
+   "barcode": null
+  },
+  {
+   "id": "oak-choc-600",
+   "name": "Oak Chocolate Milk 600ml",
+   "barcode": null
+  },
+  {
+   "id": "bega-slices-250",
+   "name": "Bega Cheese Slices 250g",
+   "barcode": null
+  },
+  {
+   "id": "smiths-original-170",
+   "name": "Smith's Crinkle Cut Original 170g",
+   "barcode": null
+  },
+  {
+   "id": "smiths-sv-170",
+   "name": "Smith's Crinkle Cut Salt & Vinegar 170g",
+   "barcode": null
+  },
+  {
+   "id": "doritos-cheese-170",
+   "name": "Doritos Cheese Supreme 170g",
+   "barcode": null
+  },
+  {
+   "id": "mars-53",
+   "name": "Mars Bar 53g",
+   "barcode": "9300682001007"
+  },
+  {
+   "id": "snickers-50",
+   "name": "Snickers 50g",
+   "barcode": "9300682003001"
+  },
+  {
+   "id": "cadbury-dm-180",
+   "name": "Cadbury Dairy Milk 180g",
+   "barcode": "9300617009003"
+  },
+  {
+   "id": "winfield-blue-25",
+   "name": "Winfield Blue 25s",
+   "barcode": "9310155000017"
+  },
+  {
+   "id": "heinz-beans-420",
+   "name": "Heinz Baked Beans 420g",
+   "barcode": null
+  },
+  {
+   "id": "spc-spaghetti-420",
+   "name": "SPC Spaghetti 420g",
+   "barcode": null
+  },
+  {
+   "id": "nutrigrain-290",
+   "name": "Kellogg's Nutri-Grain 290g",
+   "barcode": null
+  },
+  {
+   "id": "utobys-muesli-cc",
+   "name": "Uncle Tobys Muesli Bar Choc Chip 185g",
+   "barcode": null
+  },
+  {
+   "id": "bh-white-700",
+   "name": "Bakehouse White Sandwich Loaf 700g",
+   "barcode": null
+  },
+  {
+   "id": "bh-wholemeal-700",
+   "name": "Bakehouse Wholemeal Loaf 700g",
+   "barcode": null
+  },
+  {
+   "id": "bh-cheesymite",
+   "name": "Bakehouse Cheesymite Scroll",
+   "barcode": null
+  },
+  {
+   "id": "deli-hct-sandwich",
+   "name": "Ham Cheese & Tomato Sandwich",
+   "barcode": null
+  },
+  {
+   "id": "tiptop-white-700",
+   "name": "Tip Top The One White 700g",
+   "barcode": null
+  }
+ ],
+ "dockets": [
+  {
+   "id": "A-cca-table.clean",
+   "lines": [
+    "Coca-Cola Europacific Partners                                                 TAX INVOICE",
+    "ABN 52 000 002 481                                                                                            Invoice No: 7700418822",
+    "40 Mount Street, North Sydney NSW 2060                                                                             Date: 22/09/2026",
+    "Customer Service 13 26 53                                                                          Route: 4417 Driver: M. KHAN",
+    "Deliver To: METRO PETROLEUM BRUNSWICK, 401 LYGON ST BRUNSWICK EAST VIC 3057",
+    "Customer #: 30044172 PO Number: 88213",
+    "CODE       DESCRIPTION                                                                  ORD SUP UOM        UNIT $      EXT $",
+    "129354 COKE ZERO SUGAR CAN 24X375ML                              3        3 CTN         38.40 115.20",
+    "129361 COKE ZERO SUGAR PET 24X600ML                               2        1 CTN         52.80      52.80",
+    "118870     COCA-COLA CLASSIC PET 24X500ML                            5        5 CTN        48.00 240.00",
+    "140022 SPRITE PET 12X1.25L                                              2        2 CTN        26.50      53.00",
+    "151190     MONSTER ENERGY GREEN CAN 24X500ML                   1       1 CTN        61.20     61.20",
+    "162201 MOUNT FRANKLIN STILL WATER 24X600ML                      4        4 CTN         19.90      79.60",
+    "Subtotal $601.80 GST $60.18 TOTAL $661.98",
+    "Total cartons: 16. Please check goods on delivery. Claims for shortages must be lodged within 24 hours. Payment terms 14 days. BSB 062-000 ACC 1234",
+    "5678. Our Christmas range is now available — ask your rep!",
+    "Received by:                     Signature:                     Pallets: 1 CHEP"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-375-can",
+     "qty": 3,
+     "ordered": 3
+    },
+    {
+     "product": "coke-zero-600",
+     "qty": 1,
+     "ordered": 2
+    },
+    {
+     "product": "coke-classic-500",
+     "qty": 5,
+     "ordered": 5
+    },
+    {
+     "product": "sprite-125",
+     "qty": 2,
+     "ordered": 2
+    },
+    {
+     "product": "monster-green-500",
+     "qty": 1,
+     "ordered": 1
+    },
+    {
+     "product": "mf-water-600",
+     "qty": 4,
+     "ordered": 4
+    }
+   ]
+  },
+  {
+   "id": "A-cca-table.photo",
+   "lines": [
+    "Coca-Cola Europacific Partners                                                     TAX INVOICE",
+    "ABN 52 000 002 481                                                                                                      Invoice No: 7700418822",
+    "40 Mount Street, North Sydney NSW 2060                                                                                   Date: 22/09/2026",
+    "Customer Service 13 26 53                                                                                   Route: 4417 Driver: M. KHAN",
+    "Deliver To: METRO PETROLEUM BRUNSWICK, 401 LYGON ST BRUNSWICK EAST VIC 3057",
+    "Customer #: 30044172 PQ Number: 88213",
+    "CODE       DESCRIPTION                                                                     ORD SUP uom        UNITS EXTs",
+    "129354 COKE ZERO SUGAR CAN 24X375ML                              3        3 CIN         3840 11520",
+    "129361 COKE ZERO SUGAR PET 24X600ML                                  2         1 CIN          52.80      52.80",
+    "118870 COCA-COLA CLASSIC PET 24X500ML                                    5          5 CIN           48.00 240.00",
+    "140022 SPRITE PET 12X1.25L                                                            12          2 CIN           26.50       53.00",
+    "151190 MONSTER ENERGY GREEN CAN 24X500ML                       1         1 CIN          61.20      61.20",
+    "162201 MOUNT FRANKLIN STILL WATER 24X600ML                     4       4 CTN         19.90      79.60",
+    "Subtotal $601.80 GST $60.18 TOTAL $661.98",
+    "aotal canons: 16. Please check goods on delivery Claims for shortages must be lodged within 24 hours. Payment terms 14 days. BSB 062.000 ACC 1234",
+    "5678 Our Chiistmas range is now available — ask your reps",
+    "Recewed by:                  Signature:                  Pallets: 1 CHEP"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-375-can",
+     "qty": 3,
+     "ordered": 3
+    },
+    {
+     "product": "coke-zero-600",
+     "qty": 1,
+     "ordered": 2
+    },
+    {
+     "product": "coke-classic-500",
+     "qty": 5,
+     "ordered": 5
+    },
+    {
+     "product": "sprite-125",
+     "qty": 2,
+     "ordered": 2
+    },
+    {
+     "product": "monster-green-500",
+     "qty": 1,
+     "ordered": 1
+    },
+    {
+     "product": "mf-water-600",
+     "qty": 4,
+     "ordered": 4
+    }
+   ]
+  },
+  {
+   "id": "B-no-headers.clean",
+   "lines": [
+    "SUNRISE DISTRIBUTORS",
+    "Unit 4, 18 Industrial Dr, Campbellfield VIC 3061 - ph 03 9357 1100 - orders@sunrisedist.com.au",
+    "ABN 61 118 204 993",
+    "Docket 55812 23 Sep 2026 Metro Brunswick",
+    "Coca-Cola Zero Sugar 24x500ml                                                                 2",
+    "Coca-Cola Classic 24 x 375ml cans                                                               3",
+    "Red Bull Energy Drink 24x250ml                                                             2",
+    "Red Bull Sugarfree 24x250ml                                                              1",
+    "V Green Energy 24 x 500ml                                                                      2",
+    "Smiths Crinkle Cut Original 170g ctn 12                                                      1",
+    "Doritos Cheese Supreme 170g ctn12                                                        1",
+    "** 5% off Red Bull all October — ask your driver **",
+    "Goods remain the property of Sunrise Distributors until paid in full. E&OE.",
+    "Total items 12 Amount due $512.40",
+    "Driver: Tony Truck 12 Thank you for your business!"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-500",
+     "qty": 2
+    },
+    {
+     "product": "coke-classic-375-can",
+     "qty": 3
+    },
+    {
+     "product": "redbull-250",
+     "qty": 2
+    },
+    {
+     "product": "redbull-sf-250",
+     "qty": 1
+    },
+    {
+     "product": "v-green-500",
+     "qty": 2
+    },
+    {
+     "product": "smiths-original-170",
+     "qty": 1
+    },
+    {
+     "product": "doritos-cheese-170",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "id": "B-no-headers.photo",
+   "lines": [
+    "SUNRISE DISTRIBUTORS",
+    "Mow 4. 18 Industrial Or, Campbelfeld VIC 3061 - ph 03 9357 1100 - orders @sunrisedist.com.au",
+    "ABN 61 118 204 993",
+    "Docket 55812   23 Sep 2026   Metro Brunswick",
+    "Coca-Cola Zero Sugar 24x500m                                                                        2",
+    "Coca-Cola Classic 24 x 375ml cans                                                            3",
+    "Red Bull Energy Drink 24x250m!                                                              2",
+    "Red Bull Sugarfree 24x250m|                                                                    1",
+    "V Green Energy 24 x 500m|                                                                          2",
+    "Smiths Crinkle Cut Original 170g ctn 12                                                       1",
+    "Doritos Cheese Supreme 170g ctn12                                                      1",
+    "** 5% off Red Bull al October — ask your driver +",
+    "Goods remain the property of Sunrise Distributors unt pai in ful E&OE.",
+    "Total items 12 Amount due $512.40",
+    "Driver: Tony Truck 12. Thank you for your business!"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-500",
+     "qty": 2
+    },
+    {
+     "product": "coke-classic-375-can",
+     "qty": 3
+    },
+    {
+     "product": "redbull-250",
+     "qty": 2
+    },
+    {
+     "product": "redbull-sf-250",
+     "qty": 1
+    },
+    {
+     "product": "v-green-500",
+     "qty": 2
+    },
+    {
+     "product": "smiths-original-170",
+     "qty": 1
+    },
+    {
+     "product": "doritos-cheese-170",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "id": "C-dairy-pipes.clean",
+   "lines": [
+    "LION DAIRY & DRINKS PTY LTD            DELIVERY DOCKET",
+    "ABN 26 004 322 181                       DKT: 90412277",
+    "Route 311   Stop 14                      Date: 24.09.2026",
+    "Cust: METRO PETROLEUM - BRUNSWICK        Acct: 700331",
+    "QTY | CODE | DESCRIPTION                          | UNIT",
+    "EE",
+    "12 | 101204 | PURA FULL CREAM MILK 2L               | EA",
+    "8 | 101211 | PURA LIGHT START MILK 2L              | EA",
+    "18 | 101310 | PURA FULL CREAM MILK 1L               | EA",
+    "24 | 205511 | DAIRY FARMERS ICED COFFEE 600ML       | EA",
+    "12 | 205540 | OAK CHOCOLATE MILK 60OML              | EA",
+    "6 | 330120 | BEGA CHEESE SLICES 250G               | EA",
+    "EE",
+    "TOTAL UNITS: 80          CRATES OUT: 6   CRATES IN: 4",
+    "Keep refrigerated below 5C. Returns not accepted after 48h.",
+    "Driver sig:            Store sig:"
+   ],
+   "truth": [
+    {
+     "product": "pura-fc-2l",
+     "qty": 12
+    },
+    {
+     "product": "pura-light-2l",
+     "qty": 8
+    },
+    {
+     "product": "pura-fc-1l",
+     "qty": 18
+    },
+    {
+     "product": "df-iced-coffee-600",
+     "qty": 24
+    },
+    {
+     "product": "oak-choc-600",
+     "qty": 12
+    },
+    {
+     "product": "bega-slices-250",
+     "qty": 6
+    }
+   ]
+  },
+  {
+   "id": "C-dairy-pipes.photo",
+   "lines": [
+    "LION DAIRY & DRINKS PTY LTD           DELIVERY DOCKET",
+    "ABN 26 004 322 181                   DKT: 90412277",
+    "Route 311  Stop 14                 Date: 24.09.2026",
+    "Cust: METRO PETROLEUM - BRUNSWICK      Acct: 700331",
+    "QTY | CODE | DESCRIPTION                   | UNIT",
+    "Sea Ee SR Rll ee",
+    "12 | 101204 | PURA FULL CREAM MILK 2           | EA",
+    "8 | 101211 | pura LIGHT START MILK 2          | EA",
+    "18 | 101310 | PURA FULL CREAM MILK 1L           | EA",
+    "24 | 205511 | DAIRY FARMERS ICED COFFEE 60eML     | EA",
+    "12 | 205540 | 0AK CHOCOLATE MILK 60OML          | EA",
+    "6 | 330120 | BEGA CHEESE SLICES 2506           | EA",
+    "A is res ea T EA",
+    "TOTAL UNITS: go        CRATES OUT: 6  CRATES IN: 4",
+    "Keep refrigerated below SC. Returns not accepted after 4gh.",
+    "Driver sig: ———— Store sig: Csi oy"
+   ],
+   "truth": [
+    {
+     "product": "pura-fc-2l",
+     "qty": 12
+    },
+    {
+     "product": "pura-light-2l",
+     "qty": 8
+    },
+    {
+     "product": "pura-fc-1l",
+     "qty": 18
+    },
+    {
+     "product": "df-iced-coffee-600",
+     "qty": 24
+    },
+    {
+     "product": "oak-choc-600",
+     "qty": 12
+    },
+    {
+     "product": "bega-slices-250",
+     "qty": 6
+    }
+   ]
+  },
+  {
+   "id": "D-receipt.clean",
+   "lines": [
+    "CAMPBELLS CASH & CARRY",
+    "Preston Store",
+    "ABN 13 004 104 889",
+    "TAX INVOICE / RECEIPT",
+    "Trans 000412 Reg 3",
+    "24/09/26 07:42",
+    "2 Xx MARS BAR 53G BOX 48",
+    "9300682001007     $91.20",
+    "1 x SNICKERS 50G BOX 48",
+    "9300682003001     $45.60",
+    "3 x CADBURY DAIRY MILK 180G",
+    "9300617009003     $16.50",
+    "1 x WINFIELD BLUE 25S CTN 10",
+    "9310155000017     $389.90",
+    "ITEMS 7",
+    "SUBTOTAL $543.20",
+    "GST INCL $49.38",
+    "EFTPOS $543.20",
+    "No refunds on tobacco. Member #88213 - Points earned",
+    "543 - Visit campbells.com.au"
+   ],
+   "truth": [
+    {
+     "product": "mars-53",
+     "qty": 2
+    },
+    {
+     "product": "snickers-50",
+     "qty": 1
+    },
+    {
+     "product": "cadbury-dm-180",
+     "qty": 3
+    },
+    {
+     "product": "winfield-blue-25",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "id": "D-receipt.photo",
+   "lines": [
+    "Ee ——",
+    "CAMPBELLS CASH & CARRY",
+    "Preston Store",
+    "ABN 13 004 104 889",
+    "TAX INVOICE / RECEIPT",
+    "Trans 000412 Reg 3",
+    "24/09/26 07:42",
+    "2 Xx MARS BAR 53G BOX 48",
+    "9300682001007           $91.20",
+    "1 x SNICKERS 506 BOX 48",
+    "9300682003001           $45.60",
+    "3 x CADBURY DAIRY MILK 1806",
+    "9300617009003           $16.50",
+    "1 x WINFIELD BLUE 25S CTN 10",
+    "9310155000017              $389.90",
+    "ITEMS 7",
+    "SUBTOTAL $543.29",
+    "GST INCL $49.38",
+    "EFTPOS $543.20",
+    "S95efunds on tobacco. Member #88213 - points earned",
+    "543 - Visit campbells.com.ay",
+    "BE e——"
+   ],
+   "truth": [
+    {
+     "product": "mars-53",
+     "qty": 2
+    },
+    {
+     "product": "snickers-50",
+     "qty": 1
+    },
+    {
+     "product": "cadbury-dm-180",
+     "qty": 3
+    },
+    {
+     "product": "winfield-blue-25",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "id": "E-local-bakery.clean",
+   "lines": [
+    "Brunswick Bakehouse",
+    "Fresh every morning since 1998",
+    "Shop 2/99 Sydney Rd Brunswick - 0412 555 019 - ABN 88 612 330 104",
+    "Invoice #2291 — 24 September 2026",
+    "To: Metro Brunswick (Lygon St)",
+    "White sandwich loaf 700g x6",
+    "Wholemeal loaf 700g x4",
+    "Cheesymite scrolls x12",
+    "Ham cheese & tomato sandwiches x8",
+    "Note: rye not available today, will send tomorrow. Bread baked 4am, best before 3 days.",
+    "Total $118.00 - Pay by EFT to BSB 033-172 Acc 4410 2231 within 7 days"
+   ],
+   "truth": [
+    {
+     "product": "bh-white-700",
+     "qty": 6
+    },
+    {
+     "product": "bh-wholemeal-700",
+     "qty": 4
+    },
+    {
+     "product": "bh-cheesymite",
+     "qty": 12
+    },
+    {
+     "product": "deli-hct-sandwich",
+     "qty": 8
+    }
+   ]
+  },
+  {
+   "id": "E-local-bakery.photo",
+   "lines": [
+    "Brunswick Bakehouse",
+    "Fresh every morning since 1998",
+    "Shop 2/99 Sydney Rd Brunswick - 0412 555 019 - ABN 88 612 330 104",
+    "Invoice #2291 — 24 September 2026",
+    "To: Metro Brunswick (Lygon St)",
+    "White sandwich loaf 700g x6",
+    "‘Wholemeal loaf 700g x4",
+    "Cheesymite scrolls x12",
+    "Ham cheese & tomato sandwiches x8",
+    "Note: rye not available today, will send tomorrow. Bread baked 4am, best before 3 days.",
+    "Total $118.00 - Pay by EFT 10 BSB 033-172 Acc 4410 2231 within 7 days"
+   ],
+   "truth": [
+    {
+     "product": "bh-white-700",
+     "qty": 6
+    },
+    {
+     "product": "bh-wholemeal-700",
+     "qty": 4
+    },
+    {
+     "product": "bh-cheesymite",
+     "qty": 12
+    },
+    {
+     "product": "deli-hct-sandwich",
+     "qty": 8
+    }
+   ]
+  },
+  {
+   "id": "F-two-line-items.clean",
+   "lines": [
+    "METCASH FOOD & GROCERY Aasn 32 000 031 569",
+    "Campbell Street Distribution Centre - Invoice 4401-228871 - 21/09/2026 - Page 1 of 1",
+    "Ship to: Metro Petroleum Coburg - Account 5520931",
+    "Item 0044120 HEINZ BAKED BEANS 420G CTN 12",
+    "Ord5 Sup4 @ $21.60",
+    "Item 0051877 SPC SPAGHETTI 420G CTN 12",
+    "Ord3 Sup3 @ $19.80",
+    "Item 0060013 KELLOGGS NUTRI-GRAIN 290G CTN 10",
+    "Ord2 Sup2 @ $54.00",
+    "Item 0071552 UNCLE TOBYS MUESLI BAR CHOC CHIP 185G CTN 8",
+    "Ord2 Sup 0 OUT OF STOCK",
+    "Back orders will be supplied on next delivery. Prices include GST where applicable. Visit metcash.com for our latest catalogue. Invoice total $249.60."
+   ],
+   "truth": [
+    {
+     "product": "heinz-beans-420",
+     "qty": 4,
+     "ordered": 5
+    },
+    {
+     "product": "spc-spaghetti-420",
+     "qty": 3,
+     "ordered": 3
+    },
+    {
+     "product": "nutrigrain-290",
+     "qty": 2,
+     "ordered": 2
+    },
+    {
+     "product": "utobys-muesli-cc",
+     "qty": 0,
+     "ordered": 2
+    }
+   ]
+  },
+  {
+   "id": "F-two-line-items.photo",
+   "lines": [
+    "METCASH FOOD & GROCERY sn 32 000 031 560",
+    "Campbell Street Distribution Centre - Invoice 4401-22887,   21/09/2026 - Page 1 of 1",
+    "Ship to: Metro Petroleum Coburg - Account 5520931",
+    "Item 0044120 HEINZ BAKED BEANS 420G CTN12",
+    "Ord5 Supa @ $21.60",
+    "Item 0051877 spc SPAGHETTI 420G CTN 12",
+    "Ord3 Sup3  @ $19.80",
+    "Item 0060013 KELLOGGS NUTRI-GRAIN 290G CTN10",
+    "Ord2 Sup2 @ $54.00",
+    "Item 0071552 UNCLE TOBYS MUESLI BAR CHOC CHIP 185G CTN 8",
+    "Ord2 Supo OuT OF STOCK",
+    "Back orders will be supplied on next delivery. Prices include GST where applicable. Visit metcash.com for our latest catalogue. Invoice total $249.60"
+   ],
+   "truth": [
+    {
+     "product": "heinz-beans-420",
+     "qty": 4,
+     "ordered": 5
+    },
+    {
+     "product": "spc-spaghetti-420",
+     "qty": 3,
+     "ordered": 3
+    },
+    {
+     "product": "nutrigrain-290",
+     "qty": 2,
+     "ordered": 2
+    },
+    {
+     "product": "utobys-muesli-cc",
+     "qty": 0,
+     "ordered": 2
+    }
+   ]
+  },
+  {
+   "id": "G-abbreviated.clean",
+   "lines": [
+    "NORTHERN BEVERAGE WHOLESALE #sn 45 611 002 318 - 1300 555 812",
+    "INV 00318842 - 25/09/2026 - Metro Petroleum Preston - Acct MP-PRE",
+    "ITEM                       DESC                                                                                              QTY               AMT",
+    "CZS375C             CC ZERO SGR CAN 375ML 24PK                                                4          153.60",
+    "CCL500P               CC CLASSIC PET 500ML 24PK                                                         2             96.00",
+    "RB250SF               RB SUGFREE 250ML 24PK                                                            3           129.60",
+    "MUWS500                MNSTR ULTRA WHT 500ML 24PK                                                       1              61.20",
+    "VSF500                  V SF ENGY 500ML 24PK                                                                    2              98.40",
+    "All prices ex GST. Temp controlled goods: N/A. Queries: accounts@nbw.com.au. Thank you!"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-375-can",
+     "qty": 4
+    },
+    {
+     "product": "coke-classic-500",
+     "qty": 2
+    },
+    {
+     "product": "redbull-sf-250",
+     "qty": 3
+    },
+    {
+     "product": "monster-ultra-500",
+     "qty": 1
+    },
+    {
+     "product": "v-sf-500",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "id": "G-abbreviated.photo",
+   "lines": [
+    "NORTHERN  BEVERAGE WHOLESALE on 45 611 002 318 - 1300 555 812",
+    "INV 00318842 - 25/09/2026 - Metro Petroleum Preston - Acct MP-PRE",
+    "ITEM                       DESC                                                                                                 QTY                AMT",
+    "C2Zs375¢C               CC ZERO SGR CAN 375ML 24PK                                                        4            153.60",
+    "CCL500P                 CC CLASSIC PET 500ML 24PK                                                                2               96.00",
+    "RB250SF              RB SUGFREE 250ML 24PK                                                          3           129.60",
+    "MUWS00                 MNSTR ULTRA WHT 500ML 24PK                                                            3               61.20",
+    "VSF500                  V SF ENGY 500ML 24PK                                                                      2              98.40",
+    "All prices ex GST. Temp controlled goods: WA Queries: ‘accounts@nbw.com au. Thank you!"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-375-can",
+     "qty": 4
+    },
+    {
+     "product": "coke-classic-500",
+     "qty": 2
+    },
+    {
+     "product": "redbull-sf-250",
+     "qty": 3
+    },
+    {
+     "product": "monster-ultra-500",
+     "qty": 1
+    },
+    {
+     "product": "v-sf-500",
+     "qty": 2
+    }
+   ]
+  },
+  {
+   "id": "H-abbreviated-repeat.clean",
+   "lines": [
+    "NORTHERN BEVERAGE WHOLESALE Asn 45 611 002 318 - 1300 555 812",
+    "INV 00319977 - 02/10/2026 - Metro Petroleum Preston - Acct MP-PRE",
+    "ITEM                       DESC                                                                                              QTY                AMT",
+    "CZS375C              CC ZERO SGR CAN 375ML 24PK                                                6           230.40",
+    "RB250SF               RB SUGFREE 250ML 24PK                                                            2             86.40",
+    "VSF500                  V SF ENGY 500ML 24PK                                                                    1              49.20",
+    "All prices ex GST. Queries: accounts@nbw.com.au. Thank you!"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-375-can",
+     "qty": 6
+    },
+    {
+     "product": "redbull-sf-250",
+     "qty": 2
+    },
+    {
+     "product": "v-sf-500",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "id": "H-abbreviated-repeat.photo",
+   "lines": [
+    "NORTHERN  BEVERAGE WHOLESALE sn 45 611 002 318 - 1300 555 812",
+    "INV 00319977 - 02/10/2026 - Metro Petroleum Preston - Acct MP-PRE",
+    "ITEM                        DESC                                                                                                 QTY                AMT",
+    "CZs375¢C               CC ZERO SGR CAN 375ML 24PK                                                     6            230.40",
+    "RB250SF                RB SUGFREE 250ML 24PK                                                                2              86.40",
+    "VSF500                  V SF ENGY 500ML 24PK                                                                      di              49.20",
+    "All prices ex GST. Queries: accounts @nbw.com.au. Thank you!"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-375-can",
+     "qty": 6
+    },
+    {
+     "product": "redbull-sf-250",
+     "qty": 2
+    },
+    {
+     "product": "v-sf-500",
+     "qty": 1
+    }
+   ]
+  },
+  {
+   "id": "I-qty-first-no-header.clean",
+   "lines": [
+    "FRESH & FAST FOOD SUPPLY",
+    "ph 9471 2200 - ABN 19 331 450 772",
+    "Delivery 26/9 - Metro Preston",
+    "5 Coca-Cola Zero Sugar 1.25L 38",
+    "3 Fanta Orange 1.25L 21",
+    "10 Dairy Farmers Iced Coffee 600ml 32",
+    "4 Pepsi Max 24x375ml cans 152",
+    "Prices rounded to the dollar. 2 cartons short last week credited on this docket.",
+    "TOTAL $243"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-125",
+     "qty": 5
+    },
+    {
+     "product": "fanta-125",
+     "qty": 3
+    },
+    {
+     "product": "df-iced-coffee-600",
+     "qty": 10
+    },
+    {
+     "product": null,
+     "qty": 4,
+     "newProduct": "Pepsi Max 24x375ml"
+    }
+   ]
+  },
+  {
+   "id": "I-qty-first-no-header.photo",
+   "lines": [
+    "FRESH & FAST FOOD SUPPLY",
+    "Ph 9471 2200 - ABN 19 331 450 772",
+    "Delivery 26/9 - Metro Preston",
+    "5 Coca-Cola Zero Sugar 1.25, 38",
+    "3 Fanta Orange 1.25. 21",
+    "10 Dairy Farmers Iced Coffee 600m| 32",
+    "4 Pepsi Max 24x375mi cans 152",
+    "Prices rounded othe doar. 2 canons short lst week credited on this docket",
+    "TOTAL $243"
+   ],
+   "truth": [
+    {
+     "product": "coke-zero-125",
+     "qty": 5
+    },
+    {
+     "product": "fanta-125",
+     "qty": 3
+    },
+    {
+     "product": "df-iced-coffee-600",
+     "qty": 10
+    },
+    {
+     "product": null,
+     "qty": 4,
+     "newProduct": "Pepsi Max 24x375ml"
+    }
+   ]
+  }
+ ]
+}

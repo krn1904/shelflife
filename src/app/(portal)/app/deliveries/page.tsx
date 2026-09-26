@@ -43,6 +43,9 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
       >
         Receive a delivery
       </Link>
+      <Link href="/app/deliveries/docket-test" className="ml-3 text-sm text-neutral-500 underline">
+        Test docket OCR
+      </Link>
 
       {open.length > 0 && (
         <>
