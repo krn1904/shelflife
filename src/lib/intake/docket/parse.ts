@@ -27,7 +27,8 @@ export type Quantities = {
   ordered: number | null;
   supplied: number | null;
   /** How the quantity was read, shown to the operator when it looks wrong. */
-  how: 'labelled' | 'n x name' | 'name xN' | 'first column' | 'two columns' | 'one number' | 'none';
+  how: 'labelled' | 'n x name' | 'name xN' | 'first column' | 'two columns' | 'one number' | 'none'
+    | 'by heading' | 'from cartons';
 };
 
 export type DocketLine = {
@@ -44,6 +45,11 @@ export type DocketLine = {
   ordered: number | null;
   supplied: number | null;
   qtyHow: Quantities['how'];
+  /** Printed cartons and loose units, when the docket has those columns. */
+  cartons: number | null;
+  eaches: number | null;
+  /** cartons × pack + eaches against the quantity: a free check on the OCR. */
+  check: 'agrees' | 'disagrees' | null;
   code: string | null;
 };
 
@@ -61,6 +67,7 @@ export type DocketParse = { lines: DocketLine[]; verdicts: LineVerdict[] };
 /** Fix the misreads OCR makes on docket text before anything else looks at it. */
 export function normalise(raw: string): string {
   let s = ` ${raw} `;
+  s = s.replace(/\b([0-9SOo]{2,4})(?=\s?(ml|l|g|kg)\b)/gi, (m: string) => (/\d/.test(m) ? m.replace(/S/gi, '5').replace(/O/gi, '0') : m)); // S00ml → 500ml
   s = s.replace(/(\d)\s?m[l1|!I]?(?![a-z0-9])/gi, '$1ml');               // 500m| 500m! 500m → 500ml
   s = s.replace(/[|]/g, ' | ');                                         // pipes are column breaks
   s = s.replace(/(\d)\s*(?:lt|ltr|litres?)\b/gi, '$1l');                   // 2Lt → 2l
@@ -120,6 +127,71 @@ export function quantitiesOf(raw: string): Quantities {
   if (nums.length >= 2) return { ordered: nums[0], supplied: nums[1], how: 'two columns' };
   if (nums.length === 1) return { ordered: null, supplied: nums[0], how: 'one number' };
   return { ordered: null, supplied: null, how: 'none' };
+}
+
+// ---------------------------------------------------------------------------------------
+// Quantities by column heading
+//
+// When the docket has a headings row, a number's column says what it is: the first number
+// after the description sits under the first quantity heading after "Description". The
+// words are general (Ordered, Qty, Picked, Delivered, Supplied, Cartons, Eaches), never a
+// particular supplier's layout.
+
+type Column = 'ordered' | 'picked' | 'delivered' | 'qty' | 'cartons' | 'eaches';
+
+const COLUMN_WORDS: [Column, RegExp][] = [
+  ['ordered', /^(ordered|order|ord)$/i],
+  ['picked', /^pick(ed)?$/i],
+  ['delivered', /^(deliv\w*|delv\w*|supplied|supp?|received|recd?)$/i],
+  ['qty', /^(qty|quantity)$/i],
+  ['cartons', /^(cartons?|crates?|ctns?|cases?)$/i],
+  ['eaches', /^(eaches|each|units?)$/i],
+];
+const UNIT_WORDS = /^(ea|each|ctn|ctns|carton|cartons|box|pk|pack|unit|units|uom|btl|pet|can)$/i;
+
+export type Columns = { before: Column[]; after: Column[] };
+
+export function columnsOf(heading: string): Columns {
+  const tokens = normalise(heading).split(/[\s/|]+/);
+  const split = tokens.findIndex((t) => /^(description|desc|product)$/i.test(t));
+  const columns = (list: string[]) => list.flatMap((t) => {
+    const hit = COLUMN_WORDS.find(([, re]) => re.test(t.replace(/[^a-z]/gi, '')));
+    return hit ? [hit[0]] : [];
+  });
+  if (split < 0) return { before: [], after: columns(tokens) };
+  return { before: columns(tokens.slice(0, split)), after: columns(tokens.slice(split + 1)) };
+}
+
+/** A bare quantity, forgiving the stray mark OCR leaves beside it: "18)", "9|", "12f", "—6". */
+const QTY_TOKEN = /^[—_~-]?(\d{1,4})[^\d\s]?$/;
+const SKIP_TOKEN = (t: string) =>
+  /^\d+(\.\d+)?(ml|l|g|kg)$/i.test(t) || /^\(\d{1,3}\)$/.test(t) || /^\d{1,3}x\d/i.test(t)
+  || /^\$?\d+[.,]\d{2}$/.test(t) || /^\d{1,3}pk$/i.test(t) || UNIT_WORDS.test(t);
+
+export function quantitiesInColumns(raw: string, columns: Columns) {
+  const tokens = normalise(raw).split(' ').filter((t) => t !== '|');
+  const descStart = tokens.findIndex((t) => /^[a-z][a-z'&.-]{2,}$/i.test(t) && !UNIT_WORDS.test(t));
+  if (descStart < 0) return null;
+
+  const found: Partial<Record<Column, number>> = {};
+  // Before the description: small numbers only; long runs are delivery numbers and codes.
+  const before = tokens.slice(0, descStart).filter((t) => /^\d{1,3}$/.test(t)).map(Number);
+  const beforeCols = [...columns.before];
+  // "Cartons" is often lost from an OCR'd heading; a number ahead of "Eaches" is cartons.
+  if (beforeCols.includes('eaches') && !beforeCols.includes('cartons') && before.length >= 2) {
+    beforeCols.splice(beforeCols.indexOf('eaches'), 0, 'cartons');
+  }
+  // Aligned from the right: the columns nearest the description are the ones OCR keeps.
+  beforeCols.slice(-before.length).forEach((c, k) => { found[c] = before[before.length - Math.min(before.length, beforeCols.length) + k]; });
+
+  const after: number[] = [];
+  for (const t of tokens.slice(descStart + 1)) {
+    if (SKIP_TOKEN(t)) continue;
+    const q = t.match(QTY_TOKEN);
+    if (q) after.push(Number(q[1]));
+  }
+  columns.after.forEach((c, k) => { if (after[k] !== undefined) found[c] ??= after[k]; });
+  return found;
 }
 
 // ---------------------------------------------------------------------------------------
@@ -226,6 +298,8 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
   const heading = ocrLines.findIndex((l) => noiseReason(normalise(l)) === 'column headings');
   const end = heading < 0 ? -1 : ocrLines.findIndex((l, i) => i > heading && TABLE_END.test(l));
   const inTable = (i: number) => heading >= 0 && i > heading && (end < 0 || i < end);
+  const columns = heading >= 0 ? columnsOf(ocrLines[heading]) : null;
+  const quantityColumns = columns && [...columns.before, ...columns.after].some((c) => c !== 'cartons' && c !== 'eaches');
 
   ocrLines.forEach((raw, i) => {
     const text = normalise(raw);
@@ -254,9 +328,24 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
     const match = bestMatch(index, text);
     const { pack, size } = packOf(text);
     const line = (productId: string | null, productName: string | null, confidence: number, via: DocketLine['via']) => {
+      let { ordered, supplied, how } = qty;
+      const byColumn = inTable(i) && columns && quantityColumns ? quantitiesInColumns(raw, columns) : null;
+      if (byColumn) {
+        // Inside a headed table the columns decide. Nothing readable under them means the
+        // operator fills it in; the crates and eaches ahead of the description are not it.
+        ordered = byColumn.ordered ?? null;
+        // A docket with a Picked column is a pick-and-check sheet: Picked and Delivered are
+        // ticked or written by hand, and handwriting reads as noise. The printed Ordered
+        // figure is the claim; the operator confirms what actually arrived.
+        const handFilled = columns!.after.includes('picked');
+        const delivered = handFilled ? null : byColumn.delivered ?? byColumn.qty ?? null;
+        supplied = delivered !== null && (ordered === null || delivered <= ordered) ? delivered : ordered;
+        how = ordered === null && supplied === null ? 'none' : 'by heading';
+      }
       lines.push({
         source: i, text: raw, productId, productName, confidence: Number(confidence.toFixed(2)), via,
-        pack, size, ordered: qty.ordered, supplied: qty.supplied, qtyHow: qty.how, code: codes[0] ?? null,
+        pack, size, ordered, supplied, qtyHow: how,
+        cartons: byColumn?.cartons ?? null, eaches: byColumn?.eaches ?? null, check: null, code: codes[0] ?? null,
       });
       verdicts.push({ index: i, text: raw, kept: true, lineIndex: lines.length - 1 });
     };
@@ -277,7 +366,8 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
         return line(null, null, 0, 'new product?');
       }
       // A fragment under a row ("Bottle", "400mL (6)") is that row's description wrapping.
-      if (previous && (named.length >= 1 || packOf(text).size)) {
+      const fragment = packOf(text);
+      if (previous && (named.length >= 1 || fragment.size || fragment.pack)) {
         previous.text = `${previous.text} ${raw.replace(/[|§]/g, ' ').replace(/\s+/g, ' ').trim()}`;
         const wrapped = packOf(normalise(previous.text));
         previous.pack ??= wrapped.pack;
@@ -289,6 +379,18 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
     if (PRODUCT_SHAPED.test(text) && words(text).length >= 2) return line(null, null, 0, 'new product?');
     return drop('no product found');
   });
+
+  // Cartons × pack + eaches is the docket checking itself. Run once rows are whole, since a
+  // pack size often sits on a wrapped line ("400mL (6)").
+  for (const l of lines) {
+    if (l.cartons === null || l.eaches === null || l.pack === null) continue;
+    const expected = l.cartons * l.pack + l.eaches;
+    if (l.ordered === null && l.supplied === null) {
+      Object.assign(l, { ordered: expected, supplied: expected, qtyHow: 'from cartons', check: 'agrees' });
+    } else {
+      l.check = (l.ordered ?? l.supplied) === expected ? 'agrees' : 'disagrees';
+    }
+  }
 
   return { lines, verdicts };
 }

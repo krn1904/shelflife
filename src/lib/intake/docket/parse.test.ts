@@ -108,3 +108,19 @@ test('real docket: wrapped rows are joined and sizes read', () => {
   assert.equal(milk.size, '2000ml');
   assert.match(lines.find((l) => l.text.includes('Dairy Choice'))!.text, /HDPE .*Bottle/);
 });
+
+test('real docket photo: reads the printed Ordered column and checks it against cartons', () => {
+  for (const docket of REAL_DOCKETS.filter((d) => d.ordered)) {
+    const { lines } = parseDocket(docket.lines, fixtures.catalogue);
+    const read = lines.map((l) => l.ordered);
+    const right = read.filter((q, i) => q === docket.ordered![i]).length;
+    // Cleaned-up photo: every row. As taken: OCR loses a figure or two, never invents one.
+    if (docket.id.includes('cleaned up')) assert.deepEqual(read, docket.ordered, docket.id);
+    else assert.ok(right >= 9, `${docket.id}: ${read.join(',')}`);
+    // Handwritten ticks in Picked never become the quantity received.
+    lines.forEach((l, i) => assert.ok(l.supplied === null || l.supplied === docket.ordered![i], `${docket.id} row ${i}: ${l.supplied}`));
+    // Wherever cartons, eaches and pack are all readable, they agree with the quantity.
+    assert.ok(lines.every((l) => l.check !== 'disagrees'), docket.id);
+    assert.ok(lines.filter((l) => l.check === 'agrees').length >= 6, docket.id);
+  }
+});
