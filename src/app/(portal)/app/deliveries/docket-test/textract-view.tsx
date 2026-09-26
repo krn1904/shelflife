@@ -2,6 +2,8 @@
 
 import { useState } from 'react';
 import type { LineItem, Table, TextractReading } from '@/lib/intake/docket/textract-shape';
+import { draftFromTable, suggestProductTable, type ScanDraft } from '@/lib/intake/docket/scan';
+import { ExpiryDialog } from './expiry-dialog';
 
 // Below this, a cell is worth a second look.
 const SURE_AT = 80;
@@ -10,7 +12,12 @@ const SURE_AT = 80;
 const cellInput = 'field-sizing-content min-w-full rounded border border-transparent bg-transparent px-1.5 py-1 hover:border-line-strong focus:border-brand focus:bg-surface focus:outline-none';
 
 /** One table exactly as Textract found it on the page, every cell editable. */
-function EditableTable({ table, index }: { table: Table; index: number }) {
+function EditableTable({ table, index, suggested, onUse }: {
+  table: Table;
+  index: number;
+  suggested: boolean;
+  onUse: (edited: Table) => void;
+}) {
   const [rows, setRows] = useState(() => table.rows.map((r) => r.map((c) => c.text)));
   const edit = (r: number, c: number, value: string) =>
     setRows((all) => all.map((row, i) => (i === r ? row.map((v, j) => (j === c ? value : v)) : row)));
@@ -20,9 +27,20 @@ function EditableTable({ table, index }: { table: Table; index: number }) {
 
   return (
     <div>
-      <p className="text-xs text-muted">
-        Table {index + 1} · {table.rows.length} rows · {Math.round(table.confidence)}% confident
-      </p>
+      <div className="flex flex-wrap items-center gap-2">
+        <p className="text-xs text-muted">
+          Table {index + 1} · {table.rows.length} rows · {Math.round(table.confidence)}% confident
+        </p>
+        {suggested && <span className="badge badge-brand text-xs">Suggested: looks like the product list</span>}
+        <button
+          type="button"
+          className={`btn ${suggested ? 'btn-primary' : 'btn-outline'} ml-auto px-3 py-1 text-xs`}
+          // The dialog starts from the table as corrected here, not as Textract first read it.
+          onClick={() => onUse({ ...table, rows: table.rows.map((row, r) => row.map((c, i) => ({ ...c, text: rows[r][i] }))) })}
+        >
+          Use this table
+        </button>
+      </div>
       <div className="mt-1 overflow-x-auto rounded border border-line">
         {/* Natural width, scrolling sideways when wider than the screen: never squeezed. */}
         <table className="w-max min-w-full text-sm">
@@ -89,8 +107,24 @@ function EditableLineItems({ items }: { items: LineItem[] }) {
 
 export function TextractView({ reading, ms }: { reading: TextractReading; ms: number }) {
   const { expense, tables } = reading;
+  const suggested = suggestProductTable(tables);
+  const [draft, setDraft] = useState<ScanDraft | null>(null);
+  const [saved, setSaved] = useState<{ id: string; lines: number } | null>(null);
   return (
     <div className="space-y-6">
+      {saved && (
+        <p className="rounded border border-good/30 bg-good-soft px-3 py-2 text-sm text-ink">
+          Saved the docket with {saved.lines} {saved.lines === 1 ? 'line' : 'lines'}. It is listed under Saved dockets below.
+        </p>
+      )}
+      {draft && (
+        <ExpiryDialog
+          draft={draft}
+          details={{ supplierName: expense.vendor ?? '', docketNumber: expense.docketNumber ?? '', docketDate: expense.date ?? '' }}
+          onClose={(result) => { setDraft(null); if (result) setSaved(result); }}
+        />
+      )}
+
       <p className="text-sm text-muted">
         {tables.length} {tables.length === 1 ? 'table' : 'tables'} and {expense.items.length} line items ·{' '}
         {(ms / 1000).toFixed(1)}s · highlighted cells are below {SURE_AT}% confidence. Every cell can be corrected.
@@ -98,8 +132,12 @@ export function TextractView({ reading, ms }: { reading: TextractReading; ms: nu
 
       <section>
         <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Tables, as printed</h2>
+        <p className="mt-1 text-xs text-muted">Choose the table that lists the products to add expiry dates and save it.</p>
         <div className="mt-2 space-y-4">
-          {tables.map((t, i) => <EditableTable key={i} table={t} index={i} />)}
+          {tables.map((t, i) => (
+            <EditableTable key={i} table={t} index={i} suggested={i === suggested}
+              onUse={(edited) => { setSaved(null); setDraft(draftFromTable(edited)); }} />
+          ))}
           {tables.length === 0 && <p className="text-sm text-muted">No tables found on the page.</p>}
         </div>
       </section>

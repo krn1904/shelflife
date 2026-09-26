@@ -216,6 +216,105 @@ export type Database = {
           },
         ]
       }
+      docket_scan_lines: {
+        Row: {
+          cells: Json
+          created_at: string
+          expiry_date: string | null
+          id: string
+          org_id: string
+          position: number
+          scan_id: string
+        }
+        Insert: {
+          cells: Json
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          org_id: string
+          position: number
+          scan_id: string
+        }
+        Update: {
+          cells?: Json
+          created_at?: string
+          expiry_date?: string | null
+          id?: string
+          org_id?: string
+          position?: number
+          scan_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docket_scan_lines_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "docket_scan_lines_scan_id_fkey"
+            columns: ["scan_id"]
+            isOneToOne: false
+            referencedRelation: "docket_scans"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      docket_scans: {
+        Row: {
+          columns: Json
+          created_at: string
+          created_by: string | null
+          docket_date: string | null
+          docket_number: string | null
+          expiry_not_needed: boolean
+          id: string
+          org_id: string
+          site_id: string
+          supplier_name: string | null
+        }
+        Insert: {
+          columns?: Json
+          created_at?: string
+          created_by?: string | null
+          docket_date?: string | null
+          docket_number?: string | null
+          expiry_not_needed?: boolean
+          id?: string
+          org_id: string
+          site_id: string
+          supplier_name?: string | null
+        }
+        Update: {
+          columns?: Json
+          created_at?: string
+          created_by?: string | null
+          docket_date?: string | null
+          docket_number?: string | null
+          expiry_not_needed?: boolean
+          id?: string
+          org_id?: string
+          site_id?: string
+          supplier_name?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "docket_scans_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "docket_scans_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       expiry_actions: {
         Row: {
           action: Database["public"]["Enums"]["expiry_action_kind"]
@@ -879,6 +978,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      save_docket_scan: {
+        Args: {
+          p_columns: Json
+          p_docket_date: string
+          p_docket_number: string
+          p_expiry_not_needed: boolean
+          p_lines: Json
+          p_site_id: string
+          p_supplier_name: string
+        }
+        Returns: string
+      }
       add_organisation_member: {
         Args: {
           p_email: string

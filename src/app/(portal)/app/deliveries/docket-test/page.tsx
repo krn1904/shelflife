@@ -1,16 +1,19 @@
 import Link from 'next/link';
-import { requireSession } from '@/lib/auth/session';
+import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { fetchAllPages } from '@/lib/pagination';
 import type { CatalogueItem } from '@/lib/intake/docket/parse';
 import { DocketTest } from './docket-test';
+import { SavedScans } from './saved-scans';
 
 /**
- * A bench for trying docket OCR on real photos. Nothing here is saved: it shows what the
- * parser would put on a delivery, and which parts of the docket it threw away and why.
+ * A bench for docket OCR on real photos: read a docket, choose its product table, date
+ * each line and save it as a docket scan. Scans are kept apart from deliveries until
+ * their lines can be matched to catalogue products.
  */
 export default async function DocketTestPage() {
-  await requireSession();
+  const session = await requireSession();
+  const site = activeSite(session);
   const supabase = await createClient();
 
   const catalogue = await fetchAllPages<CatalogueItem>((from, to) =>
@@ -19,17 +22,22 @@ export default async function DocketTestPage() {
 
   return (
     <div>
-      <Link href="/app/deliveries" className="text-sm text-neutral-500 underline">
+      <Link href="/app/deliveries" className="text-sm text-muted underline">
         ← Deliveries
       </Link>
       <h1 className="mt-3 text-xl font-semibold">Docket OCR test</h1>
-      <p className="mt-1 text-sm text-neutral-500">
-        Upload a photo of a supplier docket. It is read on this device and nothing is saved.
-        Matching uses the {catalogue.length} products in the catalogue.
+      <p className="mt-1 text-sm text-muted">
+        Upload a photo of a supplier docket, choose the table that lists the products, add
+        expiry dates and save it. The free OCR option matches against the {catalogue.length} catalogue products.
       </p>
       <div className="mt-6">
         <DocketTest catalogue={catalogue} />
       </div>
+      {site && (
+        <div className="mt-10">
+          <SavedScans siteId={site.id} />
+        </div>
+      )}
     </div>
   );
 }

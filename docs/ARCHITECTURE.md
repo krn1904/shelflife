@@ -260,6 +260,11 @@ barcode), `site_products` (per-site overrides incl. `tracking_mode_override`), `
 makes v2 reconciliation need no migration), `stock_batches`, `expiry_actions`, `rotation_checks`,
 `waste_events`, `job_runs`, `push_subscriptions`, `audit_log`.
 
+`docket_scans` / `docket_scan_lines` hold dockets read from a photo (AWS Textract) with the
+expiry dates the operator entered, saved through `save_docket_scan()` in one transaction.
+They are a staging area, kept apart from `deliveries` on purpose: a scanned line is the
+docket's own wording and columns, not yet linked to a catalogue product.
+
 `memberships` is `unique nulls not distinct (user_id, org_id, site_id)`. Organisation-wide
 roles (owner, platform admin) store `site_id = null`, and a plain unique constraint lets NULLs
 repeat, so those rows could be duplicated and `onConflict: 'user_id,org_id,site_id'` upserts
