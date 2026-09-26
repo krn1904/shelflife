@@ -50,8 +50,8 @@ export type DocketLine = {
 export type LineVerdict =
   | { index: number; text: string; kept: true; lineIndex: number }
   | { index: number; text: string; kept: false; reason: DropReason }
-  /** Folded into the product line above it: its barcode, or its "Ord 5 Sup 4". */
-  | { index: number; text: string; kept: 'merged'; into: number; what: 'barcode' | 'quantities' };
+  /** Folded into the product line above it: its barcode, its "Ord 5 Sup 4", or a wrapped description. */
+  | { index: number; text: string; kept: 'merged'; into: number; what: 'barcode' | 'quantities' | 'description' };
 
 export type DocketParse = { lines: DocketLine[]; verdicts: LineVerdict[] };
 
@@ -63,6 +63,7 @@ export function normalise(raw: string): string {
   let s = ` ${raw} `;
   s = s.replace(/(\d)\s?m[l1|!I]?(?![a-z0-9])/gi, '$1ml');               // 500m| 500m! 500m → 500ml
   s = s.replace(/[|]/g, ' | ');                                         // pipes are column breaks
+  s = s.replace(/(\d)\s*(?:lt|ltr|litres?)\b/gi, '$1l');                   // 2Lt → 2l
   s = s.replace(/(\d)[oOe]([0-9oOe]*)\s*ml/gi, (_m, a: string, b: string) => `${a}0${b.replace(/[oOe]/g, '0')}ml`); // 60eML → 600ml
   s = s.replace(/\bC[I1l]N\b/g, 'CTN');
   s = s.replace(/\b0([a-z]{2,})/gi, 'o$1');                             // 0AK → oAK
@@ -79,7 +80,8 @@ export function packOf(text: string): { pack: number | null; size: string | null
   const multi = t.match(/(\d{1,3})\s*x\s*(\d+(?:\.\d+)?)(ml|l|g|kg)\b/);
   if (multi) return { pack: Number(multi[1]), size: canonicalSize(Number(multi[2]), multi[3]) };
   const size = t.match(/(\d+(?:\.\d+)?)(ml|l|g|kg)\b/);
-  const count = t.match(/\b(?:ctn|box|carton|pk|pack)\s*(\d{1,3})\b/) ?? t.match(/\b(\d{1,3})\s*pk\b/);
+  const count = t.match(/\b(?:ctn|box|carton|pk|pack)\s*(\d{1,3})\b/) ?? t.match(/\b(\d{1,3})\s*pk\b/)
+    ?? t.match(/\((\d{1,3})\)/);                                          // "500ml BTL (6)"
   return {
     pack: count ? Number(count[1]) : null,
     size: size ? canonicalSize(Number(size[1]), size[2]) : null,
@@ -124,7 +126,8 @@ export function quantitiesOf(raw: string): Quantities {
 // Irrelevant text: what a docket line is, when it is not a product
 
 const NOISE: [DropReason, RegExp][] = [
-  ['company or contact details', /\b(abn|acn|pty\.?\s*ltd|limited|ph|phone|tel|fax|mobile|email)\b|@\S+|\bwww\.|\.com(\.au)?\b|\b1[38]00\s?\d{3}\s?\d{3}\b|\b0[2-478]\s?\d{4}\s?\d{4}\b/i],
+  ['company or contact details', /\b(abn|acn|pty\.?\s*ltd|limited|ph|phone|tel|fax|mobile|email)\b|@\S+|\bwww\.|\.com(\.au)?\b|\b1[38]00\s?\d{3}\s?\d{3}\b|\b0[2-478][\s-]\d{4}[\s-]\d{4}\b/i],
+  // A phone number needs its spaces: a bare ten-digit run is a product or account code.
   ['totals or tax', /\b(sub\s?total|total|gst|tax|amount due|balance|net amount|items?\s+\d+|eftpos|cash|change)\b/i],
   ['payment or terms', /\b(bsb|acc(ount)?\s*(no|#|\d)|bpay|eft|cheque|payment|terms|due date|refunds?|claims?|returns?|e\s?&\s?oe|property of|credited|back ?orders?)\b/i],
   ['sign-off', /\b(signature|sig|signed|received by|driver|thank you|thanks|checked by|pallets?|crates?|chep)\b/i],
@@ -132,7 +135,8 @@ const NOISE: [DropReason, RegExp][] = [
   ['reference or date', /\b(invoice|inv|docket|dkt|delivery|route|stop|trans|reg|order no|po\s*(no|number)?|cust(omer)?|acct|account|page \d|date)\b|\b\d{1,2}[/.-]\d{1,2}[/.-]\d{2,4}\b|\b\d{1,2}:\d{2}\b/i],
   ['address', /\b(st|street|rd|road|ave|avenue|dr|drive|hwy|highway|lane|ln|pde|parade|cres|court|ct|place|pl|unit|shop|level|po box)\b.*\b(vic|nsw|qld|sa|wa|tas|nt|act)\b|\b(vic|nsw|qld|sa|wa|tas|nt|act)\s*\d{4}\b|\b(deliver|ship|bill|sold)\s*to\b/i],
 ];
-const HEADING_WORDS = /\b(qty|quantity|description|desc|code|item|price|amount|amt|unit|uom|ord|sup|ext|value|product)\b/gi;
+const HEADING_WORDS = /\b(qty|quantity|description|desc|code|item|price|amount|amt|unit|uom|ord|sup|ext|value|product|ordered|picked|delivered|supplied)\b/gi;
+const TABLE_END = /\b(sub\s?total|total|gst|amount due|balance)\b/i;
 
 /** Why a line that is not a product line is on the docket at all. */
 function noiseReason(text: string): DropReason | null {
@@ -217,6 +221,12 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
   const lines: DocketLine[] = [];
   const verdicts: LineVerdict[] = [];
 
+  // Most dockets are a table: a column-headings row, product rows, then totals. Inside it a
+  // row is a product unless it plainly is not; outside it, text has to earn its place.
+  const heading = ocrLines.findIndex((l) => noiseReason(normalise(l)) === 'column headings');
+  const end = heading < 0 ? -1 : ocrLines.findIndex((l, i) => i > heading && TABLE_END.test(l));
+  const inTable = (i: number) => heading >= 0 && i > heading && (end < 0 || i < end);
+
   ocrLines.forEach((raw, i) => {
     const text = normalise(raw);
     const drop = (reason: DropReason) => verdicts.push({ index: i, text: raw, kept: false, reason });
@@ -252,8 +262,28 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
     };
 
     // A strong product match wins even on a line that also mentions, say, "delivery".
-    if (match && match.score >= MATCH_AT && (!noise || match.score >= 0.8)) {
+    if (match && match.score >= MATCH_AT && (!noise || match.score >= 0.8 || inTable(i))) {
       return line(match.item.id, match.item.name, Math.min(1, match.score), 'name');
+    }
+    if (inTable(i)) {
+      // Row or wrapped fragment? Judged on the raw words: matching ignores packaging words
+      // like "bottle", but a fragment reading "Bottle" is still the row above continuing.
+      const named = text.match(/[a-z]{3,}/gi) ?? [];
+      const firstToken = text.split(' ')[0];
+      const startsWithCode = /^[a-z]*\d[a-z0-9]*$/i.test(firstToken) && firstToken.length >= 4
+        && !/^\d+(\.\d+)?(ml|l|g|kg)$/i.test(firstToken);
+      // A product row carries a number (code, size or quantity); OCR'd ruling lines do not.
+      if ((named.length >= 2 && /\d/.test(text)) || (startsWithCode && named.length >= 1)) {
+        return line(null, null, 0, 'new product?');
+      }
+      // A fragment under a row ("Bottle", "400mL (6)") is that row's description wrapping.
+      if (previous && (named.length >= 1 || packOf(text).size)) {
+        previous.text = `${previous.text} ${raw.replace(/[|§]/g, ' ').replace(/\s+/g, ' ').trim()}`;
+        const wrapped = packOf(normalise(previous.text));
+        previous.pack ??= wrapped.pack;
+        previous.size ??= wrapped.size;
+        return verdicts.push({ index: i, text: raw, kept: 'merged', into: lines.length - 1, what: 'description' });
+      }
     }
     if (noise) return drop(noise);
     if (PRODUCT_SHAPED.test(text) && words(text).length >= 2) return line(null, null, 0, 'new product?');

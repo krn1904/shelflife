@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { normalise, packOf, parseDocket, quantitiesOf } from './parse';
 import fixtures from './fixtures.json';
+import { REAL_DOCKETS } from './real-dockets';
 
 // Real Tesseract output of nine synthetic dockets (clean scan and phone photo of each):
 // six the parser was developed against (A–F) and three written after it was frozen (G–I).
@@ -86,4 +87,24 @@ test('reads quantities from every layout the tests cover', () => {
   assert.deepEqual(quantitiesOf('Ord2 Supo OUT OF STOCK'), { ordered: 2, supplied: 0, how: 'labelled' });
   assert.equal(quantitiesOf('Ord5 Supa @ $21.60').supplied, null, 'an unreadable digit is left for the operator');
   assert.equal(quantitiesOf('Back orders will be supplied on next delivery').how, 'none');
+});
+
+test('real docket: keeps every product row and nothing else', () => {
+  for (const docket of REAL_DOCKETS) {
+    const { lines } = parseDocket(docket.lines, fixtures.catalogue);
+    assert.equal(lines.length, docket.products.length, `${docket.id}: ${lines.map((l) => l.text).join(' / ')}`);
+    docket.products.forEach((name, i) => {
+      const first = name.split(' ').slice(0, 3).join(' ');
+      assert.ok(lines[i].text.includes(first), `${docket.id} row ${i}: expected ${name}, got ${lines[i].text}`);
+    });
+  }
+});
+
+test('real docket: wrapped rows are joined and sizes read', () => {
+  const { lines } = parseDocket(REAL_DOCKETS[0].lines, fixtures.catalogue);
+  const banana = lines.find((l) => l.text.includes('Banana'))!;
+  assert.deepEqual([banana.size, banana.pack], ['400ml', 6]);
+  const milk = lines.find((l) => l.text.includes('Pura Milk'))!;
+  assert.equal(milk.size, '2000ml');
+  assert.match(lines.find((l) => l.text.includes('Dairy Choice'))!.text, /HDPE .*Bottle/);
 });
