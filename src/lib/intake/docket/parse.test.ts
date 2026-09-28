@@ -206,3 +206,22 @@ test('supplier history never beats a clearly better match', () => {
   const { lines } = parseDocket(['Coca-Cola Zero Sugar 1.25L x6'], fixtures.catalogue, { preferred: ['coke-zero-500'] });
   assert.equal(lines[0].productId, 'coke-zero-125');
 });
+
+test('table: a real Bega layout reads the description column, not the product code', () => {
+  // Headings and rows as Textract returned them for the Bega daily delivery docket.
+  const { lines, verdicts } = parseDocketTable(grid([
+    ['Delivery #', 'Crates/ Cartons', 'Eaches', 'Product Code', 'Product Description', 'Ordered', 'Picked', 'Delivered'],
+    ['0827408699', '2', '0', '3024 I EA', 'EA I Pura Milk 2Lt Bottle', '18', '', ''],
+    ['', '1', '3', '3278 EA', 'Pura Light Start 2Lt Bottle', '9', '', ''],
+    ['', '0', '6', '7774 EA', 'Dare Espresso 500ml BTL (6)', '6', '', ''],
+    ['', '11', '4', '', '', '85', '85', ''],
+  ]), fixtures.catalogue);
+  assert.deepEqual(lines.map((l) => [l.text, l.code, l.ordered]), [
+    ['EA I Pura Milk 2Lt Bottle', '3024 I EA', 18],
+    ['Pura Light Start 2Lt Bottle', '3278 EA', 9],
+    ['Dare Espresso 500ml BTL (6)', '7774 EA', 6],
+  ]);
+  assert.deepEqual(lines.slice(0, 2).map((l) => l.productId), ['pura-fc-2l', 'pura-light-2l']);
+  // The unlabelled totals row under the table is not a product.
+  assert.equal(verdicts.at(-1)!.kept, false);
+});

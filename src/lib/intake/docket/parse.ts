@@ -450,8 +450,14 @@ type ColumnRole = Column | 'description' | 'code' | null;
 
 function roleOf(heading: string): ColumnRole {
   const t = heading.toLowerCase();
-  if (/\b(description|desc|product|details)\b/.test(t)) return 'description';
-  if (/\b(code|sku|article|barcode|plu|item\s*(no|#|number)?)\b/.test(t) && !/\bqty\b/.test(t)) return 'code';
+  // "Product Description" is the description and "Product Code" the code: the second word
+  // decides, since "product" heads both.
+  if (/\b(description|desc|details)\b/.test(t)) return 'description';
+  // A bare "Item" heads the item number; "Item Description" was caught above.
+  if (/\b(code|sku|article|barcode|plu|item)\b/.test(t) && !/\bqty\b/.test(t)) return 'code';
+  // "Delivery #", "Invoice No": a reference number, not a quantity column.
+  if (/#|\bno\.?$|\bnumber\b/.test(t)) return null;
+  if (/\bproduct\b/.test(t)) return 'description';
   for (const word of t.split(/[\s/|.]+/)) {
     const hit = COLUMN_WORDS.find(([, re]) => re.test(word.replace(/[^a-z]/g, '')));
     if (hit) return hit[0];
@@ -515,6 +521,8 @@ export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[]
     const previous = lines.at(-1);
 
     if (desc.replace(/[^a-z0-9]/gi, '').length < 3 && counts.length === 0) return drop('too short');
+    // Counts under an empty description are the table's own totals, even unlabelled.
+    if (desc.replace(/[^a-z]/gi, '').length < 3 && lines.length > 0) return drop('totals or tax');
     // A row with words but no counts and no code is the description above wrapping.
     if (counts.length === 0 && !code && previous) {
       previous.text = `${previous.text} ${desc}`;
@@ -525,7 +533,8 @@ export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[]
     }
 
     const barcode = code && byBarcode.get(code.replace(/\D/g, ''));
-    const match = barcode ? null : matchText(desc);
+    // Matched on the cleaned-up text, as the line parser does: "2Lt" is 2L, "S00ml" is 500ml.
+    const match = barcode ? null : matchText(normalise(desc));
     const noise = noiseReason(normalise(desc));
     if (!barcode && noise && !(match && match.score >= MATCH_AT)) return drop(noise);
 
