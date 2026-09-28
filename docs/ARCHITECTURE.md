@@ -105,6 +105,14 @@ All of it is in [session.ts](../src/lib/auth/session.ts).
 The `(portal)` [layout](<../src/app/(portal)/layout.tsx>) calls `requireSession()` once and wraps
 everything in `PortalShell`. Individual portal roots call `requireRole(...)` for their bar.
 
+Every portal has a `loading.tsx` (a `PageSkeleton` from
+[loading-skeleton.tsx](../src/components/loading-skeleton.tsx)), so navigation shows the next
+screen's outline at once while its server data loads. The session read stays in the shared
+`(portal)` layout, which is not re-rendered when moving between portal pages, so it does not
+block those fallbacks. `PortalNav` ignores a second tap on a tab that is loading or already
+open, and form buttons that call a Server Action directly use `SubmitButton`, which disables
+itself while the action runs.
+
 ---
 
 ## Row-Level Security (the security boundary)

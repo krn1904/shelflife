@@ -2,6 +2,7 @@
 
 import { useActionState } from 'react';
 import { createSite, removeSite, type SiteFormState } from '@/lib/admin/actions';
+import { SubmitButton } from '@/components/submit-button';
 
 export type ManagedSite = { id: string; name: string; removable: boolean };
 
@@ -23,9 +24,9 @@ export function SiteAdmin({ orgId, sites }: { orgId: string; sites: ManagedSite[
                 }}
               >
                 <input type="hidden" name="site_id" value={s.id} />
-                <button type="submit" className="btn btn-danger px-2.5 py-1 text-xs">
+                <SubmitButton className="btn btn-danger px-2.5 py-1 text-xs" pendingLabel="Removing…">
                   Remove
-                </button>
+                </SubmitButton>
               </form>
             ) : (
               <span className="ml-auto text-xs text-faint">has activity — kept</span>

@@ -24,17 +24,16 @@ anywhere that edits suppliers.
 
 ---
 
-## Loading states and perceived speed
+## Why the app is slow
 
-**Reported:** the app feels slow, and there is no feedback after a tap. Switching between
-screens (for example, Shift to another tab) was clicked twice because nothing showed it had
-registered, which fetched the page twice and made it slower still.
+**Reported:** the app feels slow. Switching screens (Shift to Group) was tapped twice because
+nothing showed the tap had registered, which fetched the page twice.
 
-- No route under `src/app/(portal)/` has a `loading.tsx`, so a navigation shows nothing until
-  the server has finished rendering the next page. Adding one per portal (a skeleton of that
-  portal's layout) gives immediate feedback and makes a second tap unnecessary.
-- Buttons that submit a Server Action should disable themselves while pending. Several do
-  (`useActionState` pending), but not all; audit them.
-- Find the actual cause of the slowness separately: measure the slowest pages' queries
-  (several pages page through whole tables, and the platform-admin organisation page lists
-  every auth user) before optimising.
+**Done (2026-09-28):** every portal has a `loading.tsx` skeleton, so a tap shows the next
+screen's outline at once; the portal tabs show a pending state and ignore a second tap on a
+tab that is loading or already open; the admin Update/Remove and Sign out buttons disable while
+their action runs (`SubmitButton`). This fixes the feedback, not the speed itself.
+
+**Still to do:** find the actual cause. Measure the slowest pages' queries before optimising:
+several pages page through whole tables (the docket intake loads the whole catalogue to match
+against), and the platform-admin organisation page lists every auth user on each view.
