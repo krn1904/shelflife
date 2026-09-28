@@ -177,6 +177,8 @@ type SupplierConfig = {
   everyDays: number;
   contact: string | null;
   active?: boolean;
+  /** Made up, but passing the ABN check, so a docket printing it is recognised. */
+  abn?: string;
 };
 
 type OrgConfig = {
@@ -199,17 +201,17 @@ type OrgConfig = {
 };
 
 const SUPPLIERS: SupplierConfig[] = [
-  { name: 'Metcash', categories: ['Grocery', 'Chips & snacks', 'Confectionery'], everyDays: 7,
+  { name: 'Metcash', abn: '36000002481', categories: ['Grocery', 'Chips & snacks', 'Confectionery'], everyDays: 7,
     contact: 'Rep: Priya — orders close Tuesday 2pm' },
-  { name: 'Coca-Cola Europacific', categories: ['Soft drinks', 'Energy drinks'], everyDays: 7,
+  { name: 'Coca-Cola Europacific', abn: '65118204993', categories: ['Soft drinks', 'Energy drinks'], everyDays: 7,
     contact: 'Account 40031822 · 13 26 53' },
-  { name: 'Lion Dairy & Drinks', categories: ['Dairy', 'Chilled'], everyDays: 3,
+  { name: 'Lion Dairy & Drinks', abn: '93004322181', categories: ['Dairy', 'Chilled'], everyDays: 3,
     contact: 'Driver arrives 6:30–7:00am' },
-  { name: 'Bakers Delight DSD', categories: ['Bakery', 'Food to go'], everyDays: 2,
+  { name: 'Bakers Delight DSD', abn: '89612330104', categories: ['Bakery', 'Food to go'], everyDays: 2,
     contact: null },
-  { name: 'PFD Food Services', categories: ['Chilled', 'Grocery'], everyDays: 14,
+  { name: 'PFD Food Services', abn: '13610051902', categories: ['Chilled', 'Grocery'], everyDays: 14,
     contact: 'Fortnightly, Thursday' },
-  { name: 'Tobacco Wholesale AU', categories: ['Tobacco', 'Accessories'], everyDays: 14,
+  { name: 'Tobacco Wholesale AU', abn: '28004104889', categories: ['Tobacco', 'Accessories'], everyDays: 14,
     contact: 'Signature required on delivery' },
   // Never delivered yet: its first docket shows the "no history, enter by hand" path.
   { name: 'Local Bakehouse', categories: ['Bakery'], everyDays: 0,
@@ -479,7 +481,7 @@ export function buildWorld(now: Date): World {
       const id = uuid();
       supplierIds.set(s.name, id);
       plan.suppliers.push({
-        id, org_id: orgId, name: s.name, contact_note: s.contact, active: s.active ?? true,
+        id, org_id: orgId, name: s.name, contact_note: s.contact, active: s.active ?? true, abn: s.abn ?? null,
         created_at: createdAt,
       });
     }

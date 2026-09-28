@@ -66,7 +66,7 @@ export function DocketPhoto({
 
   return (
     <div className="space-y-2">
-      <label className="inline-block rounded border border-neutral-300 px-4 py-2 text-sm font-medium">
+      <label className="btn btn-outline cursor-pointer">
         {busy ? 'Uploading…' : path ? 'Replace docket photo' : 'Photograph the docket'}
         <input
           type="file"
@@ -82,14 +82,14 @@ export function DocketPhoto({
       </label>
 
       {path && !error && (
-        <p className="text-xs text-green-700">Docket photo attached.</p>
+        <p className="text-xs text-good">Docket photo attached.</p>
       )}
       {!path && !error && (
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-muted">
           Optional, but it is what makes a disputed short-delivery arguable.
         </p>
       )}
-      {error && <p className="text-sm text-red-700">{error}</p>}
+      {error && <p className="text-sm text-critical">{error}</p>}
     </div>
   );
 }

@@ -22,9 +22,13 @@ Every product carries one of three tracking modes, so staff only do work that pa
 | `batch` | Drinks, snacks, chilled, grocery | One expiry per line | Auto-surfaces at T-30/14/7/3/1 |
 | `none` | Cigarettes, accessories | Quantity only | Never |
 
-Intake is **docket-driven, not scan-driven**. The docket already lists what arrived, so the app
-pre-populates expected lines from that supplier's history; staff tick what came, adjust quantity,
-and confirm a proposed expiry date — one date per SKU line, covering every box of that SKU.
+Intake is **docket-driven, not scan-driven**. The docket already lists what arrived, so staff
+photograph it and the app reads it: the supplier is recognised from the docket (its ABN, or a
+name it has printed before) and the line list is the docket's product rows. Staff check each
+line against the paper, adjust quantity, and confirm a proposed expiry date — one date per SKU
+line, covering every box of that SKU. Docketed and received quantities are kept apart, so a
+short delivery is on record. With no docket to read, the list is predicted from that supplier's
+recent deliveries instead.
 
 ## Status
 
@@ -34,7 +38,8 @@ temperature/compliance logging and fuel wet-stock reconciliation are designed fo
 See [docs/PLAN.md](docs/PLAN.md) for the full build plan, and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a developer's map of the codebase.
 Platform operations are documented in
-[docs/PLATFORM-ADMIN.md](docs/PLATFORM-ADMIN.md).
+[docs/PLATFORM-ADMIN.md](docs/PLATFORM-ADMIN.md), and agreed-but-unscheduled work is in
+[docs/BACKLOG.md](docs/BACKLOG.md).
 
 ## Stack
 
@@ -138,6 +143,22 @@ why when something cannot be sent rather than dropping it.
 Intake is deliberately **not** queued. It is a multi-step flow whose draft lives on the
 server, and pretending otherwise would be a bigger promise than this outbox can keep.
 
+### Reading dockets
+
+**Receive a delivery** offers two readers. The free one runs Tesseract in the browser and needs
+nothing set up. AWS Textract reads printed tables column by column and is billed per photo (one
+`AnalyzeDocument` call on the intake screen; the **Test docket OCR** bench makes a second,
+invoice-model call to compare them). Textract needs an IAM key allowed to call it:
+
+```bash
+TEXTRACT_ACCESS_KEY_ID=...
+TEXTRACT_SECRET_ACCESS_KEY=...
+TEXTRACT_REGION=ap-southeast-2   # default
+```
+
+Without them the Textract option shows as not set up and the free reader is used. The
+`TEXTRACT_*` names come first because Vercel reserves `AWS_*` for its own identity.
+
 ### The demo organisation
 
 The demo organisation is part of the seed world written by `npm run db:reset` (3 sites,
@@ -169,7 +190,8 @@ supabase secrets set CRON_SECRET=... VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 ```
 
 Vercel needs `NEXT_PUBLIC_SUPABASE_URL`, the anon/publishable key, the service/secret
-key, and `NEXT_PUBLIC_VAPID_PUBLIC_KEY`. Supabase renamed its keys in 2025 and both
+key, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, and the `TEXTRACT_*` keys if docket reading should offer
+AWS Textract. Supabase renamed its keys in 2025 and both
 naming schemes are accepted — `NEXT_PUBLIC_SUPABASE_ANON_KEY` or
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` or
 `SUPABASE_SECRET_KEY` — so use whichever pair your project's API settings show. Schedule both Edge
@@ -211,7 +233,7 @@ same data. `npm test` checks the world's invariants without a database.
 Across them: every waste reason (including a supplier recall), short deliveries
 (`qty_received` < `qty_docketed`), site tracking-mode overrides, ranged-off lines, an
 inactive supplier, a supplier with no history yet (the manual-entry intake path),
-products added by staff scans, done/dismissed action history, three weeks of rotation
+products added by staff scans, suppliers with ABNs (all but Local Bakehouse, the no-ABN case), done/dismissed action history, three weeks of rotation
 checks, and three weeks of `expiry-engine` / `daily-digest` runs including one failure.
 No push subscriptions are seeded — those belong to real devices.
 

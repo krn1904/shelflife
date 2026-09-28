@@ -41,7 +41,8 @@ src/
   lib/
     supabase/                  client factories, env resolution, generated types
     auth/                      session resolution + role gates, sign-in actions
-    intake/                    docket-driven receiving: expected lines, expiry proposal
+    intake/                    docket-driven receiving: docket reading, supplier recognition,
+                               expected lines, expiry proposal
     expiry/                    the engine's rules (re-exported from _shared), digest text
     offline/                   Dexie outbox + framework-free queue semantics
     products/                  tracking-mode resolution, product mutations
@@ -51,7 +52,7 @@ src/
   proxy.ts                     session refresh on every request (Next 16 "Proxy")
 
 supabase/
-  migrations/                  schema, RLS helpers, RLS policies (7 files, in order)
+  migrations/                  schema, RLS helpers, policies, lifecycle and intake changes (in order)
   functions/
     _shared/                   engine + digest + tracking logic (single source of truth)
     expiry-engine/             thin Deno wrapper, nightly
@@ -198,7 +199,37 @@ restricted to owners and platform admins.
 
 ## Docket-driven intake
 
-The receiving flow lives under `app/deliveries/` with its logic in [src/lib/intake/](../src/lib/intake):
+The receiving flow lives under `app/deliveries/` with its logic in [src/lib/intake/](../src/lib/intake).
+It starts at the docket, not a supplier list:
+
+1. **Photo before the delivery exists.** [receive-delivery.tsx](<../src/app/(portal)/app/deliveries/new/receive-delivery.tsx>)
+   picks the delivery's UUID in the browser and uploads a resized JPEG to
+   `dockets/{org}/{site}/{deliveryId}/docket.jpg`. The storage policies only check the org and
+   site folders, and `startDelivery` accepts the photo only at exactly that path.
+2. **Two readers, one shape.** Both produce a `DocketReading`
+   ([reading.ts](../src/lib/intake/docket/reading.ts)): every text line, plus the chosen product
+   table cell by cell when there is one. AWS Textract runs server-side from the stored photo
+   (`readDocketWithTextract`, one `AnalyzeDocument` TABLES call; the test bench also runs the
+   invoice model). The free reader is Tesseract in the browser
+   ([browser.ts](../src/lib/intake/docket/browser.ts)). Which engine a plan gets is meant to be
+   decided later; nothing downstream depends on it.
+3. **Supplier from the docket.** `identifySupplier()` ([supplier.ts](../src/lib/intake/docket/supplier.ts))
+   looks only at the letterhead (text above the first product-shaped line): a valid ABN on file
+   (mod-89 checked in [abn.ts](../src/lib/intake/docket/abn.ts), so a misread digit cannot match),
+   then a remembered alias, then the supplier's own name. A partial name is only a suggestion.
+   Staff create suppliers through the `add_supplier()` RPC, which returns the existing supplier
+   for a known ABN or name instead of duplicating it; `suppliers_insert` still limits direct
+   writes to managers. Starting the delivery calls `remember_supplier_docket()`, which saves the
+   printed name as an alias and fills in a missing ABN.
+4. **Lines from the reading.** The delivery keeps the reading in `deliveries.docket_reading`, and
+   `docketLines()` parses it on every render: `parseDocketTable()` reads Textract's grid by column
+   heading (an empty Delivered cell stays empty), `parseDocket()` handles plain text. Products
+   this supplier sent recently only break near-ties. Rows naming the same product are added
+   together, since a delivery holds one line per product; unmatched rows are handed back to the
+   operator. With no reading, `expectedLines()` predicts the list as before.
+5. **Docketed vs received.** `closeDelivery` stores the docket's figure in `qty_docketed` and the
+   count in `qty_received`, keeping a line with 0 received (it did not arrive) and creating
+   batches only for what arrived. Without a docket reading the two are equal, as before.
 
 - `expectedLines(history)` ([expected-lines.ts](../src/lib/intake/expected-lines.ts)) builds the
   pre-populated tick-list from what this supplier actually sent to this site before — so there is
@@ -250,11 +281,12 @@ the flag unset anywhere real.
 
 ## Data model
 
-16 tables, all with `org_id` + RLS, created across the migrations. The schema calls a customer
+17 tables, all with `org_id` + RLS, created across the migrations. The schema calls a customer
 organisation an `org`; “tenant” appears only where describing the standard multi-tenant
 architecture:
 
-`orgs`, `sites`, `profiles`, `memberships`, `suppliers`, `products` (global catalogue keyed by
+`orgs`, `sites`, `profiles`, `memberships`, `suppliers` (optional ABN, unique per organisation),
+`supplier_aliases` (docket names confirmed for a supplier), `products` (global catalogue keyed by
 barcode), `site_products` (per-site overrides incl. `tracking_mode_override`), `deliveries`,
 `delivery_lines` (`qty_docketed` vs `qty_received` kept separate from day one — this is what
 makes v2 reconciliation need no migration), `stock_batches`, `expiry_actions`, `rotation_checks`,

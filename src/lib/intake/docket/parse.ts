@@ -51,6 +51,8 @@ export type DocketLine = {
   /** cartons × pack + eaches against the quantity: a free check on the OCR. */
   check: 'agrees' | 'disagrees' | null;
   code: string | null;
+  /** The OCR engine was unsure of this row's description or quantities (Textract only). */
+  unsure?: boolean;
 };
 
 export type LineVerdict =
@@ -263,11 +265,12 @@ function buildIndex(catalogue: CatalogueItem[]) {
 
 type Index = ReturnType<typeof buildIndex>;
 
-function bestMatch(index: Index, text: string) {
+function bestMatch(index: Index, text: string, only?: Set<string>) {
   const lineWords = words(text);
   const { size } = packOf(text);
   let best: { item: Indexed; score: number } | null = null;
   for (const d of index.docs) {
+    if (only && !only.has(d.id)) continue;
     const total = d.tokens.reduce((s, t) => s + index.idf(t), 0);
     if (total === 0) continue;
     let hit = 0;
@@ -283,12 +286,65 @@ function bestMatch(index: Index, text: string) {
   return best;
 }
 
-// ---------------------------------------------------------------------------------------
-
 const MATCH_AT = 0.55;
 
-export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): DocketParse {
+export type ParseOptions = {
+  /**
+   * Products this supplier has delivered to this site before. They are tried first, so an
+   * abbreviated docket line settles on the product that actually comes from this supplier
+   * rather than a look-alike elsewhere in the catalogue. They never add lines of their own.
+   */
+  preferred?: string[];
+};
+
+// Scores this close are a tie, which the supplier's own history may break.
+const TIE = 0.05;
+
+function matcherFor(catalogue: CatalogueItem[], options: ParseOptions) {
   const index = buildIndex(catalogue);
+  const preferred = new Set(options.preferred ?? []);
+  return {
+    index,
+    match(text: string) {
+      const best = bestMatch(index, text);
+      if (preferred.size === 0 || !best) return best;
+      // History only settles a near-tie: it never beats a clearly better match, such as
+      // the 1.25L the docket names over the 600ml this supplier usually sends.
+      const likely = bestMatch(index, text, preferred);
+      return likely && likely.score >= MATCH_AT && likely.score >= best.score - TIE ? likely : best;
+    },
+  };
+}
+
+/** Cartons × pack + each is the docket checking itself. Run once rows are whole. */
+function checkCartons(lines: DocketLine[]) {
+  for (const l of lines) {
+    if (l.cartons === null || l.eaches === null || l.pack === null) continue;
+    const expected = l.cartons * l.pack + l.eaches;
+    if (l.ordered === null && l.supplied === null) {
+      Object.assign(l, { ordered: expected, supplied: expected, qtyHow: 'from cartons', check: 'agrees' });
+    } else {
+      l.check = (l.ordered ?? l.supplied) === expected ? 'agrees' : 'disagrees';
+    }
+  }
+}
+
+/**
+ * Printed Ordered against Delivered. A docket with a Picked column is a pick-and-check
+ * sheet: Picked and Delivered are ticked or written by hand, and handwriting reads as noise.
+ * The printed Ordered figure is the claim; the operator confirms what actually arrived.
+ */
+function orderedAndSupplied(found: Partial<Record<Column, number | null>>, handFilled: boolean) {
+  const ordered = found.ordered ?? null;
+  const delivered = handFilled ? null : found.delivered ?? found.qty ?? null;
+  const supplied = delivered !== null && (ordered === null || delivered <= ordered) ? delivered : ordered;
+  return { ordered, supplied, how: (ordered === null && supplied === null ? 'none' : 'by heading') as Quantities['how'] };
+}
+
+// ---------------------------------------------------------------------------------------
+
+export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[], options: ParseOptions = {}): DocketParse {
+  const { index, match: matchText } = matcherFor(catalogue, options);
   const byBarcode = new Map(catalogue.filter((p) => p.barcode).map((p) => [p.barcode!, p]));
   const lines: DocketLine[] = [];
   const verdicts: LineVerdict[] = [];
@@ -325,7 +381,7 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
     }
 
     const noise = noiseReason(text);
-    const match = bestMatch(index, text);
+    const match = matchText(text);
     const { pack, size } = packOf(text);
     const line = (productId: string | null, productName: string | null, confidence: number, via: DocketLine['via']) => {
       let { ordered, supplied, how } = qty;
@@ -333,14 +389,7 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
       if (byColumn) {
         // Inside a headed table the columns decide. Nothing readable under them means the
         // operator fills it in; the crates and eaches ahead of the description are not it.
-        ordered = byColumn.ordered ?? null;
-        // A docket with a Picked column is a pick-and-check sheet: Picked and Delivered are
-        // ticked or written by hand, and handwriting reads as noise. The printed Ordered
-        // figure is the claim; the operator confirms what actually arrived.
-        const handFilled = columns!.after.includes('picked');
-        const delivered = handFilled ? null : byColumn.delivered ?? byColumn.qty ?? null;
-        supplied = delivered !== null && (ordered === null || delivered <= ordered) ? delivered : ordered;
-        how = ordered === null && supplied === null ? 'none' : 'by heading';
+        ({ ordered, supplied, how } = orderedAndSupplied(byColumn, columns!.after.includes('picked')));
       }
       lines.push({
         source: i, text: raw, productId, productName, confidence: Number(confidence.toFixed(2)), via,
@@ -380,17 +429,125 @@ export function parseDocket(ocrLines: string[], catalogue: CatalogueItem[]): Doc
     return drop('no product found');
   });
 
-  // Cartons × pack + eaches is the docket checking itself. Run once rows are whole, since a
-  // pack size often sits on a wrapped line ("400mL (6)").
-  for (const l of lines) {
-    if (l.cartons === null || l.eaches === null || l.pack === null) continue;
-    const expected = l.cartons * l.pack + l.eaches;
-    if (l.ordered === null && l.supplied === null) {
-      Object.assign(l, { ordered: expected, supplied: expected, qtyHow: 'from cartons', check: 'agrees' });
-    } else {
-      l.check = (l.ordered ?? l.supplied) === expected ? 'agrees' : 'disagrees';
-    }
-  }
+  // After the loop, since a pack size often sits on a wrapped line ("400mL (6)").
+  checkCartons(lines);
+  return { lines, verdicts };
+}
 
+// ---------------------------------------------------------------------------------------
+// Tables read cell by cell (AWS Textract)
+//
+// Textract returns the product table as a grid, so a quantity is known by the heading of the
+// column it sits in, not by counting numbers along a line. An empty Delivered cell stays
+// empty instead of pulling the next number into its place.
+
+export type TableCell = { text: string; confidence: number; header?: boolean };
+
+// Below this Textract confidence, a row is worth a second look.
+const SURE_AT = 80;
+
+type ColumnRole = Column | 'description' | 'code' | null;
+
+function roleOf(heading: string): ColumnRole {
+  const t = heading.toLowerCase();
+  if (/\b(description|desc|product|details)\b/.test(t)) return 'description';
+  if (/\b(code|sku|article|barcode|plu|item\s*(no|#|number)?)\b/.test(t) && !/\bqty\b/.test(t)) return 'code';
+  for (const word of t.split(/[\s/|.]+/)) {
+    const hit = COLUMN_WORDS.find(([, re]) => re.test(word.replace(/[^a-z]/g, '')));
+    if (hit) return hit[0];
+  }
+  return null;
+}
+
+const headingLike = (row: TableCell[]) =>
+  row.some((c) => c.header) || row.filter((c) => (c.text.match(HEADING_WORDS) ?? []).length > 0).length >= 2;
+
+/** A bare count in a cell: "18", "18.00", "18 ea". Prices and sizes are not counts. */
+function countIn(text: string): number | null {
+  const t = normalise(text).replace(/\b(ea|each|ctn|ctns|units?)\b/gi, '').trim();
+  const m = t.match(/^[—_~-]?(\d{1,4})(?:\.0+)?[^\d\s]?$/);
+  return m ? Number(m[1]) : null;
+}
+
+/** True when a table's heading row looks like a product table's. */
+export function isProductTable(rows: TableCell[][]): boolean {
+  const heading = rows.findIndex(headingLike);
+  if (heading < 0) return false;
+  const roles = rows[heading].map((c) => roleOf(c.text));
+  return roles.includes('description') || (roles.some((r) => r && r !== 'code') && rows.length - heading > 1);
+}
+
+export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[], options: ParseOptions = {}): DocketParse {
+  const heading = rows.findIndex(headingLike);
+  const joined = (row: TableCell[]) => row.map((c) => c.text).filter(Boolean).join(' | ');
+  // No headings: nothing to read columns by, so the row text goes through the line parser.
+  if (heading < 0) return parseDocket(rows.map(joined), catalogue, options);
+
+  const { match: matchText } = matcherFor(catalogue, options);
+  const byBarcode = new Map(catalogue.filter((p) => p.barcode).map((p) => [p.barcode!, p]));
+  const roles = rows[heading].map((c) => roleOf(c.text));
+  // No Description heading: the description is whichever column carries the most words.
+  let description = roles.indexOf('description');
+  if (description < 0) {
+    const letters = roles.map((_, c) => rows.slice(heading + 1).reduce((n, r) => n + (r[c]?.text.match(/[a-z]/gi)?.length ?? 0), 0));
+    description = letters.indexOf(Math.max(...letters));
+  }
+  const handFilled = roles.includes('picked');
+  const lines: DocketLine[] = [];
+  const verdicts: LineVerdict[] = [];
+  let ended = false;
+
+  rows.forEach((row, i) => {
+    const text = joined(row);
+    const drop = (reason: DropReason) => verdicts.push({ index: i, text, kept: false, reason });
+    if (i < heading) return drop(noiseReason(normalise(text)) ?? 'reference or date');
+    if (i === heading) return drop('column headings');
+    if (ended || TABLE_END.test(text)) { ended = true; return drop('totals or tax'); }
+
+    const desc = row[description]?.text.trim() ?? '';
+    const found: Partial<Record<Column, number | null>> = {};
+    roles.forEach((role, c) => {
+      if (role && role !== 'description' && role !== 'code') found[role] ??= countIn(row[c]?.text ?? '');
+    });
+    const counts = Object.values(found).filter((n) => n !== null && n !== undefined);
+    const codeCell = roles.indexOf('code');
+    const code = (codeCell >= 0 ? row[codeCell]?.text.trim() : '') || text.match(/\b(\d{5,14})\b/)?.[1] || null;
+    const previous = lines.at(-1);
+
+    if (desc.replace(/[^a-z0-9]/gi, '').length < 3 && counts.length === 0) return drop('too short');
+    // A row with words but no counts and no code is the description above wrapping.
+    if (counts.length === 0 && !code && previous) {
+      previous.text = `${previous.text} ${desc}`;
+      const wrapped = packOf(normalise(previous.text));
+      previous.pack ??= wrapped.pack;
+      previous.size ??= wrapped.size;
+      return verdicts.push({ index: i, text, kept: 'merged', into: lines.length - 1, what: 'description' });
+    }
+
+    const barcode = code && byBarcode.get(code.replace(/\D/g, ''));
+    const match = barcode ? null : matchText(desc);
+    const noise = noiseReason(normalise(desc));
+    if (!barcode && noise && !(match && match.score >= MATCH_AT)) return drop(noise);
+
+    const quantity = orderedAndSupplied(found, handFilled);
+    const { pack, size } = packOf(normalise(desc));
+    const qtyCells = roles.map((r, c) => (r && r !== 'code' ? c : -1)).filter((c) => c >= 0);
+    const unsure = qtyCells.some((c) => row[c]?.text && row[c].confidence < SURE_AT);
+    const product = barcode
+      ? { id: barcode.id, name: barcode.name, confidence: 1, via: 'barcode' as const }
+      : match && match.score >= MATCH_AT
+        ? { id: match.item.id, name: match.item.name, confidence: Math.min(1, match.score), via: 'name' as const }
+        : { id: null, name: null, confidence: 0, via: 'new product?' as const };
+
+    lines.push({
+      source: i, text: desc || text, productId: product.id, productName: product.name,
+      confidence: Number(product.confidence.toFixed(2)), via: product.via,
+      pack, size, ordered: quantity.ordered, supplied: quantity.supplied, qtyHow: quantity.how,
+      cartons: found.cartons ?? null, eaches: found.eaches ?? null, check: null, code, unsure,
+    });
+    verdicts.push({ index: i, text, kept: true, lineIndex: lines.length - 1 });
+  });
+
+  checkCartons(lines);
   return { lines, verdicts };
 }

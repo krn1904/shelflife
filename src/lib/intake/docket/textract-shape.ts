@@ -63,6 +63,13 @@ export function tablesFromBlocks(blocks: Block[]): Table[] {
     .filter((t) => t.rows.length > 0);
 }
 
+/** Every line of printed text, in Textract's reading order (top to bottom). */
+export function textLinesFromBlocks(blocks: Block[]): string[] {
+  return blocks
+    .filter((b) => b.BlockType === 'LINE' && b.Text?.trim())
+    .map((b) => b.Text!.trim());
+}
+
 /** AnalyzeExpense's reading: who sent it, which docket, and one entry per line item. */
 export function expenseFromDocuments(documents: ExpenseDocument[]): ExpenseReading {
   const summary = new Map<string, string>();

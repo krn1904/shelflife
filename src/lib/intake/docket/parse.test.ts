@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { normalise, packOf, parseDocket, quantitiesOf } from './parse';
+import { isProductTable, normalise, packOf, parseDocket, parseDocketTable, quantitiesOf, type TableCell } from './parse';
 import fixtures from './fixtures.json';
 import { REAL_DOCKETS } from './real-dockets';
 
@@ -123,4 +123,86 @@ test('real docket photo: reads the printed Ordered column and checks it against 
     assert.ok(lines.every((l) => l.check !== 'disagrees'), docket.id);
     assert.ok(lines.filter((l) => l.check === 'agrees').length >= 6, docket.id);
   }
+});
+
+// ---------------------------------------------------------------------------------------
+// Tables read cell by cell (AWS Textract)
+
+const grid = (rows: string[][], unsure: [number, number][] = []): TableCell[][] =>
+  rows.map((row, r) => row.map((text, c) => ({
+    text, confidence: unsure.some(([ur, uc]) => ur === r && uc === c) ? 55 : 98, header: r === 0,
+  })));
+
+test('table: quantities come from their own column, even beside an empty cell', () => {
+  const { lines } = parseDocketTable(grid([
+    ['Code', 'Description', 'Ordered', 'Delivered', 'Price'],
+    ['101204', 'Pura Milk Full Cream 2L', '12', '', '38.40'],
+    ['101206', 'Pura Light Start 2L', '', '6', '19.20'],
+    ['400123', 'Oak Chocolate Milk 600ml', '10', '8', '32.00'],
+  ]), fixtures.catalogue);
+  assert.deepEqual(lines.map((l) => [l.productId, l.ordered, l.supplied]), [
+    ['pura-fc-2l', 12, 12],
+    ['pura-light-2l', null, 6],
+    ['oak-choc-600', 10, 8],
+  ]);
+  assert.deepEqual(lines.map((l) => l.code), ['101204', '101206', '400123']);
+});
+
+test('table: totals end it, wrapped descriptions join the row above, unknown rows stay', () => {
+  const { lines, verdicts } = parseDocketTable(grid([
+    ['Item', 'Product Description', 'Qty'],
+    ['0044120', 'Heinz Baked Beans', '4'],
+    ['', '420g CTN 12', ''],
+    ['7788', 'Mystery Kombucha 330ml', '2'],
+    ['', 'Sub total', '6'],
+    ['', 'GST', '0'],
+  ]), fixtures.catalogue);
+  assert.deepEqual(lines.map((l) => [l.productId, l.supplied]), [['heinz-beans-420', 4], [null, 2]]);
+  assert.equal(lines[0].size, '420g');
+  assert.equal(lines[1].via, 'new product?');
+  assert.deepEqual(verdicts.filter((v) => v.kept === false).map((v) => v.kept === false && v.reason),
+    ['column headings', 'totals or tax', 'totals or tax']);
+});
+
+test('table: a Picked column means Delivered is handwriting, so Ordered is the claim', () => {
+  const { lines } = parseDocketTable(grid([
+    ['Description', 'Ordered', 'Picked', 'Delivered'],
+    ['Pura Milk Full Cream 2L', '18', '1', '7'],
+  ]), fixtures.catalogue);
+  assert.deepEqual([lines[0].ordered, lines[0].supplied], [18, 18]);
+});
+
+test('table: a doubtful quantity cell marks the row unsure', () => {
+  const { lines } = parseDocketTable(grid([
+    ['Description', 'Qty'],
+    ['Pura Milk Full Cream 2L', '12'],
+    ['Oak Chocolate Milk 600ml', '8'],
+  ], [[2, 1]]), fixtures.catalogue);
+  assert.deepEqual(lines.map((l) => l.unsure), [false, true]);
+});
+
+test('table: without headings the rows go through the line parser', () => {
+  const { lines } = parseDocketTable(grid([['5', 'Coca-Cola Zero Sugar 1.25L', '38.00']]).map((r) => r.map((c) => ({ ...c, header: false }))),
+    fixtures.catalogue);
+  assert.equal(lines[0].productId, 'coke-zero-125');
+});
+
+test('tells a product table from a letterhead table', () => {
+  assert.equal(isProductTable(grid([['Description', 'Qty'], ['Pura Milk 2L', '2']])), true);
+  assert.equal(isProductTable(grid([['Customer #', '256582'], ['Route', 'MELO11']]).map((r) => r.map((c) => ({ ...c, header: false })))), false);
+});
+
+test('products this supplier has sent before win a close call', () => {
+  // A docket line with no size fits every Zero Sugar bottle equally; the supplier's own
+  // history settles it without the docket having to spell it out.
+  const plain = parseDocket(['Coca-Cola Zero Sugar x6'], fixtures.catalogue).lines[0];
+  const preferred = parseDocket(['Coca-Cola Zero Sugar x6'], fixtures.catalogue, { preferred: ['coke-zero-600'] }).lines[0];
+  assert.equal(preferred.productId, 'coke-zero-600');
+  assert.notEqual(plain.productId, 'coke-zero-600');
+});
+
+test('supplier history never beats a clearly better match', () => {
+  // The supplier usually sends the 500ml, but this docket line names the 1.25L.
+  const { lines } = parseDocket(['Coca-Cola Zero Sugar 1.25L x6'], fixtures.catalogue, { preferred: ['coke-zero-500'] });
+  assert.equal(lines[0].productId, 'coke-zero-125');
 });
