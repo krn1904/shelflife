@@ -12,6 +12,7 @@
     "test:rls": "tsx scripts/test-rls.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-textract": "^3.1141.0",
     "@supabase/ssr": "^0.12.6",
     "@supabase/supabase-js": "^2.115.0",
     "@zxing/browser": "^0.2.1",
@@ -22,6 +23,7 @@
     "react-dom": "19.2.8",
     "recharts": "^3.10.1",
     "server-only": "^0.0.1",
+    "tesseract.js": "^5.1.1",
     "zod": "^4.5.4"
   },
   "devDependencies": {
