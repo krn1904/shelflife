@@ -24,8 +24,10 @@ Every product carries one of three tracking modes, so staff only do work that pa
 
 Intake is **docket-driven, not scan-driven**. The docket already lists what arrived, so staff
 photograph it and the app reads it: the supplier is recognised from the docket (its ABN, or a
-name it has printed before) and the line list is the docket's product rows. Staff check each
-line against the paper, adjust quantity, and confirm a proposed expiry date — one date per SKU
+name it has printed before) and the line list is the docket's product rows, linked to the
+catalogue where that is certain and otherwise taken as printed, as new items to double-check
+that become the organisation's own products (other organisations never see them).
+Staff check each line against the paper, adjust quantity, and confirm a proposed expiry date — one date per SKU
 line, covering every box of that SKU. Docketed and received quantities are kept apart, so a
 short delivery is on record. With no docket to read, the list is predicted from that supplier's
 recent deliveries instead.

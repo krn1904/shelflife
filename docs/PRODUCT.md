@@ -77,10 +77,13 @@ enumerates exactly what arrived.
    pre-filled with the name and ABN read from the docket; a business already on the list under the
    same ABN or name is reused instead of duplicated. With no docket to read, the operator picks
    the supplier from the list.
-4. **Confirm what came.** The line list is the docket: every row that names a catalogue product.
-   Rows that name nothing known are listed separately to match to a product or leave out, and a
-   line matched to the wrong product can be sent back. Adjust counts where they differ; untick a
-   line that did not arrive. The docketed quantity is recorded separately from the received
+4. **Confirm what came.** The line list is the docket, one card per row. A row is linked to the
+   catalogue only when it is plainly a known product; otherwise the OCR is trusted, the row keeps
+   the name the docket prints (editable), and it is marked as a new item to double-check, with a
+   likely catalogue product offered but never applied on its own. New items become the
+   organisation's own products when the delivery closes (never the shared catalogue), so the next
+   docket naming them links outright. Adjust counts where
+   they differ; untick a line that did not arrive. The docketed quantity is recorded separately from the received
    quantity, so a short delivery, including one that did not arrive at all, is on record. When no
    docket was read, the list is predicted from the supplier's recent deliveries instead.
 5. **Confirm dates — one per line, never per box.** The expiry belongs to the SKU line and covers

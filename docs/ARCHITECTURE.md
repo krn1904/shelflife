@@ -231,13 +231,21 @@ It starts at the docket, not a supplier list:
    printed name as an alias and fills in a missing ABN.
 4. **Lines from the reading.** The delivery keeps the reading in `deliveries.docket_reading`, and
    `docketLines()` parses it on every render: `parseDocketTable()` reads Textract's grid by column
-   heading (an empty Delivered cell stays empty), `parseDocket()` handles plain text. Products
-   this supplier sent recently only break near-ties. Rows naming the same product are added
-   together, since a delivery holds one line per product; unmatched rows are handed back to the
-   operator. With no reading, `expectedLines()` predicts the list as before.
+   heading (an empty Delivered cell stays empty), `parseDocket()` handles plain text. Every row
+   becomes a line. It is linked to a catalogue product only when that is beyond doubt: a barcode,
+   or a name match of 0.85 or better (`LINKED_AT`), where a different size or a near-spelling
+   alone never counts. Otherwise the OCR is trusted: the line keeps the name the docket prints
+   (`printedProductName()`), a weaker match is only offered as a suggestion, and two rows are
+   never folded into one product. There is no per-supplier product-code table; that is left
+   for if OCR proves unreliable. With no reading, `expectedLines()` predicts the list as before.
 5. **Docketed vs received.** `closeDelivery` stores the docket's figure in `qty_docketed` and the
    count in `qty_received`, keeping a line with 0 received (it did not arrive) and creating
-   batches only for what arrived. Without a docket reading the two are equal, as before.
+   batches only for what arrived. Without a docket reading the two are equal, as before. Lines
+   still unlinked become products **private to the organisation** (`products.org_id`) under their
+   docket name (a visible product with exactly that name is reused), so the next docket printing
+   it links outright. Other organisations never see them; the shared catalogue (`org_id` null)
+   is unchanged. Rows that turn
+   out to be one product are added into one `delivery_line`, keeping a batch per row.
 
 - `expectedLines(history)` ([expected-lines.ts](../src/lib/intake/expected-lines.ts)) builds the
   pre-populated tick-list from what this supplier actually sent to this site before — so there is
@@ -294,8 +302,9 @@ organisation an `org`; “tenant” appears only where describing the standard m
 architecture:
 
 `orgs`, `sites`, `profiles`, `memberships`, `suppliers` (optional ABN, unique per organisation),
-`supplier_aliases` (docket names confirmed for a supplier), `products` (global catalogue keyed by
-barcode), `site_products` (per-site overrides incl. `tracking_mode_override`), `deliveries`,
+`supplier_aliases` (docket names confirmed for a supplier), `products` (the shared catalogue keyed by
+barcode, plus each organisation's own products added from dockets, which carry `org_id`),
+`site_products` (per-site overrides incl. `tracking_mode_override`), `deliveries`,
 `delivery_lines` (`qty_docketed` vs `qty_received` kept separate from day one — this is what
 makes v2 reconciliation need no migration), `stock_batches`, `expiry_actions`, `rotation_checks`,
 `waste_events`, `job_runs`, `push_subscriptions`, `audit_log`.

@@ -287,6 +287,35 @@ async function main() {
       `got ${JSON.stringify(own?.map((m) => m.role))}`);
   }
 
+  console.log('\nproducts added from a docket belong to that organisation:');
+  {
+    const { data: own, error: ownError } = await staff.from('products')
+      .insert({ name: 'RLS Docket Only Product 250ml', org_id: metro.id, tracking_mode: 'batch' })
+      .select('id').single();
+    check('staff can add a product private to their organisation', !ownError && !!own, ownError?.message ?? '');
+
+    const { data: seenByOther } = await other.from('products').select('id').eq('id', own?.id ?? '');
+    check('another organisation cannot see it', (seenByOther?.length ?? 0) === 0,
+      `saw ${seenByOther?.length} rows`);
+
+    const { data: seenByOwner } = await staff.from('products').select('id').eq('id', own?.id ?? '');
+    check('its own organisation can', seenByOwner?.length === 1);
+
+    const { error: planted } = await other.from('products')
+      .insert({ name: 'Planted product', org_id: metro.id, tracking_mode: 'batch' });
+    check('cannot add a product into another organisation', planted !== null,
+      planted ? '' : 'insert unexpectedly succeeded');
+
+    const { data: madeShared } = await staff.from('products')
+      .update({ org_id: united.id }).eq('id', own?.id ?? '').select('id');
+    check('cannot move a private product into another organisation', (madeShared?.length ?? 0) === 0);
+
+    const { data: shared } = await other.from('products').select('id').is('org_id', null).limit(1);
+    check('the shared catalogue is still visible to everyone', (shared?.length ?? 0) === 1);
+
+    if (own) await admin.from('products').delete().eq('id', own.id);
+  }
+
   console.log('\nsuppliers recognised from dockets:');
   {
     // Staff add suppliers mid-delivery through add_supplier(); suppliers_insert still

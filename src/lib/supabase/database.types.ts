@@ -407,6 +407,7 @@ export type Database = {
           default_shelf_life_days: number | null
           id: string
           name: string
+          org_id: string | null
           size: string | null
           tracking_mode: Database["public"]["Enums"]["tracking_mode"]
           updated_at: string
@@ -420,6 +421,7 @@ export type Database = {
           default_shelf_life_days?: number | null
           id?: string
           name: string
+          org_id?: string | null
           size?: string | null
           tracking_mode?: Database["public"]["Enums"]["tracking_mode"]
           updated_at?: string
@@ -433,11 +435,20 @@ export type Database = {
           default_shelf_life_days?: number | null
           id?: string
           name?: string
+          org_id?: string | null
           size?: string | null
           tracking_mode?: Database["public"]["Enums"]["tracking_mode"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {

@@ -265,25 +265,38 @@ function buildIndex(catalogue: CatalogueItem[]) {
 
 type Index = ReturnType<typeof buildIndex>;
 
-function bestMatch(index: Index, text: string, only?: Set<string>) {
+/** Every plausible product for a line, best first. */
+function rankMatches(index: Index, text: string, only?: Set<string>) {
   const lineWords = words(text);
   const { size } = packOf(text);
-  let best: { item: Indexed; score: number } | null = null;
+  const ranked: { item: Indexed; score: number }[] = [];
   for (const d of index.docs) {
     if (only && !only.has(d.id)) continue;
+    // Two different sizes are two different products: better unmatched than wrong.
+    if (d.size && size && d.size !== size) continue;
     const total = d.tokens.reduce((s, t) => s + index.idf(t), 0);
     if (total === 0) continue;
     let hit = 0;
-    for (const t of d.tokens) if (lineWords.some((w) => sameWord(w, t))) hit += index.idf(t);
+    let exact = false;
+    for (const t of d.tokens) {
+      if (lineWords.includes(t)) exact = true;
+      if (lineWords.some((w) => sameWord(w, t))) hit += index.idf(t);
+    }
+    // A near-spelling alone ("Greek" for "Green") is not a match: one word must be spelt out.
+    if (!exact) continue;
     // Catalogue words on the line that this product lacks ("classic" against a Zero) count against it.
     let extra = 0;
     for (const w of lineWords) if (index.vocab.has(w) && !d.tokens.some((t) => sameWord(w, t))) extra += index.idf(w) * 0.5;
     let score = hit / (total + extra);
-    // Sizes separate 375ml from 500ml. An unreadable size never decides between variants.
-    if (d.size && size) score += d.size === size ? 0.15 : -0.35;
-    if (!best || score > best.score) best = { item: d, score };
+    // Matching sizes separate 375ml from 500ml. An unreadable size never decides between variants.
+    if (d.size && size) score += 0.15;
+    ranked.push({ item: d, score });
   }
-  return best;
+  return ranked.sort((x, y) => y.score - x.score);
+}
+
+function bestMatch(index: Index, text: string, only?: Set<string>) {
+  return rankMatches(index, text, only)[0] ?? null;
 }
 
 const MATCH_AT = 0.55;
@@ -559,4 +572,19 @@ export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[]
 
   checkCartons(lines);
   return { lines, verdicts };
+}
+
+/**
+ * The product's name as the docket prints it, for when the OCR is trusted over the catalogue:
+ * the row's text without the unit column Textract folds in ("EA I"), a leading product code,
+ * and the quantities and prices trailing after it.
+ */
+export function printedProductName(text: string): string {
+  return text
+    .replace(/[|]/g, ' ')
+    .replace(/^\s*(?:ea|each|ctn|ctns|unit|units|uom)\b\s*(?:[il1|]\s+)?/i, '')
+    .replace(/^\s*(?:\d{4,14}|[a-z]*\d[a-z0-9]{3,})\s+/i, '')
+    .replace(/(?:\s+(?:\$?\d+(?:[.,]\d{2})?|x\s*\d{1,3}))+\s*$/i, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 }

@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { isProductTable, normalise, packOf, parseDocket, parseDocketTable, quantitiesOf, type TableCell } from './parse';
+import { isProductTable, normalise, packOf, parseDocket, parseDocketTable, printedProductName, quantitiesOf, type TableCell } from './parse';
 import fixtures from './fixtures.json';
 import { REAL_DOCKETS } from './real-dockets';
 
@@ -224,4 +224,20 @@ test('table: a real Bega layout reads the description column, not the product co
   assert.deepEqual(lines.slice(0, 2).map((l) => l.productId), ['pura-fc-2l', 'pura-light-2l']);
   // The unlabelled totals row under the table is not a product.
   assert.equal(verdicts.at(-1)!.kept, false);
+});
+
+test('a product of another size, or only a near-spelling, is not a match', () => {
+  const catalogue = [
+    { id: 'v-green', name: 'V Green 355ml' },
+    { id: 'pura-light', name: 'Pura Light Milk 2L' },
+  ];
+  const { lines } = parseDocket(['FUnion Natrl Greek Style Yogurt 1kg (6) 2', 'Pura Light Milk 1L x2'], catalogue);
+  assert.deepEqual(lines.map((l) => l.productId), [null, null]);
+});
+
+test('reads the product name as printed, without unit, code, counts or prices', () => {
+  assert.equal(printedProductName('EA I Pura Milk 2Lt Bottle'), 'Pura Milk 2Lt Bottle');
+  assert.equal(printedProductName('10442 Coca-Cola Zero Sugar 600ml 24 24'), 'Coca-Cola Zero Sugar 600ml');
+  assert.equal(printedProductName('CZS375C CC ZERO SGR CAN 375ML 24PK 4 153.60'), 'CC ZERO SGR CAN 375ML 24PK');
+  assert.equal(printedProductName('Dare Espresso 500ml BTL (6)'), 'Dare Espresso 500ml BTL (6)');
 });

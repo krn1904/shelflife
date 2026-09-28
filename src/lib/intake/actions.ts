@@ -9,7 +9,7 @@ import type { TrackingMode } from '@/lib/supabase/types';
 import { fetchAllPages } from '@/lib/pagination';
 import { expectedLines, type HistoryLine } from './expected-lines';
 import { proposeExpiry, today, type ExpiryProposal } from './expiry';
-import type { CatalogueItem } from './docket/parse';
+import { normalise, packOf, printedProductName, type CatalogueItem } from './docket/parse';
 import { docketPhotoPath, parseReading, readingFrom, DocketReadingInput } from './docket/reading';
 import { docketLessons } from './docket/supplier';
 import { customerFor, knownSuppliers } from './suppliers';
@@ -24,7 +24,12 @@ const MAX_QTY = 9999;
 export type IntakeState = { status: 'idle' } | { status: 'error'; message: string };
 
 const LineInput = z.object({
-  product_id: z.string().uuid(),
+  // A catalogue product, or a new one to add as the docket prints it (the OCR is trusted).
+  product_id: z.union([z.null(), z.string().uuid()]).default(null),
+  new_product: z.union([z.null(), z.object({
+    name: z.string().trim().min(2).max(120),
+    tracking_mode: z.enum(['batch', 'rotation', 'none']),
+  })]).default(null),
   qty_received: z.coerce.number().int().min(0).max(MAX_QTY),
   // What the docket said arrived. Null when no docket was read: the count is then all there is.
   qty_docketed: z.union([z.null(), z.coerce.number().int().min(0).max(MAX_QTY)]).default(null),
@@ -124,6 +129,14 @@ export async function startDelivery(_prev: IntakeState, formData: FormData): Pro
 
   revalidatePath('/app/deliveries');
   redirect(`/app/deliveries/${deliveryId}`);
+}
+
+/** "2000ml" → "2L", "1000g" → "1kg", "750ml" stays: sizes written the way the catalogue writes them. */
+function readableSize(size: string | null): string | null {
+  const m = size?.match(/^(\d+(?:\.\d+)?)(ml|g)$/);
+  if (!m) return size;
+  const n = Number(m[1]);
+  return n >= 1000 ? `${n / 1000}${m[2] === 'ml' ? 'L' : 'kg'}` : size;
 }
 
 type Db = Awaited<ReturnType<typeof createClient>>;
@@ -230,24 +243,33 @@ export async function suggestLines(deliveryId: string) {
   return { error: null, lines };
 }
 
-export type DocketIntakeLine = IntakeProduct & {
-  /** What the docket said: the printed quantity is the claim, the count is what arrived. */
+// A name match this strong means the product is already in the catalogue; anything weaker is
+// only offered as a suggestion, and the docket's own name is trusted instead.
+const LINKED_AT = 0.85;
+
+/** One row of the docket, as intake shows it. */
+export type DocketRow = {
+  key: string;
+  /** The row as the reader found it, and the product name as printed on it. */
+  docketText: string;
+  name: string;
   qtyDocketed: number;
   qtyReceived: number;
-  /** The docket text this line came from, and whether the reader was unsure of it. */
-  docketText: string;
+  /** The reader was unsure of this row's count, or could not find one. */
   unsure: boolean;
-  /** How many docket rows named this product (more than one are added together). */
-  rows: number;
+  /** The catalogue product this row is, when the docket leaves no doubt. */
+  product: IntakeProduct | null;
+  /** A catalogue product it might be, offered but never applied on its own. */
+  suggestion: IntakeProduct | null;
 };
 
-export type UnmatchedRow = { key: string; text: string; qty: number | null };
 export type DocketVerdict = { text: string; kept: 'kept' | 'joined' | 'dropped'; reason: string | null };
 
 /**
- * The line list, read from the docket instead of predicted from history. Every docket row
- * that names a catalogue product becomes a line; rows that name nothing known are handed
- * back for the operator to attach or leave out. Null when this delivery has no reading.
+ * The docket's rows, checked against the catalogue. A row is linked to a product only when
+ * its barcode or name leaves no doubt; otherwise the OCR is trusted, the row keeps the name
+ * the docket prints, and it becomes a new catalogue product when the delivery closes. Null
+ * when this delivery has no reading.
  */
 export async function docketLines(deliveryId: string) {
   const session = await requireSession();
@@ -259,7 +281,7 @@ export async function docketLines(deliveryId: string) {
   const reading = readingFrom(row?.docket_reading);
   if (!reading) return null;
 
-  // This supplier's own products at this site are tried first when a line is ambiguous.
+  // This supplier's own products at this site break near-ties between look-alikes.
   const { data: past } = await supabase
     .from('deliveries')
     .select('id')
@@ -281,39 +303,28 @@ export async function docketLines(deliveryId: string) {
     preferred: [...new Set((history ?? []).map((h) => h.product_id))],
   });
 
-  // One line per product: a product can only be received once per delivery.
-  const byProduct = new Map<string, { docketed: number; received: number; text: string; unsure: boolean; rows: number }>();
-  const unmatched: UnmatchedRow[] = [];
-  for (const line of parsed.lines) {
-    const docketed = line.ordered ?? line.supplied;
-    const received = line.supplied ?? line.ordered;
-    if (!line.productId) {
-      unmatched.push({ key: `row-${line.source}`, text: line.text, qty: received });
-      continue;
-    }
-    const seen = byProduct.get(line.productId);
-    byProduct.set(line.productId, {
-      docketed: (seen?.docketed ?? 0) + (docketed ?? 0),
-      received: (seen?.received ?? 0) + (received ?? 0),
-      text: seen ? `${seen.text} + ${line.text}` : line.text,
-      // A quantity the reader could not find at all is as doubtful as one it was unsure of.
-      unsure: Boolean(seen?.unsure || line.unsure || received === null || line.check === 'disagrees'),
-      rows: (seen?.rows ?? 0) + 1,
-    });
-  }
+  const ids = [...new Set(parsed.lines.flatMap((l) => (l.productId ? [l.productId] : [])))];
+  const products = await intakeProducts(supabase, delivery.site_id, ids);
+  // Two rows are never folded into one product: the first sure match keeps it, later ones
+  // are left as their own rows, with that product offered.
+  const linked = new Set<string>();
 
-  const products = await intakeProducts(supabase, delivery.site_id, [...byProduct.keys()]);
-  const lines: DocketIntakeLine[] = [...byProduct].flatMap(([productId, d]) => {
-    const product = products.get(productId);
-    if (!product) return [];
-    return [{
-      ...product,
-      qtyDocketed: Math.min(MAX_QTY, d.docketed),
-      qtyReceived: Math.min(MAX_QTY, d.received),
-      docketText: d.text,
-      unsure: d.unsure,
-      rows: d.rows,
-    }];
+  const rows: DocketRow[] = parsed.lines.map((line) => {
+    const received = line.supplied ?? line.ordered;
+    const candidate = line.productId ? products.get(line.productId) ?? null : null;
+    const sure = candidate !== null && (line.via === 'barcode' || line.confidence >= LINKED_AT)
+      && !linked.has(candidate.productId);
+    if (sure) linked.add(candidate.productId);
+    return {
+      key: `row-${line.source}`,
+      docketText: line.text,
+      name: printedProductName(line.text) || line.text,
+      qtyDocketed: Math.min(MAX_QTY, line.ordered ?? line.supplied ?? 0),
+      qtyReceived: Math.min(MAX_QTY, received ?? 0),
+      unsure: Boolean(line.unsure || received === null || line.check === 'disagrees'),
+      product: sure ? candidate : null,
+      suggestion: sure ? null : candidate,
+    };
   });
 
   const verdicts: DocketVerdict[] = parsed.verdicts.map((v) => ({
@@ -322,7 +333,7 @@ export async function docketLines(deliveryId: string) {
     reason: v.kept === false ? v.reason : v.kept === 'merged' ? `${v.what} of the row above` : null,
   }));
 
-  return { engine: reading.engine, lines, unmatched, verdicts };
+  return { engine: reading.engine, rows, verdicts };
 }
 
 /**
@@ -410,41 +421,85 @@ export async function closeDelivery(_prev: IntakeState, formData: FormData): Pro
     return { status: 'error', message: 'Those lines did not make sense.' };
   }
 
-  const parsed = z.array(LineInput).safeParse(payload);
+  const parsed = z.array(LineInput.refine((l) => (l.product_id === null) !== (l.new_product === null)))
+    .safeParse(payload);
   if (!parsed.success) return { status: 'error', message: 'Those lines did not make sense.' };
 
   // A docket line that did not arrive at all is kept (0 received against its docketed
   // quantity): that gap is the short-delivery record. Anything else needs a count.
-  const received = parsed.data.filter((l) => l.qty_received > 0 || (l.qty_docketed ?? 0) > 0);
-  if (!received.some((l) => l.qty_received > 0)) {
+  const kept = parsed.data.filter((l) => l.qty_received > 0 || (l.qty_docketed ?? 0) > 0);
+  if (!kept.some((l) => l.qty_received > 0)) {
     return { status: 'error', message: 'Tick at least one line before closing.' };
   }
-  if (new Set(received.map((l) => l.product_id)).size !== received.length) {
-    return { status: 'error', message: 'A product is on the list twice. Combine them before closing.' };
+
+  // Rows trusted from the docket become this organisation's own products, unless one by that
+  // exact name is already visible to it (shared, or added from an earlier docket).
+  const newProductIds = new Map<string, string>();
+  for (const l of kept) {
+    if (!l.new_product) continue;
+    const key = l.new_product.name.toLowerCase();
+    if (newProductIds.has(key)) continue;
+    const { data: existing } = await supabase
+      .from('products').select('id').ilike('name', l.new_product.name.replace(/[%_\\]/g, '\\$&')).limit(1).maybeSingle();
+    if (existing) {
+      newProductIds.set(key, existing.id);
+      continue;
+    }
+    const { data: created, error: productError } = await supabase
+      .from('products')
+      .insert({
+        name: l.new_product.name,
+        size: readableSize(packOf(normalise(l.new_product.name)).size),
+        tracking_mode: l.new_product.tracking_mode,
+        // The docket's wording is this organisation's, not the shared catalogue's.
+        org_id: delivery.org_id,
+        created_by: session.userId,
+      })
+      .select('id')
+      .single();
+    if (productError || !created) {
+      return { status: 'error', message: `Could not add ${l.new_product.name} to the catalogue (${productError?.code ?? 'unknown'}).` };
+    }
+    newProductIds.set(key, created.id);
   }
+  const received = kept.map((l) => ({
+    ...l,
+    product_id: l.product_id ?? newProductIds.get(l.new_product!.name.toLowerCase())!,
+  }));
 
   const { data: products } = await supabase
     .from('products')
     .select('id, tracking_mode')
-    .in('id', received.map((l) => l.product_id));
+    .in('id', [...new Set(received.map((l) => l.product_id))]);
   const trackingMode = new Map((products ?? []).map((p) => [p.id, p.tracking_mode]));
 
   const docketNumber = String(formData.get('docket_number') ?? '').trim() || null;
 
+  // A delivery holds one line per product: two docket rows that are the same product add up.
+  const perProduct = new Map<string, { docketed: number; received: number }>();
+  for (const l of received) {
+    const sum = perProduct.get(l.product_id) ?? { docketed: 0, received: 0 };
+    perProduct.set(l.product_id, {
+      docketed: sum.docketed + (l.qty_docketed ?? l.qty_received),
+      received: sum.received + l.qty_received,
+    });
+  }
+
   await supabase.from('delivery_lines').delete().eq('delivery_id', delivery.id);
   const { data: lines, error: lineError } = await supabase
     .from('delivery_lines')
-    .insert(received.map((l) => ({
+    .insert([...perProduct].map(([productId, qty]) => ({
       org_id: delivery.org_id,
       delivery_id: delivery.id,
-      product_id: l.product_id,
-      qty_docketed: l.qty_docketed ?? l.qty_received,
-      qty_received: l.qty_received,
+      product_id: productId,
+      qty_docketed: Math.min(MAX_QTY, qty.docketed),
+      qty_received: Math.min(MAX_QTY, qty.received),
     })))
     .select('id, product_id');
 
   if (lineError) return { status: 'error', message: `Could not save the lines (${lineError.code ?? 'unknown'}).` };
 
+  // Batches stay per row: two rows of one product can carry two different dates.
   const lineByProduct = new Map((lines ?? []).map((l) => [l.product_id, l.id]));
   const batches = received
     .filter((l) => l.qty_received > 0 && trackingMode.get(l.product_id) === 'batch' && l.expiry_date)
