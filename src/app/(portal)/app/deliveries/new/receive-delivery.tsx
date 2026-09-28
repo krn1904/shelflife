@@ -34,6 +34,42 @@ const VIA: Record<'abn' | 'alias' | 'name', string> = {
   name: 'Recognised by its name on the docket.',
 };
 
+const PREVIEW_ROWS = 4;
+
+/** A table as the reader found it: headings, then the first few rows, with the rest on request. */
+function TablePreview({ rows }: { rows: FoundTable['rows'] }) {
+  const [all, setAll] = useState(false);
+  const shown = all ? rows : rows.slice(0, PREVIEW_ROWS);
+  return (
+    <div>
+      <div className="overflow-x-auto rounded border border-line">
+        <table className="w-max min-w-full text-xs">
+          <tbody className="divide-y divide-line">
+            {shown.map((row, r) => (
+              <tr key={r} className={row.some((c) => c.header) ? 'bg-surface-2 font-medium' : ''}>
+                {row.map((cell, c) => (
+                  <td key={c} className="max-w-64 truncate border-r border-line px-2 py-1 last:border-r-0" title={cell.text}>
+                    {cell.text}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {rows.length > PREVIEW_ROWS && (
+        <button
+          type="button"
+          className="mt-1 text-xs text-muted underline"
+          onClick={(e) => { e.stopPropagation(); setAll((v) => !v); }}
+        >
+          {all ? 'Show fewer rows' : `Show all ${rows.length} rows`}
+        </button>
+      )}
+    </div>
+  );
+}
+
 /**
  * Receiving starts at the docket, not a supplier list: photograph it, read it, and the
  * supplier it came from is recognised from what it prints. The operator confirms (or
@@ -243,18 +279,25 @@ export function ReceiveDelivery({
         {tables.length > 1 && (
           <fieldset className="space-y-2">
             <legend className="text-sm font-medium">Which table lists the products?</legend>
+            <p className="text-xs text-muted">
+              Pick the one with a row per product. Its headings and first rows are shown as the reader found them.
+            </p>
             {tables.map((t, i) => (
-              <label key={i} className="card flex cursor-pointer items-start gap-3 p-3 text-sm">
-                <input type="radio" name="table" className="mt-1" checked={tableIndex === i} onChange={() => setTableIndex(i)} />
-                <span className="min-w-0 flex-1">
-                  <span className="font-medium">Table {i + 1}</span>
-                  <span className="text-muted"> · {t.rows.length} rows</span>
-                  {t.products && <span className="badge badge-brand ml-2">looks like products</span>}
-                  <span className="mt-1 block truncate font-mono text-xs text-faint">
-                    {t.rows.slice(0, 2).map((r) => r.map((c) => c.text).filter(Boolean).join(' | ')).join('  ·  ')}
+              <div
+                key={i}
+                onClick={() => setTableIndex(i)}
+                className={`card cursor-pointer space-y-2 p-3 text-sm ${tableIndex === i ? 'ring-2 ring-brand' : ''}`}
+              >
+                <label className="flex cursor-pointer items-center gap-3">
+                  <input type="radio" name="table" checked={tableIndex === i} onChange={() => setTableIndex(i)} />
+                  <span>
+                    <span className="font-medium">Table {i + 1}</span>
+                    <span className="text-muted"> · {t.rows.length} rows</span>
+                    {t.products && <span className="badge badge-brand ml-2">looks like products</span>}
                   </span>
-                </span>
-              </label>
+                </label>
+                <TablePreview rows={t.rows} />
+              </div>
             ))}
             <label className="flex items-center gap-2 text-sm text-muted">
               <input type="radio" name="table" checked={tableIndex === -1} onChange={() => setTableIndex(-1)} />
