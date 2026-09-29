@@ -79,7 +79,7 @@ Scheduled Edge Functions exist only on the hosted project; locally their history
 ### Verification
 
 ```bash
-npm test                # pure logic — barcode check digits, tracking-mode resolution
+npm test                # pure logic — barcodes, tracking modes, docket reading, intake rules
 npm run test:rls        # cross-organisation isolation must pass before anything ships
 npx tsc --noEmit
 npm run build

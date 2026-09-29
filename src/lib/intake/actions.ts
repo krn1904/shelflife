@@ -5,11 +5,11 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { activeSite, requireSession, type Session } from '@/lib/auth/session';
-import type { TrackingMode } from '@/lib/supabase/types';
 import { fetchAllPages } from '@/lib/pagination';
 import { expectedLines, type HistoryLine } from './expected-lines';
 import { proposeExpiry, today, type ExpiryProposal } from './expiry';
-import { normalise, packOf, printedProductName, type CatalogueItem } from './docket/parse';
+import { normalise, packOf, type CatalogueItem } from './docket/parse';
+import { ClosingLines, docketRows, MAX_QTY, planDelivery, readableSize, recordable, type IntakeProduct } from './plan';
 import { docketPhotoPath, parseReading, readingFrom, DocketReadingInput } from './docket/reading';
 import { docketLessons } from './docket/supplier';
 import { customerFor, knownSuppliers } from './suppliers';
@@ -19,23 +19,8 @@ import { customerFor, knownSuppliers } from './suppliers';
 const HISTORY_DELIVERIES = 3;
 // How far back a supplier's own products count when matching its docket lines to the catalogue.
 const MATCHING_DELIVERIES = 10;
-const MAX_QTY = 9999;
 
 export type IntakeState = { status: 'idle' } | { status: 'error'; message: string };
-
-const LineInput = z.object({
-  // A catalogue product, or a new one to add as the docket prints it (the OCR is trusted).
-  product_id: z.union([z.null(), z.string().uuid()]).default(null),
-  new_product: z.union([z.null(), z.object({
-    name: z.string().trim().min(2).max(120),
-    tracking_mode: z.enum(['batch', 'rotation', 'none']),
-  })]).default(null),
-  qty_received: z.coerce.number().int().min(0).max(MAX_QTY),
-  // What the docket said arrived. Null when no docket was read: the count is then all there is.
-  qty_docketed: z.union([z.null(), z.coerce.number().int().min(0).max(MAX_QTY)]).default(null),
-  expiry_date: z.union([z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
-  confirmed: z.boolean(),
-});
 
 /**
  * Resolves the delivery and proves the caller may touch it, in one place.
@@ -131,24 +116,9 @@ export async function startDelivery(_prev: IntakeState, formData: FormData): Pro
   redirect(`/app/deliveries/${deliveryId}`);
 }
 
-/** "2000ml" → "2L", "1000g" → "1kg", "750ml" stays: sizes written the way the catalogue writes them. */
-function readableSize(size: string | null): string | null {
-  const m = size?.match(/^(\d+(?:\.\d+)?)(ml|g)$/);
-  if (!m) return size;
-  const n = Number(m[1]);
-  return n >= 1000 ? `${n / 1000}${m[2] === 'ml' ? 'L' : 'kg'}` : size;
-}
-
 type Db = Awaited<ReturnType<typeof createClient>>;
 
-export type IntakeProduct = {
-  productId: string;
-  name: string;
-  brand: string | null;
-  size: string | null;
-  trackingMode: TrackingMode;
-  proposal: ExpiryProposal;
-};
+export type { DocketRow, IntakeProduct } from './plan';
 
 /**
  * The products as intake shows them, each with a proposed expiry. The most recent batch
@@ -243,26 +213,6 @@ export async function suggestLines(deliveryId: string) {
   return { error: null, lines };
 }
 
-// A name match this strong means the product is already in the catalogue; anything weaker is
-// only offered as a suggestion, and the docket's own name is trusted instead.
-const LINKED_AT = 0.85;
-
-/** One row of the docket, as intake shows it. */
-export type DocketRow = {
-  key: string;
-  /** The row as the reader found it, and the product name as printed on it. */
-  docketText: string;
-  name: string;
-  qtyDocketed: number;
-  qtyReceived: number;
-  /** The reader was unsure of this row's count, or could not find one. */
-  unsure: boolean;
-  /** The catalogue product this row is, when the docket leaves no doubt. */
-  product: IntakeProduct | null;
-  /** A catalogue product it might be, offered but never applied on its own. */
-  suggestion: IntakeProduct | null;
-};
-
 export type DocketVerdict = { text: string; kept: 'kept' | 'joined' | 'dropped'; reason: string | null };
 
 /**
@@ -305,27 +255,7 @@ export async function docketLines(deliveryId: string) {
 
   const ids = [...new Set(parsed.lines.flatMap((l) => (l.productId ? [l.productId] : [])))];
   const products = await intakeProducts(supabase, delivery.site_id, ids);
-  // Two rows are never folded into one product: the first sure match keeps it, later ones
-  // are left as their own rows, with that product offered.
-  const linked = new Set<string>();
-
-  const rows: DocketRow[] = parsed.lines.map((line) => {
-    const received = line.supplied ?? line.ordered;
-    const candidate = line.productId ? products.get(line.productId) ?? null : null;
-    const sure = candidate !== null && (line.via === 'barcode' || line.confidence >= LINKED_AT)
-      && !linked.has(candidate.productId);
-    if (sure) linked.add(candidate.productId);
-    return {
-      key: `row-${line.source}`,
-      docketText: line.text,
-      name: printedProductName(line.text) || line.text,
-      qtyDocketed: Math.min(MAX_QTY, line.ordered ?? line.supplied ?? 0),
-      qtyReceived: Math.min(MAX_QTY, received ?? 0),
-      unsure: Boolean(line.unsure || received === null || line.check === 'disagrees'),
-      product: sure ? candidate : null,
-      suggestion: sure ? null : candidate,
-    };
-  });
+  const rows = docketRows(parsed.lines, products);
 
   const verdicts: DocketVerdict[] = parsed.verdicts.map((v) => ({
     text: v.text,
@@ -421,16 +351,12 @@ export async function closeDelivery(_prev: IntakeState, formData: FormData): Pro
     return { status: 'error', message: 'Those lines did not make sense.' };
   }
 
-  const parsed = z.array(LineInput.refine((l) => (l.product_id === null) !== (l.new_product === null)))
-    .safeParse(payload);
+  const parsed = ClosingLines.safeParse(payload);
   if (!parsed.success) return { status: 'error', message: 'Those lines did not make sense.' };
 
-  // A docket line that did not arrive at all is kept (0 received against its docketed
-  // quantity): that gap is the short-delivery record. Anything else needs a count.
-  const kept = parsed.data.filter((l) => l.qty_received > 0 || (l.qty_docketed ?? 0) > 0);
-  if (!kept.some((l) => l.qty_received > 0)) {
-    return { status: 'error', message: 'Tick at least one line before closing.' };
-  }
+  const record = recordable(parsed.data);
+  if (!record.ok) return { status: 'error', message: record.message };
+  const kept = record.lines;
 
   // Rows trusted from the docket become this organisation's own products, unless one by that
   // exact name is already visible to it (shared, or added from an earlier docket).
@@ -458,7 +384,7 @@ export async function closeDelivery(_prev: IntakeState, formData: FormData): Pro
       .select('id')
       .single();
     if (productError || !created) {
-      return { status: 'error', message: `Could not add ${l.new_product.name} to the catalogue (${productError?.code ?? 'unknown'}).` };
+      return { status: 'error', message: `Could not add ${l.new_product.name} to your products (${productError?.code ?? 'unknown'}).` };
     }
     newProductIds.set(key, created.id);
   }
@@ -475,46 +401,35 @@ export async function closeDelivery(_prev: IntakeState, formData: FormData): Pro
 
   const docketNumber = String(formData.get('docket_number') ?? '').trim() || null;
 
-  // A delivery holds one line per product: two docket rows that are the same product add up.
-  const perProduct = new Map<string, { docketed: number; received: number }>();
-  for (const l of received) {
-    const sum = perProduct.get(l.product_id) ?? { docketed: 0, received: 0 };
-    perProduct.set(l.product_id, {
-      docketed: sum.docketed + (l.qty_docketed ?? l.qty_received),
-      received: sum.received + l.qty_received,
-    });
-  }
+  const plan = planDelivery(received, trackingMode);
 
   await supabase.from('delivery_lines').delete().eq('delivery_id', delivery.id);
   const { data: lines, error: lineError } = await supabase
     .from('delivery_lines')
-    .insert([...perProduct].map(([productId, qty]) => ({
+    .insert(plan.lines.map((line) => ({
       org_id: delivery.org_id,
       delivery_id: delivery.id,
-      product_id: productId,
-      qty_docketed: Math.min(MAX_QTY, qty.docketed),
-      qty_received: Math.min(MAX_QTY, qty.received),
+      product_id: line.productId,
+      qty_docketed: line.qtyDocketed,
+      qty_received: line.qtyReceived,
     })))
     .select('id, product_id');
 
   if (lineError) return { status: 'error', message: `Could not save the lines (${lineError.code ?? 'unknown'}).` };
 
-  // Batches stay per row: two rows of one product can carry two different dates.
   const lineByProduct = new Map((lines ?? []).map((l) => [l.product_id, l.id]));
-  const batches = received
-    .filter((l) => l.qty_received > 0 && trackingMode.get(l.product_id) === 'batch' && l.expiry_date)
-    .map((l) => ({
-      org_id: delivery.org_id,
-      site_id: delivery.site_id,
-      product_id: l.product_id,
-      delivery_line_id: lineByProduct.get(l.product_id) ?? null,
-      expiry_date: l.expiry_date,
-      // A date someone ticked is evidence; one left as proposed is a guess we should
-      // still be able to tell apart later when a write-off needs explaining.
-      expiry_source: l.confirmed ? ('confirmed' as const) : ('predicted' as const),
-      qty_received: l.qty_received,
-      qty_remaining: l.qty_received,
-    }));
+  const batches = plan.batches.map((b) => ({
+    org_id: delivery.org_id,
+    site_id: delivery.site_id,
+    product_id: b.productId,
+    delivery_line_id: lineByProduct.get(b.productId) ?? null,
+    expiry_date: b.expiry,
+    // A date someone ticked is evidence; one left as proposed is a guess we should
+    // still be able to tell apart later when a write-off needs explaining.
+    expiry_source: b.confirmed ? ('confirmed' as const) : ('predicted' as const),
+    qty_received: b.qty,
+    qty_remaining: b.qty,
+  }));
 
   if (batches.length > 0) {
     const { error: batchError } = await supabase.from('stock_batches').insert(batches);

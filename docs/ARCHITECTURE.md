@@ -229,7 +229,8 @@ It starts at the docket, not a supplier list:
    for a known ABN or name instead of duplicating it; `suppliers_insert` still limits direct
    writes to managers. Starting the delivery calls `remember_supplier_docket()`, which saves the
    printed name as an alias and fills in a missing ABN.
-4. **Lines from the reading.** The delivery keeps the reading in `deliveries.docket_reading`, and
+4. **Lines from the reading.** The rules below live in [plan.ts](../src/lib/intake/plan.ts), free of the
+   database and the browser, and are covered by `plan.test.ts`. The delivery keeps the reading in `deliveries.docket_reading`, and
    `docketLines()` parses it on every render: `parseDocketTable()` reads Textract's grid by column
    heading (an empty Delivered cell stays empty), `parseDocket()` handles plain text. Every row
    becomes a line. It is linked to a catalogue product only when that is beyond doubt: a barcode,
@@ -324,7 +325,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, expiry ladder, digest text, intake proposal, outbox queue |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, expiry ladder, digest text, intake proposal, outbox queue, docket parsing (incl. the real Bega table), supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload) |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

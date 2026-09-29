@@ -9,6 +9,7 @@ import {
   type IntakeState,
 } from '@/lib/intake/actions';
 import { BASIS_NOTE, type ExpiryBasis } from '@/lib/intake/expiry';
+import { intakePayload, intakeSummary, trackingOf } from '@/lib/intake/plan';
 import { DocketPhoto } from './docket-photo';
 import type { TrackingMode } from '@/lib/supabase/types';
 
@@ -101,8 +102,6 @@ function fromDocket(row: DocketRow): Row {
   };
 }
 
-const trackingOf = (row: Row): TrackingMode => row.product?.trackingMode ?? row.newTracking;
-
 /**
  * Working down the docket, not around the store.
  *
@@ -144,29 +143,8 @@ export function IntakeClient({
     status: 'idle',
   });
 
-  // An unticked docket line still goes in, as 0 received: that is the short-delivery record.
-  const recorded = rows.filter((r) =>
-    (r.ticked && r.qty > 0) || (r.fromDocket && (r.docketed ?? 0) > 0));
-  const received = recorded.filter((r) => r.ticked && r.qty > 0);
-  const undated = received.filter((r) => trackingOf(r) === 'batch' && !r.expiry);
-  const short = recorded.filter((r) => r.docketed !== null && (r.ticked ? r.qty : 0) < r.docketed);
-  const unnamed = recorded.filter((r) => !r.product && r.name.trim().length < 2);
-  const newItems = recorded.filter((r) => !r.product);
-
-  const payload = useMemo(
-    () =>
-      JSON.stringify(
-        recorded.map((r) => ({
-          product_id: r.product?.productId ?? null,
-          new_product: r.product ? null : { name: r.name.trim(), tracking_mode: r.newTracking },
-          qty_received: r.ticked ? r.qty : 0,
-          qty_docketed: docket ? r.docketed ?? 0 : null,
-          expiry_date: trackingOf(r) === 'batch' && r.ticked ? r.expiry : null,
-          confirmed: r.confirmed,
-        })),
-      ),
-    [recorded, docket],
-  );
+  const { received, undated, short, unnamed, newItems } = intakeSummary(rows);
+  const payload = useMemo(() => JSON.stringify(intakePayload(rows, docket !== null)), [rows, docket]);
 
   function update(key: string, patch: Partial<Row>) {
     setRows((prev) => prev.map((r) => (r.key === key ? { ...r, ...patch } : r)));
