@@ -108,7 +108,7 @@ async function wipe() {
   // is not guaranteed to succeed.
   for (const table of [
     'waste_events', 'expiry_actions', 'rotation_checks', 'stock_batches', 'delivery_lines',
-    'deliveries', 'site_products', 'suppliers', 'push_subscriptions', 'memberships', 'sites',
+    'deliveries', 'site_products', 'supplier_aliases', 'suppliers', 'push_subscriptions', 'memberships', 'sites',
     'audit_log', 'job_runs', 'orgs', 'products',
   ] as const) {
     await deleteAll(table);

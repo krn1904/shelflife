@@ -10,6 +10,7 @@ import {
   type PersonFormState,
 } from '@/lib/admin/actions';
 import type { AppRole } from '@/lib/supabase/types';
+import { SubmitButton } from '@/components/submit-button';
 
 const ROLE_LABEL: Record<AppRole, string> = {
   platform_admin: 'Platform admin',
@@ -106,7 +107,7 @@ function RoleEditor({ person, sites }: { person: Person; sites: SiteOption[] }) 
             ))}
           </select>
         </label>
-        <button type="submit" className="btn btn-outline">Update</button>
+        <SubmitButton className="btn btn-outline" pendingLabel="Updating…">Update</SubmitButton>
       </form>
 
       <form
@@ -116,7 +117,7 @@ function RoleEditor({ person, sites }: { person: Person; sites: SiteOption[] }) 
         }}
       >
         <input type="hidden" name="membership_id" value={person.membershipId} />
-        <button type="submit" className="btn btn-danger">Remove</button>
+        <SubmitButton className="btn btn-danger" pendingLabel="Removing…">Remove</SubmitButton>
       </form>
       <ResetPasswordForm person={person} />
     </div>

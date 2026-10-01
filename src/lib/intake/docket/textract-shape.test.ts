@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import type { Block, ExpenseDocument } from '@aws-sdk/client-textract';
-import { expenseFromDocuments, tablesFromBlocks } from './textract-shape';
+import { expenseFromDocuments, tablesFromBlocks, textLinesFromBlocks } from './textract-shape';
 
 // Shaped like Textract's AnalyzeDocument answer for the top of the Bega docket's table.
 const word = (id: string, text: string): Block => ({ Id: id, BlockType: 'WORD', Text: text });
@@ -60,4 +60,14 @@ test('reads supplier, docket and line items from the invoice model', () => {
     code: '3024', item: 'Pura Milk 2Lt Bottle', quantity: '18', unitPrice: null, price: null,
     row: '0827408699 2 0 3024|EA Pura Milk 2Lt Bottle 18', confidence: 73,
   }]);
+});
+
+test('keeps every printed line in reading order, for the letterhead', () => {
+  const lines: Block[] = [
+    { Id: 'l1', BlockType: 'LINE', Text: 'Bega Dairy and Drinks Pty Ltd' },
+    { Id: 'l2', BlockType: 'LINE', Text: '  ' },
+    { Id: 'l3', BlockType: 'LINE', Text: 'ABN 51 824 753 556 ' },
+    ...blocks,
+  ];
+  assert.deepEqual(textLinesFromBlocks(lines), ['Bega Dairy and Drinks Pty Ltd', 'ABN 51 824 753 556']);
 });

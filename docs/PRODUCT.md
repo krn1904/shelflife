@@ -66,19 +66,32 @@ The effect is that staff record dates only for stock that would otherwise go unn
 Intake works down the docket rather than around a barcode scanner, because the docket already
 enumerates exactly what arrived.
 
-1. **Pick the supplier.** The app pre-populates the expected line list from that supplier's recent
-   deliveries to this site. The first delivery from a supplier is entered manually; every delivery
-   after that is a tick-list.
-2. **Photograph the docket.** Stored against the delivery, so the manager sees it without anyone
+1. **Photograph the docket.** Stored against the delivery, so the manager sees it without anyone
    sending a photo by text.
-3. **Confirm what came.** Tick the lines that arrived and adjust quantities. Received quantity is
-   recorded separately from docketed quantity, so a short delivery is captured as a deliberate edit.
-4. **Confirm dates — one per line, never per box.** The expiry belongs to the SKU line and covers
+2. **Read it.** The operator taps **Read docket**, choosing the reader: AWS Textract (reads printed
+   tables column by column, billed per photo) or the free reader that runs on the device. Reading
+   is a deliberate tap, so a blurry photo can be retaken before anything is billed.
+3. **Confirm the supplier.** It is recognised from the docket: its ABN first, then a printed name
+   confirmed on an earlier docket, then its name in the letterhead. The operator confirms or
+   changes it. A supplier that is not on the list yet is added on the spot (staff may do this),
+   pre-filled with the name and ABN read from the docket; a business already on the list under the
+   same ABN or name is reused instead of duplicated. With no docket to read, the operator picks
+   the supplier from the list.
+4. **Confirm what came.** The line list is the docket, one card per row. A row is linked to the
+   catalogue only when it is plainly a known product; otherwise the OCR is trusted, the row keeps
+   the name the docket prints (editable), and it is marked as a new item to double-check, with a
+   likely catalogue product offered but never applied on its own. New items become the
+   organisation's own products when the delivery closes (never the shared catalogue), so the next
+   docket naming them links outright. Adjust counts where
+   they differ; untick a line that did not arrive. The docketed quantity is recorded separately from the received
+   quantity, so a short delivery, including one that did not arrive at all, is on record. When no
+   docket was read, the list is predicted from the supplier's recent deliveries instead.
+5. **Confirm dates — one per line, never per box.** The expiry belongs to the SKU line and covers
    every box of that SKU in the delivery. Coke Zero 1.5L × 2 boxes is one line with one date;
    Coke Zero 2L × 2 boxes is a separate line with its own date. The app proposes each date from the
    product's shelf life or the last date seen from that supplier, so the usual action is a tap to
    confirm rather than typing.
-5. **Optionally photograph the date panel.** Kept as evidence for audit and supplier disputes.
+6. **Optionally photograph the date panel.** Kept as evidence for audit and supplier disputes.
 
 Target: a repeat delivery from a known supplier closes in under 60 seconds.
 

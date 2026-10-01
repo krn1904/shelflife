@@ -3,6 +3,7 @@ import { PendingChanges } from '@/components/pending-changes';
 import { PortalNav, type NavLink } from '@/components/portal-nav';
 import { roleAtLeast, type Session } from '@/lib/auth/session';
 import type { AppRole } from '@/lib/supabase/types';
+import { SubmitButton } from '@/components/submit-button';
 
 const NAV: (NavLink & { bar: AppRole })[] = [
   { href: '/app', label: 'Shift', bar: 'staff' },
@@ -43,9 +44,9 @@ export function PortalShell({ session, children }: { session: Session; children:
               <div className="text-xs text-faint">{ROLE_LABEL[session.primaryRole]}</div>
             </div>
             <form action={signOut}>
-              <button type="submit" className="btn btn-ghost px-2.5 py-1.5 text-sm">
+              <SubmitButton className="btn btn-ghost px-2.5 py-1.5 text-sm" pendingLabel="Signing out…">
                 Sign out
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </div>

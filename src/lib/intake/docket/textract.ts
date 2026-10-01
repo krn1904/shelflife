@@ -1,6 +1,6 @@
 import 'server-only';
 import { AnalyzeDocumentCommand, AnalyzeExpenseCommand, TextractClient } from '@aws-sdk/client-textract';
-import { expenseFromDocuments, tablesFromBlocks, type TextractReading } from './textract-shape';
+import { expenseFromDocuments, tablesFromBlocks, textLinesFromBlocks, type Table, type TextractReading } from './textract-shape';
 
 /** Raised when the server does not have the AWS credentials needed to call Textract. */
 export class TextractNotConfigured extends Error {}
@@ -42,4 +42,24 @@ export async function readWithTextract(bytes: Uint8Array): Promise<TextractReadi
     tables: tablesFromBlocks(document.Blocks ?? []),
     expense: expenseFromDocuments(expense.ExpenseDocuments ?? []),
   };
+}
+
+/**
+ * The intake read: one billed call. The table call returns the printed lines as well, which
+ * is all the letterhead needs, so the invoice model's second charge is not paid for here.
+ */
+export async function readDocketTables(bytes: Uint8Array): Promise<{ text: string[]; tables: Table[] }> {
+  const document = await client().send(
+    new AnalyzeDocumentCommand({ Document: { Bytes: bytes }, FeatureTypes: ['TABLES'] }),
+  );
+  const blocks = document.Blocks ?? [];
+  return { text: textLinesFromBlocks(blocks), tables: tablesFromBlocks(blocks) };
+}
+
+/** Whether the server has the credentials to call Textract at all. */
+export function textractConfigured(): boolean {
+  return Boolean(
+    (process.env.TEXTRACT_ACCESS_KEY_ID ?? process.env.AWS_ACCESS_KEY_ID)
+    && (process.env.TEXTRACT_SECRET_ACCESS_KEY ?? process.env.AWS_SECRET_ACCESS_KEY),
+  );
 }

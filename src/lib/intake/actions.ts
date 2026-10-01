@@ -5,22 +5,22 @@ import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { activeSite, requireSession, type Session } from '@/lib/auth/session';
+import { fetchAllPages } from '@/lib/pagination';
 import { expectedLines, type HistoryLine } from './expected-lines';
 import { proposeExpiry, today, type ExpiryProposal } from './expiry';
+import { normalise, packOf, type CatalogueItem } from './docket/parse';
+import { ClosingLines, docketRows, MAX_QTY, planDelivery, readableSize, recordable, type IntakeProduct } from './plan';
+import { docketPhotoPath, parseReading, readingFrom, DocketReadingInput } from './docket/reading';
+import { docketLessons } from './docket/supplier';
+import { customerFor, knownSuppliers } from './suppliers';
 
 // How far back to look when guessing what a delivery will contain. Three is enough to
 // tell a weekly line from a one-off without dragging in stock that was dropped months ago.
 const HISTORY_DELIVERIES = 3;
-const MAX_QTY = 9999;
+// How far back a supplier's own products count when matching its docket lines to the catalogue.
+const MATCHING_DELIVERIES = 10;
 
 export type IntakeState = { status: 'idle' } | { status: 'error'; message: string };
-
-const LineInput = z.object({
-  product_id: z.string().uuid(),
-  qty_received: z.coerce.number().int().min(0).max(MAX_QTY),
-  expiry_date: z.union([z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
-  confirmed: z.boolean(),
-});
 
 /**
  * Resolves the delivery and proves the caller may touch it, in one place.
@@ -47,6 +47,11 @@ async function openDeliveryFor(session: Session, deliveryId: string) {
   return { ok: true as const, delivery, supabase };
 }
 
+/**
+ * Opens the delivery once the supplier is settled. When the docket was read first, the
+ * delivery takes the id its photo was filed under, keeps the reading, and the supplier
+ * remembers what its docket printed (name and ABN) so the next one is recognised outright.
+ */
 export async function startDelivery(_prev: IntakeState, formData: FormData): Promise<IntakeState> {
   const session = await requireSession();
   const supplierId = String(formData.get('supplier_id') ?? '');
@@ -57,23 +62,109 @@ export async function startDelivery(_prev: IntakeState, formData: FormData): Pro
     return { status: 'error', message: 'Pick a supplier first.' };
   }
 
-  const supabase = await createClient();
-  const { data, error } = await supabase
-    .from('deliveries')
-    .insert({
-      org_id: site.orgId,
-      site_id: site.id,
-      supplier_id: supplierId,
-      received_by: session.userId,
-      received_at: new Date().toISOString(),
-    })
-    .select('id')
-    .single();
+  const requestedId = String(formData.get('delivery_id') ?? '');
+  const deliveryId = z.string().uuid().safeParse(requestedId).success ? requestedId : crypto.randomUUID();
+  // The browser names the photo; it only counts if it sits in this delivery's own folder.
+  const photoPath = String(formData.get('docket_photo_path') ?? '');
+  const docketPhoto = photoPath === docketPhotoPath(site.orgId, site.id, deliveryId) ? photoPath : null;
 
+  let reading = null;
+  const rawReading = String(formData.get('docket_reading') ?? '');
+  if (rawReading) {
+    try {
+      const parsed = DocketReadingInput.safeParse(JSON.parse(rawReading));
+      if (!parsed.success) return { status: 'error', message: 'The docket reading did not make sense. Read it again.' };
+      reading = parsed.data;
+    } catch {
+      return { status: 'error', message: 'The docket reading did not make sense. Read it again.' };
+    }
+  }
+
+  const supabase = await createClient();
+  const { error } = await supabase.from('deliveries').insert({
+    id: deliveryId,
+    org_id: site.orgId,
+    site_id: site.id,
+    supplier_id: supplierId,
+    docket_photo_path: docketPhoto,
+    docket_reading: reading,
+    received_by: session.userId,
+    received_at: new Date().toISOString(),
+  });
+
+  // A second tap on Start, after the first already went through: carry on with that one.
+  if (error?.code === '23505') redirect(`/app/deliveries/${deliveryId}`);
   if (error) return { status: 'error', message: `Could not start the delivery (${error.code ?? 'unknown'}).` };
 
+  if (reading) {
+    const [known, customer] = await Promise.all([
+      knownSuppliers(supabase, site.orgId),
+      customerFor(supabase, session, site),
+    ]);
+    const lessons = docketLessons(reading.text, known, supplierId, customer);
+    // Best effort: the delivery is open either way, and the next docket can teach it again.
+    if (lessons.alias || lessons.abn) {
+      await supabase.rpc('remember_supplier_docket', {
+        p_supplier_id: supplierId,
+        p_alias: lessons.alias,
+        p_abn: lessons.abn,
+      });
+    }
+  }
+
   revalidatePath('/app/deliveries');
-  redirect(`/app/deliveries/${data.id}`);
+  redirect(`/app/deliveries/${deliveryId}`);
+}
+
+type Db = Awaited<ReturnType<typeof createClient>>;
+
+export type { DocketRow, IntakeProduct } from './plan';
+
+/**
+ * The products as intake shows them, each with a proposed expiry. The most recent batch
+ * per product tells us the shelf life this site actually receives, which beats the
+ * catalogue's generic figure.
+ */
+async function intakeProducts(supabase: Db, siteId: string, productIds: string[]): Promise<Map<string, IntakeProduct>> {
+  if (productIds.length === 0) return new Map();
+  const [{ data: products }, { data: lastBatches }] = await Promise.all([
+    supabase
+      .from('products')
+      .select('id, name, brand, size, tracking_mode, default_shelf_life_days')
+      .in('id', productIds),
+    supabase
+      .from('stock_batches')
+      .select('product_id, expiry_date, created_at')
+      .eq('site_id', siteId)
+      .in('product_id', productIds)
+      .not('expiry_date', 'is', null)
+      .order('created_at', { ascending: false }),
+  ]);
+
+  const lastSeen = new Map<string, { receivedOn: string; expiryDate: string }>();
+  for (const batch of lastBatches ?? []) {
+    if (lastSeen.has(batch.product_id) || !batch.expiry_date) continue;
+    lastSeen.set(batch.product_id, {
+      receivedOn: batch.created_at.slice(0, 10),
+      expiryDate: batch.expiry_date,
+    });
+  }
+
+  const receivedOn = today();
+  return new Map((products ?? []).map((product) => [product.id, {
+    productId: product.id,
+    name: product.name,
+    brand: product.brand,
+    size: product.size,
+    trackingMode: product.tracking_mode,
+    proposal: product.tracking_mode === 'batch'
+      ? proposeExpiry({
+          receivedOn,
+          defaultShelfLifeDays: product.default_shelf_life_days,
+          previous: lastSeen.get(product.id) ?? null,
+        })
+      : { date: null, source: 'manual', basis: 'none' },
+  }]));
 }
 
 /**
@@ -112,59 +203,67 @@ export async function suggestLines(deliveryId: string) {
   const suggestions = expectedLines(ordered);
   if (suggestions.length === 0) return { error: null, lines: [] };
 
-  const productIds = suggestions.map((s) => s.productId);
-  const [{ data: products }, { data: lastBatches }] = await Promise.all([
-    supabase
-      .from('products')
-      .select('id, name, brand, size, tracking_mode, default_shelf_life_days')
-      .in('id', productIds),
-    // The most recent batch per product tells us the shelf life this supplier actually
-    // delivers, which beats the catalogue's generic figure.
-    supabase
-      .from('stock_batches')
-      .select('product_id, expiry_date, created_at')
-      .eq('site_id', delivery.site_id)
-      .in('product_id', productIds)
-      .not('expiry_date', 'is', null)
-      .order('created_at', { ascending: false }),
-  ]);
-
-  const catalogue = new Map((products ?? []).map((p) => [p.id, p]));
-  const lastSeen = new Map<string, { receivedOn: string; expiryDate: string }>();
-  for (const batch of lastBatches ?? []) {
-    if (lastSeen.has(batch.product_id) || !batch.expiry_date) continue;
-    lastSeen.set(batch.product_id, {
-      receivedOn: batch.created_at.slice(0, 10),
-      expiryDate: batch.expiry_date,
-    });
-  }
-
-  const receivedOn = today();
+  const products = await intakeProducts(supabase, delivery.site_id, suggestions.map((s) => s.productId));
   const lines = suggestions.flatMap((s) => {
-    const product = catalogue.get(s.productId);
+    const product = products.get(s.productId);
     if (!product) return [];
-    const proposal: ExpiryProposal =
-      product.tracking_mode === 'batch'
-        ? proposeExpiry({
-            receivedOn,
-            defaultShelfLifeDays: product.default_shelf_life_days,
-            previous: lastSeen.get(s.productId) ?? null,
-          })
-        : { date: null, source: 'manual', basis: 'none' };
-
-    return [{
-      productId: s.productId,
-      name: product.name,
-      brand: product.brand,
-      size: product.size,
-      trackingMode: product.tracking_mode,
-      qtyDocketed: s.qtyDocketed,
-      seenInDeliveries: s.seenInDeliveries,
-      proposal,
-    }];
+    return [{ ...product, qtyDocketed: s.qtyDocketed, seenInDeliveries: s.seenInDeliveries }];
   });
 
   return { error: null, lines };
+}
+
+export type DocketVerdict = { text: string; kept: 'kept' | 'joined' | 'dropped'; reason: string | null };
+
+/**
+ * The docket's rows, checked against the catalogue. A row is linked to a product only when
+ * its barcode or name leaves no doubt; otherwise the OCR is trusted, the row keeps the name
+ * the docket prints, and it becomes a new catalogue product when the delivery closes. Null
+ * when this delivery has no reading.
+ */
+export async function docketLines(deliveryId: string) {
+  const session = await requireSession();
+  const resolved = await openDeliveryFor(session, deliveryId);
+  if (!resolved.ok) return null;
+  const { delivery, supabase } = resolved;
+
+  const { data: row } = await supabase.from('deliveries').select('docket_reading').eq('id', delivery.id).single();
+  const reading = readingFrom(row?.docket_reading);
+  if (!reading) return null;
+
+  // This supplier's own products at this site break near-ties between look-alikes.
+  const { data: past } = await supabase
+    .from('deliveries')
+    .select('id')
+    .eq('supplier_id', delivery.supplier_id)
+    .eq('site_id', delivery.site_id)
+    .eq('status', 'closed')
+    .order('closed_at', { ascending: false })
+    .limit(MATCHING_DELIVERIES);
+  const pastIds = (past ?? []).map((d) => d.id);
+  const [catalogue, { data: history }] = await Promise.all([
+    fetchAllPages<CatalogueItem>((from, to) =>
+      supabase.from('products').select('id, name, barcode').order('id').range(from, to)),
+    pastIds.length > 0
+      ? supabase.from('delivery_lines').select('product_id').in('delivery_id', pastIds)
+      : Promise.resolve({ data: [] as { product_id: string }[] }),
+  ]);
+
+  const parsed = parseReading(reading, catalogue, {
+    preferred: [...new Set((history ?? []).map((h) => h.product_id))],
+  });
+
+  const ids = [...new Set(parsed.lines.flatMap((l) => (l.productId ? [l.productId] : [])))];
+  const products = await intakeProducts(supabase, delivery.site_id, ids);
+  const rows = docketRows(parsed.lines, products);
+
+  const verdicts: DocketVerdict[] = parsed.verdicts.map((v) => ({
+    text: v.text,
+    kept: v.kept === true ? 'kept' : v.kept === 'merged' ? 'joined' : 'dropped',
+    reason: v.kept === false ? v.reason : v.kept === 'merged' ? `${v.what} of the row above` : null,
+  }));
+
+  return { engine: reading.engine, rows, verdicts };
 }
 
 /**
@@ -183,12 +282,15 @@ export async function searchProductsForIntake(deliveryId: string, term: string) 
   const query = term.replace(/[,()\\*%]/g, ' ').trim();
   if (query.length < 2) return { error: null, products: [] };
 
-  const { data: matches } = await supabase
+  // Every word must appear somewhere in the name, brand or barcode, so "coca cola zero"
+  // finds "Coca-Cola Zero Sugar" and the order people type words in does not matter.
+  let search = supabase
     .from('products')
-    .select('id, name, brand, size, tracking_mode, default_shelf_life_days')
-    .or(`name.ilike.%${query}%,brand.ilike.%${query}%,barcode.ilike.%${query}%`)
-    .order('name')
-    .limit(25);
+    .select('id, name, brand, size, tracking_mode, default_shelf_life_days');
+  for (const word of query.split(/\s+/).slice(0, 5)) {
+    search = search.or(`name.ilike.%${word}%,brand.ilike.%${word}%,barcode.ilike.%${word}%`);
+  }
+  const { data: matches } = await search.order('name').limit(25);
 
   const found = matches ?? [];
   if (found.length === 0) return { error: null, products: [] };
@@ -249,51 +351,85 @@ export async function closeDelivery(_prev: IntakeState, formData: FormData): Pro
     return { status: 'error', message: 'Those lines did not make sense.' };
   }
 
-  const parsed = z.array(LineInput).safeParse(payload);
+  const parsed = ClosingLines.safeParse(payload);
   if (!parsed.success) return { status: 'error', message: 'Those lines did not make sense.' };
 
-  const received = parsed.data.filter((l) => l.qty_received > 0);
-  if (received.length === 0) {
-    return { status: 'error', message: 'Tick at least one line before closing.' };
+  const record = recordable(parsed.data);
+  if (!record.ok) return { status: 'error', message: record.message };
+  const kept = record.lines;
+
+  // Rows trusted from the docket become this organisation's own products, unless one by that
+  // exact name is already visible to it (shared, or added from an earlier docket).
+  const newProductIds = new Map<string, string>();
+  for (const l of kept) {
+    if (!l.new_product) continue;
+    const key = l.new_product.name.toLowerCase();
+    if (newProductIds.has(key)) continue;
+    const { data: existing } = await supabase
+      .from('products').select('id').ilike('name', l.new_product.name.replace(/[%_\\]/g, '\\$&')).limit(1).maybeSingle();
+    if (existing) {
+      newProductIds.set(key, existing.id);
+      continue;
+    }
+    const { data: created, error: productError } = await supabase
+      .from('products')
+      .insert({
+        name: l.new_product.name,
+        size: readableSize(packOf(normalise(l.new_product.name)).size),
+        tracking_mode: l.new_product.tracking_mode,
+        // The docket's wording is this organisation's, not the shared catalogue's.
+        org_id: delivery.org_id,
+        created_by: session.userId,
+      })
+      .select('id')
+      .single();
+    if (productError || !created) {
+      return { status: 'error', message: `Could not add ${l.new_product.name} to your products (${productError?.code ?? 'unknown'}).` };
+    }
+    newProductIds.set(key, created.id);
   }
+  const received = kept.map((l) => ({
+    ...l,
+    product_id: l.product_id ?? newProductIds.get(l.new_product!.name.toLowerCase())!,
+  }));
 
   const { data: products } = await supabase
     .from('products')
     .select('id, tracking_mode')
-    .in('id', received.map((l) => l.product_id));
+    .in('id', [...new Set(received.map((l) => l.product_id))]);
   const trackingMode = new Map((products ?? []).map((p) => [p.id, p.tracking_mode]));
 
   const docketNumber = String(formData.get('docket_number') ?? '').trim() || null;
 
+  const plan = planDelivery(received, trackingMode);
+
   await supabase.from('delivery_lines').delete().eq('delivery_id', delivery.id);
   const { data: lines, error: lineError } = await supabase
     .from('delivery_lines')
-    .insert(received.map((l) => ({
+    .insert(plan.lines.map((line) => ({
       org_id: delivery.org_id,
       delivery_id: delivery.id,
-      product_id: l.product_id,
-      qty_docketed: l.qty_received,
-      qty_received: l.qty_received,
+      product_id: line.productId,
+      qty_docketed: line.qtyDocketed,
+      qty_received: line.qtyReceived,
     })))
     .select('id, product_id');
 
   if (lineError) return { status: 'error', message: `Could not save the lines (${lineError.code ?? 'unknown'}).` };
 
   const lineByProduct = new Map((lines ?? []).map((l) => [l.product_id, l.id]));
-  const batches = received
-    .filter((l) => trackingMode.get(l.product_id) === 'batch' && l.expiry_date)
-    .map((l) => ({
-      org_id: delivery.org_id,
-      site_id: delivery.site_id,
-      product_id: l.product_id,
-      delivery_line_id: lineByProduct.get(l.product_id) ?? null,
-      expiry_date: l.expiry_date,
-      // A date someone ticked is evidence; one left as proposed is a guess we should
-      // still be able to tell apart later when a write-off needs explaining.
-      expiry_source: l.confirmed ? ('confirmed' as const) : ('predicted' as const),
-      qty_received: l.qty_received,
-      qty_remaining: l.qty_received,
-    }));
+  const batches = plan.batches.map((b) => ({
+    org_id: delivery.org_id,
+    site_id: delivery.site_id,
+    product_id: b.productId,
+    delivery_line_id: lineByProduct.get(b.productId) ?? null,
+    expiry_date: b.expiry,
+    // A date someone ticked is evidence; one left as proposed is a guess we should
+    // still be able to tell apart later when a write-off needs explaining.
+    expiry_source: b.confirmed ? ('confirmed' as const) : ('predicted' as const),
+    qty_received: b.qty,
+    qty_remaining: b.qty,
+  }));
 
   if (batches.length > 0) {
     const { error: batchError } = await supabase.from('stock_batches').insert(batches);

@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import { requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { suggestLines } from '@/lib/intake/actions';
+import { docketLines, suggestLines } from '@/lib/intake/actions';
 import { IntakeClient } from './intake-client';
 
 export default async function DeliveryPage(props: PageProps<'/app/deliveries/[deliveryId]'>) {
@@ -24,11 +24,11 @@ export default async function DeliveryPage(props: PageProps<'/app/deliveries/[de
   if (delivery.status === 'closed') {
     return (
       <div>
-        <Link href="/app/deliveries" className="text-sm text-neutral-500 underline">
+        <Link href="/app/deliveries" className="text-sm text-muted underline">
           ← Deliveries
         </Link>
         <h1 className="mt-3 text-xl font-semibold">{supplierName}</h1>
-        <p className="mt-2 text-sm text-neutral-500">
+        <p className="mt-2 text-sm text-muted">
           This delivery is closed{delivery.docket_number ? ` (docket #${delivery.docket_number})` : ''}.
           Closed dockets are the audit trail, so they are not edited here.
         </p>
@@ -36,7 +36,9 @@ export default async function DeliveryPage(props: PageProps<'/app/deliveries/[de
     );
   }
 
-  const { lines } = await suggestLines(delivery.id);
+  // A docket that was read decides the lines; without one, this supplier's history predicts them.
+  const docket = await docketLines(delivery.id);
+  const { lines } = docket ? { lines: [] } : await suggestLines(delivery.id);
 
   // Staff need to know whether an empty list means "first time from this supplier" or
   // "we predicted nothing" — the two call for different amounts of care.
@@ -47,7 +49,7 @@ export default async function DeliveryPage(props: PageProps<'/app/deliveries/[de
 
   return (
     <div>
-      <Link href="/app/deliveries" className="text-sm text-neutral-500 underline">
+      <Link href="/app/deliveries" className="text-sm text-muted underline">
         ← Deliveries
       </Link>
       <h1 className="mt-3 text-xl font-semibold">{supplierName}</h1>
@@ -61,6 +63,7 @@ export default async function DeliveryPage(props: PageProps<'/app/deliveries/[de
           docketPhotoPath={delivery.docket_photo_path}
           suggested={lines}
           historyNote={historyNote}
+          docket={docket}
         />
       </div>
     </div>

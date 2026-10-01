@@ -97,6 +97,7 @@ export type Database = {
           created_at: string
           docket_number: string | null
           docket_photo_path: string | null
+          docket_reading: Json | null
           id: string
           org_id: string
           received_at: string | null
@@ -111,6 +112,7 @@ export type Database = {
           created_at?: string
           docket_number?: string | null
           docket_photo_path?: string | null
+          docket_reading?: Json | null
           id?: string
           org_id: string
           received_at?: string | null
@@ -125,6 +127,7 @@ export type Database = {
           created_at?: string
           docket_number?: string | null
           docket_photo_path?: string | null
+          docket_reading?: Json | null
           id?: string
           org_id?: string
           received_at?: string | null
@@ -404,6 +407,7 @@ export type Database = {
           default_shelf_life_days: number | null
           id: string
           name: string
+          org_id: string | null
           size: string | null
           tracking_mode: Database["public"]["Enums"]["tracking_mode"]
           updated_at: string
@@ -417,6 +421,7 @@ export type Database = {
           default_shelf_life_days?: number | null
           id?: string
           name: string
+          org_id?: string | null
           size?: string | null
           tracking_mode?: Database["public"]["Enums"]["tracking_mode"]
           updated_at?: string
@@ -430,11 +435,20 @@ export type Database = {
           default_shelf_life_days?: number | null
           id?: string
           name?: string
+          org_id?: string | null
           size?: string | null
           tracking_mode?: Database["public"]["Enums"]["tracking_mode"]
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "products_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profiles: {
         Row: {
@@ -759,29 +773,77 @@ export type Database = {
           },
         ]
       }
+      supplier_aliases: {
+        Row: {
+          alias: string
+          created_at: string
+          created_by: string | null
+          id: string
+          org_id: string
+          supplier_id: string
+        }
+        Insert: {
+          alias: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id: string
+          supplier_id: string
+        }
+        Update: {
+          alias?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          org_id?: string
+          supplier_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "supplier_aliases_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "supplier_aliases_supplier_id_fkey"
+            columns: ["supplier_id"]
+            isOneToOne: false
+            referencedRelation: "suppliers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       suppliers: {
         Row: {
+          abn: string | null
           active: boolean
           contact_note: string | null
           created_at: string
+          created_by: string | null
           id: string
           name: string
           org_id: string
           updated_at: string
         }
         Insert: {
+          abn?: string | null
           active?: boolean
           contact_note?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           name: string
           org_id: string
           updated_at?: string
         }
         Update: {
+          abn?: string | null
           active?: boolean
           contact_note?: string | null
           created_at?: string
+          created_by?: string | null
           id?: string
           name?: string
           org_id?: string
@@ -889,6 +951,13 @@ export type Database = {
         }
         Returns: string
       }
+      add_supplier: {
+        Args: { p_abn?: string | null; p_name: string; p_org_id: string }
+        Returns: {
+          existing: boolean
+          supplier_id: string
+        }[]
+      }
       archive_organisation: {
         Args: { p_confirm_slug: string; p_org_id: string }
         Returns: undefined
@@ -962,6 +1031,10 @@ export type Database = {
       upsert_active_rotation_checks: {
         Args: { p_checks: Json }
         Returns: number
+      }
+      remember_supplier_docket: {
+        Args: { p_abn?: string | null; p_alias: string | null; p_supplier_id: string }
+        Returns: undefined
       }
       remove_empty_site: {
         Args: { p_site_id: string }

@@ -5,8 +5,8 @@ How the app works end-to-end, one line per step. For the code-level map see
 
 1. **Sign in** — user hits `/login`; `getSession()` revalidates via `auth.getUser()` and loads their memberships → routed to their portal (`/app`, `/manage`, `/owner`, `/admin`).
 2. **Every request** — the proxy refreshes the auth cookie; every DB query runs as that user, so Postgres RLS enforces organisation/site isolation.
-3. **Receive a delivery** — staff pick a supplier; `expectedLines()` pre-fills the tick-list from that supplier's past dockets (no template table).
-4. **Confirm lines** — tick what arrived, adjust `qty_received`; photograph the docket to Storage.
+3. **Receive a delivery** — staff photograph the docket to Storage and tap **Read docket** (Textract or the on-device reader); the supplier is recognised from its ABN, a remembered docket name, or its letterhead name (`identifySupplier()`), then confirmed or added. With no docket, staff pick a supplier and `expectedLines()` pre-fills the tick-list from its past dockets.
+4. **Confirm lines** — the list is the docket's product rows (`parseReading()`), linked to catalogue products only when certain and otherwise trusted as printed (new products on close); tick what arrived and adjust `qty_received` against the docket's `qty_docketed`.
 5. **Confirm dates** — `proposeExpiry()` suggests one date per SKU line (from observed supplier shelf life, else catalogue default); staff tap to confirm → one `stock_batch` per line.
 6. **Nightly 02:00 (expiry-engine)** — auth via `x-cron-secret`, read active batches, `planExpiryActions()` assigns one action per batch on the T-30/14/7/3/1 ladder, delete-and-regenerate all `open` `expiry_actions`, upsert today's rotation checks through organisation-locked RPCs that skip archives → write a `job_runs` row.
 7. **Morning 06:00 (daily-digest)** — build each site's summary, recheck the organisation is still active, Web Push to on-shift devices whose subscription belongs to that organisation + email the owner (nothing outstanding → nothing sent).

@@ -287,6 +287,103 @@ async function main() {
       `got ${JSON.stringify(own?.map((m) => m.role))}`);
   }
 
+  console.log('\nproducts added from a docket belong to that organisation:');
+  {
+    const { data: own, error: ownError } = await staff.from('products')
+      .insert({ name: 'RLS Docket Only Product 250ml', org_id: metro.id, tracking_mode: 'batch' })
+      .select('id').single();
+    check('staff can add a product private to their organisation', !ownError && !!own, ownError?.message ?? '');
+
+    const { data: seenByOther } = await other.from('products').select('id').eq('id', own?.id ?? '');
+    check('another organisation cannot see it', (seenByOther?.length ?? 0) === 0,
+      `saw ${seenByOther?.length} rows`);
+
+    const { data: seenByOwner } = await staff.from('products').select('id').eq('id', own?.id ?? '');
+    check('its own organisation can', seenByOwner?.length === 1);
+
+    const { error: planted } = await other.from('products')
+      .insert({ name: 'Planted product', org_id: metro.id, tracking_mode: 'batch' });
+    check('cannot add a product into another organisation', planted !== null,
+      planted ? '' : 'insert unexpectedly succeeded');
+
+    const { data: madeShared } = await staff.from('products')
+      .update({ org_id: united.id }).eq('id', own?.id ?? '').select('id');
+    check('cannot move a private product into another organisation', (madeShared?.length ?? 0) === 0);
+
+    const { data: shared } = await other.from('products').select('id').is('org_id', null).limit(1);
+    check('the shared catalogue is still visible to everyone', (shared?.length ?? 0) === 1);
+
+    if (own) await admin.from('products').delete().eq('id', own.id);
+  }
+
+  console.log('\nsuppliers recognised from dockets:');
+  {
+    // Staff add suppliers mid-delivery through add_supplier(); suppliers_insert still
+    // stops them writing the table directly, so the function is the only way in.
+    const { error: directSupplier } = await staff.from('suppliers')
+      .insert({ org_id: metro.id, name: 'RLS direct supplier' });
+    check('staff cannot insert a supplier directly', directSupplier !== null,
+      directSupplier ? '' : 'insert unexpectedly succeeded');
+
+    // Made up for this suite; cleared first in case an earlier run stopped part-way.
+    const abn = '91999000111';
+    await admin.from('suppliers').delete().eq('org_id', metro.id).or(`abn.eq.${abn},name.ilike.rls docket supplier`);
+    const { data: added, error: addError } = await staff.rpc('add_supplier', {
+      p_org_id: metro.id, p_name: 'RLS Docket Supplier', p_abn: abn,
+    });
+    const supplierId = added?.[0]?.supplier_id;
+    check('staff can add a supplier to their own organisation',
+      !addError && added?.[0]?.existing === false, addError?.message ?? '');
+
+    const { data: sameName } = await staff.rpc('add_supplier', {
+      p_org_id: metro.id, p_name: 'rls docket supplier', p_abn: null,
+    });
+    const { data: sameAbn } = await staff.rpc('add_supplier', {
+      p_org_id: metro.id, p_name: 'Someone Else Entirely', p_abn: abn,
+    });
+    check('the same name or ABN returns the existing supplier, not a duplicate',
+      sameName?.[0]?.supplier_id === supplierId && sameName?.[0]?.existing === true
+        && sameAbn?.[0]?.supplier_id === supplierId && sameAbn?.[0]?.existing === true);
+
+    const { error: foreignAdd } = await other.rpc('add_supplier', {
+      p_org_id: metro.id, p_name: 'Planted supplier', p_abn: null,
+    });
+    check('cannot add a supplier to another organisation', foreignAdd !== null,
+      foreignAdd ? '' : 'rpc unexpectedly succeeded');
+
+    const archived = await signIn('owner@liberty-oil.test');
+    const liberty = orgs!.find((o) => o.slug === 'liberty-oil')!;
+    const { error: archivedAdd } = await archived.rpc('add_supplier', {
+      p_org_id: liberty.id, p_name: 'After archive', p_abn: null,
+    });
+    check('an archived organisation cannot gain suppliers', archivedAdd !== null,
+      archivedAdd ? '' : 'rpc unexpectedly succeeded');
+
+    const { error: rememberError } = await staff.rpc('remember_supplier_docket', {
+      p_supplier_id: supplierId!, p_alias: 'rls docket supplier wholesale', p_abn: null,
+    });
+    const { data: ownAliases } = await staff.from('supplier_aliases').select('alias').eq('supplier_id', supplierId!);
+    check('staff can teach a supplier its docket name',
+      !rememberError && ownAliases?.length === 1, rememberError?.message ?? `got ${ownAliases?.length}`);
+
+    const { data: foreignAliases } = await other.from('supplier_aliases').select('org_id');
+    check('sees no foreign supplier aliases', (foreignAliases ?? []).every((a) => a.org_id === united.id),
+      `got ${foreignAliases?.length} aliases`);
+
+    const { error: foreignRemember } = await other.rpc('remember_supplier_docket', {
+      p_supplier_id: supplierId!, p_alias: 'hijacked name', p_abn: null,
+    });
+    check('cannot teach another organisation\'s supplier a name', foreignRemember !== null,
+      foreignRemember ? '' : 'rpc unexpectedly succeeded');
+
+    const { error: directAlias } = await staff.from('supplier_aliases')
+      .insert({ org_id: metro.id, supplier_id: supplierId!, alias: 'direct alias' });
+    check('aliases are only written through the function', directAlias !== null,
+      directAlias ? '' : 'insert unexpectedly succeeded');
+
+    await admin.from('suppliers').delete().eq('id', supplierId!);
+  }
+
   console.log('\norganisation lifecycle:');
   {
     const platform = await signIn('admin@shelflife.test');
