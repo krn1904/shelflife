@@ -412,6 +412,7 @@ export async function closeDelivery(_prev: IntakeState, formData: FormData): Pro
       product_id: line.productId,
       qty_docketed: line.qtyDocketed,
       qty_received: line.qtyReceived,
+      unit_cost: line.unitCost,
     })))
     .select('id, product_id');
 

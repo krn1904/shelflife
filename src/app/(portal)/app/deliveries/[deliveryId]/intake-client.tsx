@@ -53,6 +53,7 @@ type Row = {
   fromDocket: boolean;
   docketText: string | null;
   unsure: boolean;
+  unitCost?: number | null;
 };
 
 const TRACKING_LABEL: Record<TrackingMode, string> = {
@@ -99,6 +100,7 @@ function fromDocket(row: DocketRow): Row {
     fromDocket: true,
     docketText: row.docketText,
     unsure: row.unsure,
+    unitCost: row.unitCost,
   };
 }
 

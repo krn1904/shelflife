@@ -34,6 +34,8 @@ export type DocketRow = {
   qtyReceived: number;
   /** The reader was unsure of this row's count, or could not find one. */
   unsure: boolean;
+  /** Price of one unit as the docket prints it, when the reader was certain of it. */
+  unitCost: number | null;
   /** The catalogue product this row is, when the docket leaves no doubt. */
   product: IntakeProduct | null;
   /** A catalogue product it might be, offered but never applied on its own. */
@@ -61,6 +63,7 @@ export function docketRows(lines: DocketLine[], products: Map<string, IntakeProd
       qtyDocketed: Math.min(MAX_QTY, line.ordered ?? line.supplied ?? 0),
       qtyReceived: Math.min(MAX_QTY, received ?? 0),
       unsure: Boolean(line.unsure || received === null || line.check === 'disagrees'),
+      unitCost: line.unitPrice ?? null,
       product: sure ? candidate : null,
       suggestion: sure ? null : candidate,
     };
@@ -104,17 +107,20 @@ export const ClosingLines = z.array(z.object({
   qty_docketed: z.union([z.null(), z.coerce.number().int().min(0).max(MAX_QTY)]).default(null),
   expiry_date: z.union([z.null(), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)]),
   confirmed: z.boolean(),
+  // Unit price read off the docket, used to value waste. Null when the docket did not show one.
+  unit_cost: z.union([z.null(), z.coerce.number().nonnegative().max(99999)]).default(null),
 }).refine((l) => (l.product_id === null) !== (l.new_product === null))).max(500);
 
 export type ClosingLine = Counted & {
   product_id: string;
   expiry_date: string | null;
   confirmed: boolean;
+  unit_cost?: number | null;
 };
 
 export type DeliveryPlan = {
   /** One per product: a delivery holds each product once. */
-  lines: { productId: string; qtyDocketed: number; qtyReceived: number }[];
+  lines: { productId: string; qtyDocketed: number; qtyReceived: number; unitCost: number | null }[];
   /** One per received, dated row: two rows of one product can carry two different dates. */
   batches: { productId: string; qty: number; expiry: string; confirmed: boolean }[];
 };
@@ -125,12 +131,14 @@ export type DeliveryPlan = {
  * a batch, and only once someone gave it a date.
  */
 export function planDelivery(lines: ClosingLine[], tracking: Map<string, TrackingMode>): DeliveryPlan {
-  const perProduct = new Map<string, { docketed: number; received: number }>();
+  const perProduct = new Map<string, { docketed: number; received: number; prices: Set<number> }>();
   for (const l of lines) {
-    const sum = perProduct.get(l.product_id) ?? { docketed: 0, received: 0 };
+    const sum = perProduct.get(l.product_id) ?? { docketed: 0, received: 0, prices: new Set<number>() };
+    if (l.unit_cost != null) sum.prices.add(l.unit_cost);
     perProduct.set(l.product_id, {
       docketed: sum.docketed + (l.qty_docketed ?? l.qty_received),
       received: sum.received + l.qty_received,
+      prices: sum.prices,
     });
   }
   return {
@@ -138,6 +146,8 @@ export function planDelivery(lines: ClosingLine[], tracking: Map<string, Trackin
       productId,
       qtyDocketed: Math.min(MAX_QTY, qty.docketed),
       qtyReceived: Math.min(MAX_QTY, qty.received),
+      // One price when the rows agree; two different prices for one product is doubt, so none.
+      unitCost: qty.prices.size === 1 ? [...qty.prices][0] : null,
     })),
     batches: lines.flatMap((l) =>
       l.qty_received > 0 && tracking.get(l.product_id) === 'batch' && l.expiry_date
@@ -161,6 +171,8 @@ export type ScreenRow = {
   /** What the docket said arrived; null when no docket was read. */
   docketed: number | null;
   fromDocket: boolean;
+  /** Unit price from the docket, when it showed one. */
+  unitCost?: number | null;
 };
 
 export const trackingOf = (row: ScreenRow): TrackingMode => row.product?.trackingMode ?? row.newTracking;
@@ -189,5 +201,6 @@ export function intakePayload(rows: ScreenRow[], docketRead: boolean) {
     qty_docketed: docketRead ? r.docketed ?? 0 : null,
     expiry_date: trackingOf(r) === 'batch' && r.ticked ? r.expiry : null,
     confirmed: r.confirmed,
+    unit_cost: r.unitCost ?? null,
   }));
 }

@@ -183,9 +183,9 @@ test('rows of one product add into one line, keeping a batch per dated row', () 
     { product_id: 'bread', qty_received: 8, qty_docketed: null, expiry_date: '2026-10-02', confirmed: true },
   ], tracking);
   assert.deepEqual(plan.lines, [
-    { productId: 'milk', qtyDocketed: 18, qtyReceived: 16 },
+    { productId: 'milk', qtyDocketed: 18, qtyReceived: 16, unitCost: null },
     // No docket read: the count is the docketed figure too.
-    { productId: 'bread', qtyDocketed: 8, qtyReceived: 8 },
+    { productId: 'bread', qtyDocketed: 8, qtyReceived: 8, unitCost: null },
   ]);
   // Rotation stock never gets a batch, even with a date.
   assert.deepEqual(plan.batches, [
@@ -200,8 +200,30 @@ test('no batch for stock that did not arrive or has no date yet', () => {
     { product_id: 'milk', qty_received: 0, qty_docketed: 12, expiry_date: '2026-10-10', confirmed: true },
     { product_id: 'milk', qty_received: 4, qty_docketed: 4, expiry_date: null, confirmed: false },
   ], tracking);
-  assert.deepEqual(plan.lines, [{ productId: 'milk', qtyDocketed: 16, qtyReceived: 4 }]);
+  assert.deepEqual(plan.lines, [{ productId: 'milk', qtyDocketed: 16, qtyReceived: 4, unitCost: null }]);
   assert.deepEqual(plan.batches, []);
+});
+
+test('the docket\'s unit price is kept on the line, unless rows of one product disagree', () => {
+  const plan = planDelivery([
+    { product_id: 'milk', qty_received: 10, qty_docketed: 10, expiry_date: null, confirmed: false, unit_cost: 3.2 },
+    { product_id: 'milk', qty_received: 2, qty_docketed: 2, expiry_date: null, confirmed: false, unit_cost: 3.2 },
+    { product_id: 'chips', qty_received: 5, qty_docketed: 5, expiry_date: null, confirmed: false, unit_cost: 2.1 },
+    { product_id: 'chips', qty_received: 5, qty_docketed: 5, expiry_date: null, confirmed: false, unit_cost: 2.4 },
+    { product_id: 'bread', qty_received: 4, qty_docketed: 4, expiry_date: null, confirmed: false },
+  ], new Map());
+  assert.deepEqual(plan.lines.map((l) => [l.productId, l.unitCost]), [['milk', 3.2], ['chips', null], ['bread', null]]);
+});
+
+test('a docket row carries its unit price through to what intake sends', () => {
+  const rows = docketRows([line(0, 'Mystery Kombucha 330ml', { unitPrice: 4.5 })], productsOf());
+  assert.equal(rows[0].unitCost, 4.5);
+  const [sent] = intakePayload([{
+    product: null, name: rows[0].name, newTracking: 'batch', ticked: true, qty: 5,
+    expiry: null, confirmed: false, docketed: 5, fromDocket: true, unitCost: rows[0].unitCost,
+  }], true);
+  assert.equal(sent.unit_cost, 4.5);
+  assert.equal(ClosingLines.parse([sent])[0].unit_cost, 4.5);
 });
 
 test('line totals are capped at what a delivery line can hold', () => {
@@ -209,7 +231,7 @@ test('line totals are capped at what a delivery line can hold', () => {
     { product_id: 'milk', qty_received: 9000, qty_docketed: 9000, expiry_date: null, confirmed: false },
     { product_id: 'milk', qty_received: 9000, qty_docketed: 9000, expiry_date: null, confirmed: false },
   ], new Map());
-  assert.deepEqual(plan.lines, [{ productId: 'milk', qtyDocketed: 9999, qtyReceived: 9999 }]);
+  assert.deepEqual(plan.lines, [{ productId: 'milk', qtyDocketed: 9999, qtyReceived: 9999, unitCost: null }]);
 });
 
 // ---------------------------------------------------------------------------------------
