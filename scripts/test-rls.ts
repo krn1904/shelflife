@@ -409,6 +409,51 @@ async function main() {
     await admin.from('suppliers').delete().eq('id', supplierId!);
   }
 
+  console.log('\nreminder settings and Today answers:');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    // Cleared first in case an earlier run stopped part-way.
+    await admin.from('reminder_settings').delete().in('site_id', [brunswick.id, coburg.id]);
+
+    const brunswickManager = await signIn('manager@metro-petroleum.test');
+    const { error: ownSave } = await brunswickManager.from('reminder_settings')
+      .insert({ site_id: brunswick.id, org_id: metro.id, short_max_days: 14 });
+    check('a manager can save their own site\'s reminder settings', ownSave === null, ownSave?.message ?? '');
+
+    const { error: otherSiteSave } = await brunswickManager.from('reminder_settings')
+      .insert({ site_id: coburg.id, org_id: metro.id });
+    check('but not another site\'s, even in the same organisation', otherSiteSave !== null,
+      otherSiteSave ? '' : 'insert unexpectedly succeeded');
+
+    const { data: staffEdit } = await staff.from('reminder_settings')
+      .update({ short_max_days: 30 }).eq('site_id', brunswick.id).select('site_id');
+    check('staff can read but not change them', (staffEdit?.length ?? 0) === 0,
+      `updated ${staffEdit?.length} rows`);
+
+    const { data: foreignSettings } = await other.from('reminder_settings').select('site_id').eq('site_id', brunswick.id);
+    check('another organisation cannot see them', (foreignSettings?.length ?? 0) === 0);
+
+    const { error: plantedSettings } = await other.from('reminder_settings')
+      .insert({ site_id: coburg.id, org_id: united.id });
+    check('nor file settings against a foreign site under its own org_id', plantedSettings !== null,
+      plantedSettings ? '' : 'insert unexpectedly succeeded');
+
+    // A Today answer closes a batch, so it must never reach another tenant's stock.
+    const { data: theirBatch } = await admin.from('stock_batches')
+      .select('id').eq('org_id', united.id).eq('status', 'active').limit(1).single();
+    const { error: foreignAnswer } = await staff.rpc('resolve_batch_step', {
+      p_batch_id: theirBatch!.id, p_step: 'sold',
+    });
+    const { data: stillActive } = await admin.from('stock_batches').select('status').eq('id', theirBatch!.id).single();
+    check('cannot answer a reminder for another organisation\'s batch',
+      foreignAnswer !== null && stillActive?.status === 'active',
+      foreignAnswer ? '' : `rpc succeeded; batch is ${stillActive?.status}`);
+
+    await admin.from('reminder_settings').delete().in('site_id', [brunswick.id, coburg.id]);
+  }
+
   console.log('\norganisation lifecycle:');
   {
     const platform = await signIn('admin@shelflife.test');
