@@ -33,7 +33,7 @@ src/
   app/                         Next.js App Router
     (portal)/                  authenticated shell; layout gates the session
       app/                       staff PWA  — deliveries, today, scan, waste, settings
-      manage/                    manager    — expiry board, waste, products
+      manage/                    manager    — delivery review, expiry board, waste, products
       owner/                     owner      — multi-site rollup + CSV export route
       admin/                     platform admin — organisations, lifecycle, job history
     login/                     one public route (+ demo one-click logins)

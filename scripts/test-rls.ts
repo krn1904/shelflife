@@ -287,6 +287,31 @@ async function main() {
       `got ${JSON.stringify(own?.map((m) => m.role))}`);
   }
 
+  console.log('\nmanagers review only their own site\'s deliveries:');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    const { count: coburgDeliveries } = await admin
+      .from('deliveries').select('*', { count: 'exact', head: true }).eq('site_id', coburg.id);
+
+    const brunswickManager = await signIn('manager@metro-petroleum.test');
+    const { data: seenFromBrunswick } = await brunswickManager.from('deliveries').select('site_id');
+    check('the Brunswick manager sees deliveries, all of them Brunswick\'s',
+      (seenFromBrunswick?.length ?? 0) > 0 && seenFromBrunswick!.every((d) => d.site_id === brunswick.id),
+      `saw ${seenFromBrunswick?.length} deliveries`);
+
+    const coburgManager = await signIn('coburg.manager@metro-petroleum.test');
+    const { data: seenFromCoburg } = await coburgManager.from('deliveries').select('site_id');
+    check('the Coburg manager sees exactly Coburg\'s deliveries',
+      (seenFromCoburg?.length ?? 0) === (coburgDeliveries ?? -1) && seenFromCoburg!.every((d) => d.site_id === coburg.id),
+      `saw ${seenFromCoburg?.length} of ${coburgDeliveries}`);
+
+    const { data: oneCoburg } = await admin.from('deliveries').select('id').eq('site_id', coburg.id).limit(1).single();
+    const { data: lines } = await brunswickManager.from('delivery_lines').select('id').eq('delivery_id', oneCoburg!.id);
+    check('nor the lines of another site\'s delivery', (lines?.length ?? 0) === 0, `saw ${lines?.length} lines`);
+  }
+
   console.log('\nproducts added from a docket belong to that organisation:');
   {
     const { data: own, error: ownError } = await staff.from('products')
