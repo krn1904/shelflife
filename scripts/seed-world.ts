@@ -797,7 +797,10 @@ export function buildWorld(now: Date): World {
     const open = planExpiryActions(
       plan.batches
         .filter((b) => b.status === 'active' && b.qty_remaining > 0)
-        .map((b) => ({ id: b.id!, orgId, siteId: b.site_id, expiryDate: b.expiry_date ?? null })),
+        .map((b) => ({
+          id: b.id!, orgId, siteId: b.site_id, expiryDate: b.expiry_date ?? null,
+          arrivedOn: melbourneDate(new Date(b.created_at!)), checked: false, markedDown: false,
+        })),
       endDay,
     );
     for (const action of open) {

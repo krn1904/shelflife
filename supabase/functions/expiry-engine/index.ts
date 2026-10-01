@@ -9,12 +9,15 @@
 
 import { createClient } from '@supabase/supabase-js';
 import {
-  HORIZON_DAYS,
+  localDate,
   planExpiryActions,
   planRotationChecks,
+  settingsFromRow,
   type BatchRow,
   type FixtureRow,
   type JobResult,
+  type ReminderSettings,
+  type ReminderSettingsRow,
 } from '../_shared/engine.ts';
 import { effectiveTrackingMode } from '../_shared/tracking.ts';
 import { fetchAllPages } from '../_shared/pagination.ts';
@@ -33,16 +36,11 @@ function chunks<T>(rows: T[], size = WRITE_CHUNK_SIZE): T[][] {
 
 /**
  * "Today" has to be the store's today, not UTC's. A run at 02:00 Melbourne is still the
- * previous day in UTC for most of the year, and using the UTC date would shift the whole
- * ladder by one — pulling stock a day late, every day, invisibly.
+ * previous day in UTC for most of the year, and using the UTC date would shift every
+ * reminder by one — pulling stock a day late, every day, invisibly.
  */
 function todayAt(timeZone: string): string {
-  return new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-  }).format(new Date());
+  return localDate(new Date().toISOString(), timeZone);
 }
 
 Deno.serve(async (request: Request) => {
@@ -73,10 +71,13 @@ Deno.serve(async (request: Request) => {
       org_id: string;
       site_id: string;
       expiry_date: string | null;
+      created_at: string;
+      checked_at: string | null;
+      marked_down_at: string | null;
     }>((from, to) =>
       supabase
         .from('stock_batches')
-        .select('id, org_id, site_id, expiry_date, orgs!inner(status)')
+        .select('id, org_id, site_id, expiry_date, created_at, checked_at, marked_down_at, orgs!inner(status)')
         .eq('orgs.status', 'active')
         .eq('status', 'active')
         .gt('qty_remaining', 0)
@@ -90,9 +91,21 @@ Deno.serve(async (request: Request) => {
       orgId: b.org_id,
       siteId: b.site_id,
       expiryDate: b.expiry_date,
+      // A batch is written when its delivery closes, so created_at is its arrival day.
+      arrivedOn: localDate(b.created_at, SITE_TIMEZONE),
+      checked: b.checked_at !== null,
+      markedDown: b.marked_down_at !== null,
     }));
 
-    const planned = planExpiryActions(rows, today);
+    // Each site's own reminder plan. Sites without a row get the defaults in the engine.
+    const settingsRows = await fetchAllPages<ReminderSettingsRow & { site_id: string }>((from, to) =>
+      supabase.from('reminder_settings').select('*').order('site_id').range(from, to)
+    );
+    const settingsBySite = new Map<string, ReminderSettings>(
+      settingsRows.map((r) => [r.site_id, settingsFromRow(r)]),
+    );
+
+    const planned = planExpiryActions(rows, today, settingsBySite);
     result.skipped = rows.length - planned.length;
 
     // Delete and regenerate rather than diff. A few thousand rows recompute in
@@ -169,7 +182,7 @@ Deno.serve(async (request: Request) => {
       }
     }
 
-    result.reason = `${planned.length} actions, ${checks.length} rotation checks, horizon ${HORIZON_DAYS}d`;
+    result.reason = `${planned.length} actions, ${checks.length} rotation checks, ${settingsBySite.size} sites with own reminder settings`;
   } catch (error) {
     result.ok = false;
     result.reason = error instanceof Error ? error.message : String(error);
