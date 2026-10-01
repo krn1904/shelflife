@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { differenceInCalendarDays, parseISO, subMonths } from 'date-fns';
 import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
@@ -64,7 +65,8 @@ export default async function ManagePage() {
 
       <div>
         <SectionTitle>Manage</SectionTitle>
-        <div className="grid gap-3 sm:grid-cols-3">
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <QuickAction href="/manage/deliveries" title="Deliveries" hint="What staff received, and what came short" />
           <QuickAction href="/manage/waste" title="Waste" hint="Log and review write-offs" />
           <QuickAction href="/manage/products" title="Products & ranging" hint="Par levels, fixtures, tracking modes" />
           <QuickAction href="/manage/expiry" title="Expiry board" hint="Everything dated, by days left" />
@@ -72,17 +74,21 @@ export default async function ManagePage() {
       </div>
 
       <div>
-        <SectionTitle>Recent deliveries</SectionTitle>
+        <SectionTitle actions={<Link href="/manage/deliveries" className="text-sm text-muted hover:text-ink">All deliveries →</Link>}>
+          Recent deliveries
+        </SectionTitle>
         <ul className="card divide-y divide-line overflow-hidden">
           {(recent ?? []).map((d) => (
-            <li key={d.id} className="flex flex-wrap items-baseline gap-3 px-4 py-2.5 text-sm">
-              <span className="font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
-              {d.docket_number && (
-                <span className="font-mono text-xs text-faint">#{d.docket_number}</span>
-              )}
-              <span className="ml-auto text-xs text-muted">
-                {d.closed_at ? new Date(d.closed_at).toLocaleDateString('en-AU') : '—'}
-              </span>
+            <li key={d.id}>
+              <Link href={`/manage/deliveries/${d.id}`} className="flex flex-wrap items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-surface-2">
+                <span className="font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
+                {d.docket_number && (
+                  <span className="font-mono text-xs text-faint">#{d.docket_number}</span>
+                )}
+                <span className="ml-auto text-xs text-muted">
+                  {d.closed_at ? new Date(d.closed_at).toLocaleDateString('en-AU') : '—'}
+                </span>
+              </Link>
             </li>
           ))}
           {(recent ?? []).length === 0 && (

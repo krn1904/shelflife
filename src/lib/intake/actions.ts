@@ -9,7 +9,7 @@ import { fetchAllPages } from '@/lib/pagination';
 import { expectedLines, type HistoryLine } from './expected-lines';
 import { proposeExpiry, today, type ExpiryProposal } from './expiry';
 import { normalise, packOf, type CatalogueItem } from './docket/parse';
-import { ClosingLines, docketRows, MAX_QTY, planDelivery, readableSize, recordable, type IntakeProduct } from './plan';
+import { ClosingLines, docketRows, planDelivery, readableSize, recordable, type IntakeProduct } from './plan';
 import { docketPhotoPath, parseReading, readingFrom, DocketReadingInput } from './docket/reading';
 import { docketLessons } from './docket/supplier';
 import { customerFor, knownSuppliers } from './suppliers';

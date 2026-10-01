@@ -95,6 +95,20 @@ enumerates exactly what arrived.
 
 Target: a repeat delivery from a known supplier closes in under 60 seconds.
 
+### Reviewing deliveries
+
+A manager (or an owner, per site) checks what staff received under **Site → Deliveries**:
+
+1. **What is still open**, with who started it and for how long, since a delivery nobody closed
+   records no stock.
+2. **What closed**, filtered by date range and supplier, with each delivery marked as received
+   as docketed or short (and how many lines never arrived).
+3. **One delivery in full:** who received it and when (in the store's time), each line's
+   docketed against received quantity, the expiry dates entered and whether someone checked
+   them, items first added from a docket, the docket photo, and what the reader found on it.
+
+The review is read-only: the saved lines are the record.
+
 ### The daily action list
 
 A scheduled job runs overnight and rebuilds the action list from current stock. Each morning the

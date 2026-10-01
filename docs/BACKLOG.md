@@ -17,6 +17,11 @@ supplier list.
   onto the surviving supplier).
 - Review suppliers that staff created during intake, since staff can add one from a docket.
 
+**Partly done (2026-09-30):** Site → Deliveries lists deliveries by supplier and date with
+docketed against received quantities, so a supplier's short deliveries show up (filter by the
+supplier). Still open: a per-supplier summary page, supplier upkeep (rename, deactivate,
+merge) and reviewing suppliers staff created.
+
 **Already in place:** suppliers carry an optional ABN and a list of printed-name aliases,
 which intake uses to recognise a supplier from its docket
 ([docs/ARCHITECTURE.md](ARCHITECTURE.md), docket-driven intake). There is currently no screen
