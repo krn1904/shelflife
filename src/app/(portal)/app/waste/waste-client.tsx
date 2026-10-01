@@ -51,6 +51,9 @@ export function WasteClient({
         <p className="mt-1 text-sm text-neutral-500">
           {siteName ? `Writing off at ${siteName}.` : 'No site assigned to you yet.'}
         </p>
+        <p className="mt-1 text-sm text-neutral-500">
+          For damaged, spoiled or recalled stock. Expired stock is answered on Today&apos;s list.
+        </p>
       </div>
 
       {!initialBatchId && <BarcodeScanner onScan={onScan} disabled={pending} />}
@@ -120,7 +123,7 @@ export function WasteClient({
               <select
                 id="reason"
                 name="reason"
-                defaultValue="expired"
+                defaultValue="damaged"
                 className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
               >
                 {WASTE_REASONS.map((r) => (

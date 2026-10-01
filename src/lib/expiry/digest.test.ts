@@ -13,8 +13,8 @@ test('leads with the pull count, which is the number that costs money', () => {
     ],
     rotationFixtures: 2,
   });
-  assert.equal(digest.title, 'Brunswick: 2 lines to pull');
-  assert.equal(digest.body, '2 lines to pull, 1 line to mark down, 1 line to check, 2 fixtures to walk · 1 already past date');
+  assert.equal(digest.title, 'Brunswick: 2 lines on their last day');
+  assert.equal(digest.body, '2 lines on their last day, 1 line to put on half price, 1 line to check, 2 fixtures to walk · 1 already past date');
 });
 
 test('singular and plural both read correctly', () => {
@@ -23,7 +23,7 @@ test('singular and plural both read correctly', () => {
     actions: [{ action: 'pull', daysLeft: 0 }],
     rotationFixtures: 1,
   });
-  assert.equal(one.title, 'Coburg: 1 line to pull');
+  assert.equal(one.title, 'Coburg: 1 line on its last day');
   assert.ok(one.body.includes('1 fixture to walk'));
 });
 
