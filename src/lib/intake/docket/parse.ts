@@ -478,7 +478,10 @@ function roleOf(heading: string): ColumnRole {
   if (/#|\bno\.?$|\bnumber\b/.test(t)) return null;
   if (/\bproduct\b/.test(t)) return 'description';
   // Money columns, checked before quantities so "Unit Price" is not read as a units count.
-  if (/\b(amount|amt|total|ext\w*|value|nett?)\b/.test(t) && !/\b(qty|quantity|units?|ctns?|cartons?)\b/.test(t)) return 'amount';
+  // A quantity word wins ("Total Delivered", "Total Qty"); "Order Total" is still money.
+  const countWord = t.split(/[\s/|.]+/).some((word) =>
+    COLUMN_WORDS.some(([column, re]) => column !== 'ordered' && re.test(word.replace(/[^a-z]/g, ''))));
+  if (/\b(amount|amt|total|ext\w*|value|nett?)\b/.test(t) && !countWord) return 'amount';
   if (/\bunit\s*(price|cost)\b|\b(price|cost)\s*(ea|each|per\b.*)\b|\brate\b/.test(t)) return 'unitPrice';
   if (/\b(price|cost)\b/.test(t)) return 'price';
   for (const word of t.split(/[\s/|.]+/)) {

@@ -222,12 +222,25 @@ test('table: a price that does not match its amount is dropped, not guessed', ()
   assert.equal(lines[0].unitPrice, null);
 });
 
-test('table: "Total Qty" is a quantity heading, not money', () => {
+test('table: "Total Qty" and "Total Delivered" are quantity headings, not money', () => {
+  for (const heading of ['Total Qty', 'Total Delivered', 'Total Supplied']) {
+    const { lines } = parseDocketTable(grid([
+      ['Description', heading],
+      ['Pura Milk Full Cream 2L', '12'],
+    ]), fixtures.catalogue);
+    assert.equal(lines[0].supplied, 12, heading);
+  }
+  // Cases are a carton count, not money either.
+  const cases = parseDocketTable(grid([['Description', 'Total Cases'], ['Pura Milk Full Cream 2L', '12']]), fixtures.catalogue);
+  assert.equal(cases.lines[0].cartons, 12);
+});
+
+test('table: "Order Total" is money, and proves the unit price beside it', () => {
   const { lines } = parseDocketTable(grid([
-    ['Description', 'Total Qty'],
-    ['Pura Milk Full Cream 2L', '12'],
+    ['Description', 'Qty', 'Price', 'Order Total'],
+    ['Pura Milk Full Cream 2L', '12', '3.20', '38.40'],
   ]), fixtures.catalogue);
-  assert.equal(lines[0].supplied, 12);
+  assert.deepEqual([lines[0].supplied, lines[0].unitPrice], [12, 3.2]);
 });
 
 test('tells a product table from a letterhead table', () => {
