@@ -32,8 +32,15 @@ export function newClientId(): string {
   return crypto.randomUUID();
 }
 
-export async function enqueue(kind: OutboxKind, payload: Record<string, unknown>): Promise<string> {
-  const clientId = newClientId();
+// Fired whenever the queue gains an entry, so the "pending" strip updates at once.
+export const OUTBOX_CHANGED = 'shelflife:outbox-changed';
+
+/** Queues a change. Pass the id an online attempt already used, so a retry stays idempotent. */
+export async function enqueue(
+  kind: OutboxKind,
+  payload: Record<string, unknown>,
+  clientId: string = newClientId(),
+): Promise<string> {
   await database().entries.put({
     clientId,
     kind,
@@ -42,6 +49,7 @@ export async function enqueue(kind: OutboxKind, payload: Record<string, unknown>
     attempts: 0,
     lastError: null,
   });
+  window.dispatchEvent(new Event(OUTBOX_CHANGED));
   return clientId;
 }
 

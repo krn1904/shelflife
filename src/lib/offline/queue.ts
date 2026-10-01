@@ -8,7 +8,7 @@
  * key, and replay order is preserved so a decrement never overtakes the write it depends on.
  */
 
-export type OutboxKind = 'waste' | 'action-state' | 'rotation-check';
+export type OutboxKind = 'waste' | 'action-state' | 'rotation-check' | 'batch-step';
 
 export type OutboxEntry = {
   /** Generated on the device, before the write is attempted. The idempotency key. */

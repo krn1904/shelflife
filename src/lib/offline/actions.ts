@@ -26,8 +26,15 @@ const StatePayload = z.object({
   state: z.enum(['done', 'dismissed']),
 });
 
+const BatchStepPayload = z.object({
+  batch_id: z.string().uuid(),
+  step: z.enum(['checked', 'marked_down', 'sold', 'pulled']),
+  qty: z.union([z.null(), z.coerce.number().int().min(0).max(9999)]),
+});
+
 // Postgres classes we know will be rejected identically on every retry.
-const PERMANENT_CODES = new Set(['23514', '23503', '22P02', '42501', 'PGRST116']);
+// P0002 is "batch not found": gone, or another organisation's.
+const PERMANENT_CODES = new Set(['23514', '23503', '22P02', '42501', 'PGRST116', 'P0002']);
 
 function permanent(message: string): ReplayReply {
   return { ok: false, permanent: true, message };
@@ -64,6 +71,29 @@ export async function replayOutboxEntry(
       return { ok: false, permanent: isPermanent, message: error.message };
     }
 
+    revalidatePath('/app/today');
+    return { ok: true };
+  }
+
+  if (kind === 'batch-step') {
+    const parsed = BatchStepPayload.safeParse(payload);
+    if (!parsed.success) return permanent('That queued answer was malformed.');
+
+    // client_id makes a replayed "pulled" write its waste once; the other steps are
+    // naturally safe to repeat.
+    const { error } = await supabase.rpc('resolve_batch_step', {
+      p_batch_id: parsed.data.batch_id,
+      p_step: parsed.data.step,
+      p_qty: parsed.data.qty ?? undefined,
+      p_client_id: clientId,
+    });
+
+    if (error) {
+      const isPermanent = PERMANENT_CODES.has(error.code ?? '') || error.message.includes('cannot pull');
+      return { ok: false, permanent: isPermanent, message: error.message };
+    }
+
+    revalidatePath('/app');
     revalidatePath('/app/today');
     return { ok: true };
   }

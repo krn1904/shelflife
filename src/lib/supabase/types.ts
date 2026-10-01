@@ -12,6 +12,7 @@ export type ExpirySource = Enums<'expiry_source'>;
 export type BatchStatus = Enums<'batch_status'>;
 export type ActionState = Enums<'action_state'>;
 export type ExpiryActionKind = Enums<'expiry_action_kind'>;
+export type BatchStep = Enums<'batch_step'>;
 export type WasteReason = Enums<'waste_reason'>;
 
 export type Org = Tables<'orgs'>;

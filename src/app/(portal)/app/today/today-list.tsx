@@ -1,18 +1,19 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import Link from 'next/link';
-import { setActionState, setRotationCheckState } from '@/lib/expiry/actions';
-import type { ExpiryActionKind } from '@/lib/supabase/types';
+import { setRotationCheckState } from '@/lib/expiry/actions';
+import { sendOrQueue } from '@/lib/offline/send';
+import { CARD_TITLE, cardInstruction } from '@/lib/expiry/today';
+import { SectionTitle } from '@/components/ui';
+import type { BatchStep, ExpiryActionKind } from '@/lib/supabase/types';
 
 export type TodayItem = {
   id: string;
   batchId: string;
   action: ExpiryActionKind;
-  actionLabel: string;
-  dueDate: string;
   daysLeft: number;
   qtyRemaining: number;
+  markedDownOn: string | null;
   name: string;
   detail: string;
 };
@@ -20,45 +21,34 @@ export type TodayItem = {
 export type FixtureCheck = { id: string; fixture: string; done: boolean };
 
 const TONE: Record<ExpiryActionKind, string> = {
-  pull: 'border-red-300 bg-red-50',
-  markdown: 'border-amber-300 bg-amber-50',
-  check: 'border-neutral-200',
+  pull: 'border-critical bg-critical-soft',
+  markdown: 'border-warning bg-warning-soft',
+  check: '',
 };
 
-function whenText(daysLeft: number): string {
-  if (daysLeft < 0) return `${Math.abs(daysLeft)} ${Math.abs(daysLeft) === 1 ? 'day' : 'days'} ago`;
-  if (daysLeft === 0) return 'today';
-  return `in ${daysLeft} ${daysLeft === 1 ? 'day' : 'days'}`;
-}
-
 /**
- * The shift's whole list in one screen: dated stock that needs a decision, then the
- * fixtures to walk past. Rotation stock has no dates at all, so without the second list
- * it would simply never be surfaced — that is the trade the tracking modes make.
+ * The shift's whole list: dated stock that needs an answer, then fixtures to walk past.
+ *
+ * Every answer is one tap (plus a count when binning). It works without signal: the
+ * answer is kept on the phone and sent when the connection returns.
  */
-export function TodayList({
-  items,
-  fixtures,
-}: {
-  items: TodayItem[];
-  fixtures: FixtureCheck[];
-}) {
+export function TodayList({ items, fixtures }: { items: TodayItem[]; fixtures: FixtureCheck[] }) {
   const [hidden, setHidden] = useState<Set<string>>(new Set());
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [error, setError] = useState<string | null>(null);
   const [, startTransition] = useTransition();
 
-  function resolve(id: string, state: 'done' | 'dismissed') {
-    // Hide it immediately — staff are standing at the shelf, and waiting on a round trip
-    // before the row disappears is how a list gets double-actioned.
-    setHidden((prev) => new Set(prev).add(id));
+  function answer(item: TodayItem, step: BatchStep, qty: number | null = null) {
+    // Hide at once: staff are at the shelf, and a card that lingers gets tapped twice.
+    setHidden((prev) => new Set(prev).add(item.id));
+    setError(null);
     startTransition(async () => {
-      const result = await setActionState(id, state);
+      const result = await sendOrQueue('batch-step', { batch_id: item.batchId, step, qty });
       if (result.status === 'error') {
-        setError(result.message);
+        setError(`${item.name}: ${result.message}`);
         setHidden((prev) => {
           const next = new Set(prev);
-          next.delete(id);
+          next.delete(item.id);
           return next;
         });
       }
@@ -85,72 +75,31 @@ export function TodayList({
   return (
     <div className="space-y-8">
       {error && (
-        <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p role="alert" className="rounded-lg border border-critical bg-critical-soft px-3 py-2 text-sm text-critical-ink">
           {error}
         </p>
       )}
 
       <section>
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Dated stock ({visible.length})
-        </h2>
-
-        <ul className="mt-2 space-y-2">
+        <SectionTitle>Dated stock ({visible.length})</SectionTitle>
+        <ul className="space-y-2">
           {visible.map((item) => (
-            <li key={item.id} className={`rounded border px-4 py-3 ${TONE[item.action]}`}>
-              <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-                <span className="text-sm font-semibold">{item.actionLabel}</span>
-                <span className="text-sm">{item.name}</span>
-                <span className="text-xs text-neutral-500">{item.detail}</span>
-                <span className="ml-auto text-xs text-neutral-600">
-                  {item.qtyRemaining} left · expires {whenText(item.daysLeft)}
-                </span>
-              </div>
-
-              <div className="mt-2 flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={() => resolve(item.id, 'done')}
-                  className="rounded bg-neutral-900 px-3 py-1.5 text-xs font-medium text-white"
-                >
-                  Done
-                </button>
-                {item.action === 'pull' && (
-                  <Link
-                    href={`/app/waste?batch=${item.batchId}`}
-                    className="rounded border border-neutral-400 px-3 py-1.5 text-xs font-medium"
-                  >
-                    Pull &amp; record waste
-                  </Link>
-                )}
-                <button
-                  type="button"
-                  onClick={() => resolve(item.id, 'dismissed')}
-                  className="rounded px-3 py-1.5 text-xs text-neutral-600 underline"
-                >
-                  Not here
-                </button>
-              </div>
-            </li>
+            <ReminderCard key={item.id} item={item} onAnswer={answer} />
           ))}
-
           {visible.length === 0 && (
-            <li className="rounded border border-neutral-200 px-4 py-3 text-sm text-neutral-500">
-              Nothing dated needs attention. The engine reruns overnight.
+            <li className="card px-4 py-3 text-sm text-muted">
+              Nothing dated needs attention. The list is rebuilt overnight.
             </li>
           )}
         </ul>
       </section>
 
       <section>
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Fixtures to check
-        </h2>
-        <p className="mt-1 text-xs text-neutral-500">
+        <SectionTitle>Fixtures to check</SectionTitle>
+        <p className="-mt-1 mb-2 text-xs text-muted">
           Short-life stock is rotated by eye, so these are a walk-past rather than a scan.
         </p>
-
-        <ul className="mt-2 divide-y divide-neutral-200 rounded border border-neutral-200">
+        <ul className="card divide-y divide-line">
           {fixtures.map((f) => {
             const done = f.done || ticked.has(f.id);
             return (
@@ -161,23 +110,93 @@ export function TodayList({
                   disabled={done}
                   onChange={() => tickFixture(f.id)}
                   aria-label={`Checked ${f.fixture}`}
-                  className="size-5"
+                  className="size-5 accent-brand"
                 />
-                <span className={`text-sm ${done ? 'text-neutral-400 line-through' : ''}`}>
-                  {f.fixture}
-                </span>
+                <span className={`text-sm ${done ? 'text-faint line-through' : ''}`}>{f.fixture}</span>
               </li>
             );
           })}
-
           {fixtures.length === 0 && (
-            <li className="px-4 py-3 text-sm text-neutral-500">
-              No fixtures set up. A manager assigns one to each rotation product from the
-              Site portal, and the list builds itself overnight.
+            <li className="px-4 py-3 text-sm text-muted">
+              No fixtures set up. A manager assigns one to each rotation product from the Site
+              portal, and the list builds itself overnight.
             </li>
           )}
         </ul>
       </section>
     </div>
+  );
+}
+
+/** One reminder and its answers. Last-day cards also ask how many are being binned. */
+function ReminderCard({
+  item,
+  onAnswer,
+}: {
+  item: TodayItem;
+  onAnswer: (item: TodayItem, step: BatchStep, qty?: number | null) => void;
+}) {
+  const [left, setLeft] = useState(String(item.qtyRemaining));
+  const leftCount = Number(left);
+  const leftValid = left !== '' && Number.isInteger(leftCount) && leftCount >= 0 && leftCount <= item.qtyRemaining;
+
+  return (
+    <li className={`card px-4 py-3 ${TONE[item.action]}`}>
+      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <span className="text-sm font-semibold">{CARD_TITLE[item.action]}</span>
+        <span className="text-sm">{item.name}</span>
+        {item.detail && <span className="text-xs text-muted">{item.detail}</span>}
+        <span className="ml-auto text-xs text-muted">{item.qtyRemaining} in stock</span>
+      </div>
+      <p className="mt-1 text-sm text-muted">{cardInstruction(item)}</p>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        {item.action === 'check' && (
+          <button type="button" className="btn btn-primary" onClick={() => onAnswer(item, 'checked')}>
+            Checked
+          </button>
+        )}
+
+        {item.action === 'markdown' && (
+          <>
+            <button type="button" className="btn btn-primary" onClick={() => onAnswer(item, 'marked_down')}>
+              Reduced price
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => onAnswer(item, 'sold')}>
+              Gone (sold)
+            </button>
+          </>
+        )}
+
+        {item.action === 'pull' && (
+          <>
+            <label className="flex items-center gap-2 text-sm">
+              Left on shelf
+              <input
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={item.qtyRemaining}
+                value={left}
+                onChange={(e) => setLeft(e.target.value)}
+                className="field w-20"
+                aria-label={`How many ${item.name} are left on the shelf`}
+              />
+            </label>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={!leftValid}
+              onClick={() => onAnswer(item, 'pulled', leftCount)}
+            >
+              Pulled out
+            </button>
+            <button type="button" className="btn btn-outline" onClick={() => onAnswer(item, 'sold')}>
+              Sold (none left)
+            </button>
+          </>
+        )}
+      </div>
+    </li>
   );
 }

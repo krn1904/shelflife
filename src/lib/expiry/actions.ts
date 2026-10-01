@@ -17,35 +17,6 @@ const WasteInput = z.object({
   note: z.union([z.null(), z.string().max(280)]),
 });
 
-/**
- * Marks an expiry action done or dismissed.
- *
- * RLS scopes the update to sites this user can see, so a forged id changes nothing —
- * `.select()` then tells us whether a row actually moved, rather than reporting a
- * cheerful success for a write that silently matched nothing.
- */
-export async function setActionState(
-  actionId: string,
-  state: Exclude<ActionState, 'open'>,
-): Promise<ActionResult> {
-  const session = await requireSession();
-  const supabase = await createClient();
-
-  const { data, error } = await supabase
-    .from('expiry_actions')
-    .update({ state, actioned_by: session.userId, actioned_at: new Date().toISOString() })
-    .eq('id', actionId)
-    .select('id');
-
-  if (error) return { status: 'error', message: `Could not update that (${error.code ?? 'unknown'}).` };
-  if (!data || data.length === 0) {
-    return { status: 'error', message: 'That item is no longer on your list.' };
-  }
-
-  revalidatePath('/app/today');
-  return { status: 'idle' };
-}
-
 export async function setRotationCheckState(
   checkId: string,
   state: Exclude<ActionState, 'open'>,
