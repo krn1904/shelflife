@@ -5,6 +5,7 @@ import {
   localDate,
   planExpiryActions,
   planRotationChecks,
+  remindersFor,
   settingsFromRow,
   shelfLifeGroup,
   validateReminderSettings,
@@ -138,6 +139,14 @@ test('settings that would fire a reminder on arrival are refused, naming the fie
   assert.deepEqual(fieldsWrong({ mediumMaxDays: 21 }), ['mediumMaxDays', 'longCheckDays']); // the 30-day check no longer fits either
   assert.deepEqual(fieldsWrong({ shortMarkdownDays: 0 }), ['shortMarkdownDays']);
   assert.deepEqual(fieldsWrong({ longCheckDays: 2.5 }), ['longCheckDays']);
+});
+
+test('remindersFor lists each group\'s plan, earliest first', () => {
+  const plan = (g: 'short' | 'medium' | 'long') =>
+    remindersFor(g, DEFAULT_REMINDER_SETTINGS).map((r) => `${r.action}@${r.daysBefore}`);
+  assert.deepEqual(plan('short'), ['markdown@2', 'pull@0']);
+  assert.deepEqual(plan('medium'), ['markdown@7', 'pull@0']);
+  assert.deepEqual(plan('long'), ['check@30', 'markdown@7', 'pull@0']);
 });
 
 test('localDate gives the store\'s calendar day, not UTC\'s', () => {

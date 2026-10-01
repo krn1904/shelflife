@@ -119,6 +119,20 @@ export function shelfLifeGroup(arrivedOn: string, expiryDate: string, settings: 
   return 'long';
 }
 
+/** A group's reminders, earliest first, as days before expiry (0 = the expiry day). */
+export function remindersFor(
+  group: ShelfLifeGroup,
+  settings: ReminderSettings,
+): { action: ExpiryActionKind; daysBefore: number }[] {
+  if (group === 'short') return [{ action: 'markdown', daysBefore: settings.shortMarkdownDays }, { action: 'pull', daysBefore: 0 }];
+  if (group === 'medium') return [{ action: 'markdown', daysBefore: settings.mediumMarkdownDays }, { action: 'pull', daysBefore: 0 }];
+  return [
+    { action: 'check', daysBefore: settings.longCheckDays },
+    { action: 'markdown', daysBefore: settings.longMarkdownDays },
+    { action: 'pull', daysBefore: 0 },
+  ];
+}
+
 /** A timestamp's calendar date in a time zone, e.g. a batch's arrival day in Melbourne. */
 export function localDate(timestamp: string, timeZone: string): string {
   return new Intl.DateTimeFormat('en-CA', {

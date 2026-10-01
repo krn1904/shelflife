@@ -70,6 +70,7 @@ export default async function ManagePage() {
           <QuickAction href="/manage/waste" title="Waste" hint="Log and review write-offs" />
           <QuickAction href="/manage/products" title="Products & ranging" hint="Par levels, fixtures, tracking modes" />
           <QuickAction href="/manage/expiry" title="Expiry board" hint="Everything dated, by days left" />
+          <QuickAction href="/manage/reminders" title="Reminder settings" hint="When staff are told to check, discount or pull" />
         </div>
       </div>
 
