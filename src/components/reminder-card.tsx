@@ -73,12 +73,22 @@ export function ReminderCard({
 
   return (
     <li className={`card ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} ${TONE[card.kind]}`}>
-      <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-        {!compact && <span className="text-sm font-semibold">{COLUMN_TITLE[card.kind]}</span>}
-        <span className="text-sm font-medium">{card.name}</span>
-        {card.detail && <span className="text-xs text-muted">{card.detail}</span>}
-        <span className="ml-auto text-xs text-muted">{card.qtyRemaining} in stock</span>
-      </div>
+      {compact ? (
+        // Narrow board column: name, then brand · size · stock on one line beneath.
+        <>
+          <p className="text-sm font-medium">{card.name}</p>
+          <p className="text-xs text-muted">
+            {[card.detail, `${card.qtyRemaining} in stock`].filter(Boolean).join(' · ')}
+          </p>
+        </>
+      ) : (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+          <span className="text-sm font-semibold">{COLUMN_TITLE[card.kind]}</span>
+          <span className="text-sm font-medium">{card.name}</span>
+          {card.detail && <span className="text-xs text-muted">{card.detail}</span>}
+          <span className="ml-auto text-xs text-muted">{card.qtyRemaining} in stock</span>
+        </div>
+      )}
       <p className={`mt-1 text-muted ${compact ? 'text-xs' : 'text-sm'}`}>{cardInstruction({ action: card.kind, ...card })}</p>
       {card.predicted && <p className="mt-1 text-xs text-warning">Date never confirmed</p>}
 
