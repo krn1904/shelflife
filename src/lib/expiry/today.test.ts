@@ -24,6 +24,12 @@ test('a last-day card says when it went to half price, in the store\'s calendar'
     'On half price since Tue 13 Oct. Expires today. Still on the shelf? Pull it out.');
 });
 
+test('board-only cards say where the stock stands', () => {
+  assert.equal(cardInstruction({ action: 'comingUp', daysLeft: 9, markedDownOn: null }), 'Expires in 9 days. Nothing to do yet.');
+  assert.equal(cardInstruction({ action: 'onHalfPrice', daysLeft: 1, markedDownOn: '2026-10-12T22:30:00Z' }),
+    'On half price since Tue 13 Oct. Expires in 1 day.');
+});
+
 test('cards sort last day first, then half price, then checks, soonest first', () => {
   const cards = [
     { id: 'check', action: 'check' as const, daysLeft: 30 },

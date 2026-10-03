@@ -1,5 +1,6 @@
 import { format, parseISO } from 'date-fns';
 import { localDate } from '@/lib/expiry/engine';
+import type { BoardColumn } from '@/lib/expiry/board';
 import type { ExpiryActionKind } from '@/lib/supabase/types';
 
 // Same zone the nightly job plans in, so dates on a card match the store's calendar.
@@ -27,10 +28,12 @@ export function whenText(daysLeft: number): string {
   return `Expires in ${days(daysLeft)}`;
 }
 
-/** The one-line instruction under a card's title. */
-export function cardInstruction(card: { action: ExpiryActionKind; daysLeft: number; markedDownOn: string | null }): string {
+/** The one-line instruction under a card's title. Board-only columns just say where it stands. */
+export function cardInstruction(card: { action: BoardColumn; daysLeft: number; markedDownOn: string | null }): string {
+  const since = card.markedDownOn ? `On half price since ${format(parseISO(localDate(card.markedDownOn, STORE_TIMEZONE)), 'EEE d MMM')}. ` : '';
   if (card.action === 'check') return `${card.daysLeft} days left. Face it up or put it on special.`;
   if (card.action === 'markdown') return `${whenText(card.daysLeft)}. Put it on half price.`;
-  const since = card.markedDownOn ? `On half price since ${format(parseISO(localDate(card.markedDownOn, STORE_TIMEZONE)), 'EEE d MMM')}. ` : '';
+  if (card.action === 'onHalfPrice') return `${since}${whenText(card.daysLeft)}.`;
+  if (card.action === 'comingUp') return `${whenText(card.daysLeft)}. Nothing to do yet.`;
   return `${since}${whenText(card.daysLeft)}. Still on the shelf? Pull it out.`;
 }
