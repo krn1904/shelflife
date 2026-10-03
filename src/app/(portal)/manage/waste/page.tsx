@@ -2,10 +2,9 @@ import { subMonths } from 'date-fns';
 import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { today } from '@/lib/intake/expiry';
-import { wasteByMonth, wasteByReason, type WasteRow } from '@/lib/analytics/aggregate';
+import { wasteByMonth, type WasteRow } from '@/lib/analytics/aggregate';
 import { WASTE_REASON_LABEL } from '@/lib/expiry/waste-reasons';
 import { formatAud } from '@/lib/charts/tokens';
-import { HorizontalBars } from '@/components/charts/bar-chart';
 import { TrendChart } from '@/components/charts/trend-chart';
 import { Stat } from '@/components/stat';
 import { firstParam } from '@/lib/search-params';
@@ -38,7 +37,6 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
     siteId: e.site_id,
   }));
 
-  const byReason = wasteByReason(rows);
   const byMonth = wasteByMonth(rows, WINDOW_MONTHS, asOf);
   const total = rows.reduce((sum, r) => sum + (r.valueAud ?? 0), 0);
   const units = rows.reduce((sum, r) => sum + r.qty, 0);
@@ -71,20 +69,6 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
         </div>
       </section>
 
-      <section className="mt-8">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
-          Where it goes
-        </h2>
-        <div className="mt-2 rounded border border-neutral-200 p-3">
-          <HorizontalBars
-            data={byReason.map((r) => ({
-              label: WASTE_REASON_LABEL[r.reason],
-              value: r.valueAud,
-            }))}
-            emptyNote="Nothing written off yet."
-          />
-        </div>
-      </section>
 
       <section className="mt-8">
         <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
