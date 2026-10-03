@@ -6,7 +6,7 @@ import { MAX_ATTEMPTS, classifyFailure, replayOrder, type OutboxEntry, type Outb
 /**
  * The device-side outbox. Dexie for storage, `queue.ts` for the rules.
  *
- * Only shelf-side mutations are queued — writing off stock and ticking an action. Those
+ * Only shelf-side mutations are queued: answers on the Today list and expiry board. Those
  * are the ones a staff member makes standing in a cold room with one bar of signal, and
  * they are small, additive and safe to replay. Intake is deliberately not queued: it is a
  * multi-step flow whose draft lives on the server, and pretending otherwise would be a
@@ -65,7 +65,7 @@ export type Sender = (entry: OutboxEntry) => Promise<
  * Replays the queue in order, stopping at the first entry that needs retrying.
  *
  * Stopping rather than skipping ahead is deliberate: later writes can depend on earlier
- * ones (a second write-off against a batch the first has not yet decremented), so racing
+ * ones (a batch's "Pulled out" after its "Reduced price"), so racing
  * past a stuck entry would produce failures that look like data errors.
  */
 export async function drain(send: Sender): Promise<{ sent: number; failed: number }> {

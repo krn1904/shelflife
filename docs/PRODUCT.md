@@ -163,8 +163,8 @@ binned quantity as expired waste. Because the system knows unit cost (the site's
 price read off the delivery docket), this produces the number the business cares about: dollars
 written off this month.
 
-Damaged, spoiled or recalled stock is scanned out with **Scan to waste**, with a reason code and
-a quantity.
+Nothing else is logged as waste. Damaged, spoiled or recalled stock is rare at a servo and not
+worth a staff member's time to record, so there is deliberately no separate write-off screen.
 
 ---
 

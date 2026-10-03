@@ -162,7 +162,7 @@ the snapshot, and the digest rechecks status immediately before dispatch.
 - Receive delivery: pick supplier → photo docket → tick pre-populated lines and adjust quantity →
   confirm proposed expiry dates (bulk "apply to all selected") → optional date photo → close
 - Today's list — check / half price / last day, each answered in one tap
-- Scan to waste — camera scan, quantity + reason code
+- ~~Scan to waste~~ — removed 2026-10: expired stock is recorded from the last-day answer, and other write-offs are not tracked
 - Daily rotation checklist
 - Add product — scan an unknown barcode, fill it into the global catalogue once
 

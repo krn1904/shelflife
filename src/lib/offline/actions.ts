@@ -14,13 +14,6 @@ import { requireSession } from '@/lib/auth/session';
  */
 export type ReplayReply = { ok: true } | { ok: false; permanent: boolean; message: string };
 
-const WastePayload = z.object({
-  batch_id: z.string().uuid(),
-  qty: z.coerce.number().int().positive().max(9999),
-  reason: z.enum(['expired', 'damaged', 'spoiled', 'recalled', 'staff_error', 'other']),
-  note: z.union([z.null(), z.string().max(280)]),
-});
-
 const StatePayload = z.object({
   id: z.string().uuid(),
   state: z.enum(['done', 'dismissed']),
@@ -50,29 +43,6 @@ export async function replayOutboxEntry(
 
   if (!z.string().uuid().safeParse(clientId).success) {
     return permanent('That queued change had no valid id.');
-  }
-
-  if (kind === 'waste') {
-    const parsed = WastePayload.safeParse(payload);
-    if (!parsed.success) return permanent('That queued write-off was malformed.');
-
-    // client_id makes this safe to send twice: the function returns the existing row
-    // rather than decrementing the batch again.
-    const { error } = await supabase.rpc('record_waste', {
-      p_batch_id: parsed.data.batch_id,
-      p_qty: parsed.data.qty,
-      p_reason: parsed.data.reason,
-      p_note: parsed.data.note ?? undefined,
-      p_client_id: clientId,
-    });
-
-    if (error) {
-      const isPermanent = PERMANENT_CODES.has(error.code ?? '') || error.message.includes('cannot waste');
-      return { ok: false, permanent: isPermanent, message: error.message };
-    }
-
-    revalidatePath('/app/today');
-    return { ok: true };
   }
 
   if (kind === 'batch-step') {

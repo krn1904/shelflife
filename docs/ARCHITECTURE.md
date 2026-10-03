@@ -285,7 +285,7 @@ One expiry per SKU line, covering every box of that SKU ⇒ normally one `stock_
 
 Only shelf-side mutations are queued: today that is **answers on the Today list**
 (`batch-step`, sent through [send.ts](../src/lib/offline/send.ts), which tries the server first and
-queues under the same id when there is no signal). Fixture ticks and Scan to waste are sent
+queues under the same id when there is no signal). Fixture ticks are sent
 directly. Intake is
 deliberately *not* (its draft lives on the server; a multi-step flow is a bigger promise than the
 outbox can keep). Split in two on purpose:
