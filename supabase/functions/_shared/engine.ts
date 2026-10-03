@@ -211,6 +211,20 @@ export function planExpiryActions(
   });
 }
 
+/**
+ * Runs a planner once per site, each with that site's own "today". Sites can sit in
+ * different timezones, so one shared date would plan a Perth site on Melbourne's day.
+ */
+export function planPerSite<T extends { siteId: string }, R>(
+  rows: T[],
+  todayFor: (siteId: string) => string,
+  plan: (siteRows: T[], today: string) => R[],
+): R[] {
+  const bySite = new Map<string, T[]>();
+  for (const row of rows) bySite.set(row.siteId, [...(bySite.get(row.siteId) ?? []), row]);
+  return [...bySite].flatMap(([siteId, siteRows]) => plan(siteRows, todayFor(siteId)));
+}
+
 export type FixtureRow = { orgId: string; siteId: string; fixture: string };
 
 export type PlannedRotationCheck = {

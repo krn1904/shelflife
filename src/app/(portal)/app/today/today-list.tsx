@@ -26,7 +26,7 @@ export type FixtureCheck = { id: string; fixture: string; done: boolean };
  * Every answer is one tap (plus a count when binning). It works without signal: the
  * answer is kept on the phone and sent when the connection returns.
  */
-export function TodayList({ items, fixtures }: { items: TodayItem[]; fixtures: FixtureCheck[] }) {
+export function TodayList({ items, fixtures, timeZone }: { items: TodayItem[]; fixtures: FixtureCheck[]; timeZone: string }) {
   const { isHidden, error, setError, answer } = useBatchAnswers();
   const [ticked, setTicked] = useState<Set<string>>(new Set());
   const [, startTransition] = useTransition();
@@ -63,7 +63,7 @@ export function TodayList({ items, fixtures }: { items: TodayItem[]; fixtures: F
         </SectionTitle>
         <ul className="space-y-2">
           {visible.map((card) => (
-            <ReminderCard key={card.key} card={card} onAnswer={answer} />
+            <ReminderCard key={card.key} card={card} onAnswer={answer} timeZone={timeZone} />
           ))}
           {visible.length === 0 && (
             <li className="card px-4 py-3 text-sm text-muted">

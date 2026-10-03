@@ -94,7 +94,7 @@ async function main() {
       `got ${s?.length}: ${JSON.stringify(s?.map((x) => x.name))}`);
 
     const { error } = await owner.from('sites')
-      .insert({ org_id: united.id, name: 'Injected site' });
+      .insert({ org_id: united.id, name: 'Injected site', timezone: 'Australia/Melbourne' });
     check('cannot insert a site into another org', error !== null,
       error ? '' : 'insert unexpectedly succeeded');
 
@@ -108,7 +108,7 @@ async function main() {
     const ownerSiteName = `Owner site ${Date.now()}`;
     const { error: ownerSiteInsert } = await owner
       .from('sites')
-      .insert({ org_id: metro.id, name: ownerSiteName });
+      .insert({ org_id: metro.id, name: ownerSiteName, timezone: 'Australia/Melbourne' });
     const { data: createdSite } = await owner
       .from('sites')
       .select('id')
@@ -409,6 +409,20 @@ async function main() {
     await admin.from('suppliers').delete().eq('id', supplierId!);
   }
 
+  console.log('\nsite timezones:');
+  {
+    // Even the service role, which skips RLS, cannot create a site without a real zone:
+    // every date the site sees is worked out in it.
+    const { error: madeUp } = await admin.from('sites')
+      .insert({ org_id: metro.id, name: 'RLS zone check', timezone: 'Perth' });
+    check('a made-up timezone is refused', madeUp !== null, madeUp ? '' : 'insert unexpectedly succeeded');
+
+    const { error: missing } = await admin.from('sites')
+      .insert({ org_id: metro.id, name: 'RLS zone check', timezone: null as unknown as string });
+    check('a site needs a timezone (no silent Melbourne default)', missing !== null,
+      missing ? '' : 'insert unexpectedly succeeded');
+  }
+
   console.log('\nreminder settings and Today answers:');
   {
     const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
@@ -525,7 +539,7 @@ async function main() {
       .single();
     const { data: cascadeSite } = await admin
       .from('sites')
-      .insert({ org_id: cascadeOrg!.id, name: 'Cascade site' })
+      .insert({ org_id: cascadeOrg!.id, name: 'Cascade site', timezone: 'Australia/Melbourne' })
       .select('id')
       .single();
     await admin.from('memberships').insert({
@@ -546,7 +560,7 @@ async function main() {
       .single();
     const { data: jobSite } = await admin
       .from('sites')
-      .insert({ org_id: jobOrg!.id, name: 'Job site' })
+      .insert({ org_id: jobOrg!.id, name: 'Job site', timezone: 'Australia/Melbourne' })
       .select('id')
       .single();
     const { data: jobProduct } = await admin.from('products').select('id').limit(1).single();
@@ -634,7 +648,7 @@ async function main() {
 
     const { error: directSiteWrite } = await platform
       .from('sites')
-      .insert({ org_id: united.id, name: 'Unaudited site' });
+      .insert({ org_id: united.id, name: 'Unaudited site', timezone: 'Australia/Melbourne' });
     check('platform admin cannot bypass audited site creation',
       directSiteWrite !== null, directSiteWrite ? '' : 'insert unexpectedly succeeded');
 
@@ -936,7 +950,7 @@ async function main() {
 
     const { error: archivedServiceWrite } = await admin
       .from('sites')
-      .insert({ org_id: united.id, name: 'Post-archive service write' });
+      .insert({ org_id: united.id, name: 'Post-archive service write', timezone: 'Australia/Melbourne' });
     check('service role cannot add a site after archival', archivedServiceWrite !== null,
       archivedServiceWrite ? '' : 'insert unexpectedly succeeded');
 

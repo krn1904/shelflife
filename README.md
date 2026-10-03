@@ -210,6 +210,9 @@ supabase functions deploy daily-digest
 supabase secrets set CRON_SECRET=... VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 ```
 
+When a branch adds a migration, run `supabase db push` before testing its Vercel preview: the
+preview runs the new code against the hosted database, and pages fail until it has the migration.
+
 Vercel needs `NEXT_PUBLIC_SUPABASE_URL`, the anon/publishable key, the service/secret
 key, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, and the `TEXTRACT_*` keys if docket reading should offer
 AWS Textract. Supabase renamed its keys in 2025 and both

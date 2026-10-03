@@ -1,4 +1,5 @@
-// Nightly expiry engine. Scheduled at 02:00 Australia/Melbourne.
+// Nightly expiry engine. Scheduled at 02:00 Australia/Melbourne. Every date it works out
+// (today, a batch's arrival day) is in each site's own timezone.
 //
 // This file is deliberately thin. Every decision it makes lives in
 // src/lib/expiry/engine.ts, which is plain TypeScript covered by `npm test` — the rules
@@ -11,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import {
   localDate,
   planExpiryActions,
+  planPerSite,
   planRotationChecks,
   settingsFromRow,
   type BatchRow,
@@ -23,7 +25,6 @@ import { effectiveTrackingMode } from '../_shared/tracking.ts';
 import { fetchAllPages } from '../_shared/pagination.ts';
 
 const JOB = 'expiry-engine';
-const SITE_TIMEZONE = 'Australia/Melbourne';
 const WRITE_CHUNK_SIZE = 500;
 
 function chunks<T>(rows: T[], size = WRITE_CHUNK_SIZE): T[][] {
@@ -41,6 +42,19 @@ function chunks<T>(rows: T[], size = WRITE_CHUNK_SIZE): T[][] {
  */
 function todayAt(timeZone: string): string {
   return localDate(new Date().toISOString(), timeZone);
+}
+
+/** Each active site's timezone, so every date below is on that site's own calendar. */
+async function siteTimeZones(supabase: ReturnType<typeof createClient>): Promise<Map<string, string>> {
+  const sites = await fetchAllPages<{ id: string; timezone: string }>((from, to) =>
+    supabase
+      .from('sites')
+      .select('id, timezone, orgs!inner(status)')
+      .eq('orgs.status', 'active')
+      .order('id')
+      .range(from, to)
+  );
+  return new Map(sites.map((s) => [s.id, s.timezone]));
 }
 
 Deno.serve(async (request: Request) => {
@@ -62,7 +76,12 @@ Deno.serve(async (request: Request) => {
   const result: JobResult = { ok: true, processed: 0, skipped: 0, reason: null };
 
   try {
-    const today = todayAt(SITE_TIMEZONE);
+    const zones = await siteTimeZones(supabase);
+    // A site missing here belongs to an org archived since the read; its rows are
+    // skipped by the write RPCs anyway, so any zone is fine for it.
+    const zoneOf = (siteId: string) => zones.get(siteId) ?? 'UTC';
+    const todayBySite = new Map([...zones].map(([siteId, zone]) => [siteId, todayAt(zone)]));
+    const todayFor = (siteId: string) => todayBySite.get(siteId) ?? todayAt(zoneOf(siteId));
 
     // Service-role clients bypass RLS. Join lifecycle scope in the database and page
     // every result so PostgREST's max_rows cap cannot silently omit organisations.
@@ -92,7 +111,7 @@ Deno.serve(async (request: Request) => {
       siteId: b.site_id,
       expiryDate: b.expiry_date,
       // A batch is written when its delivery closes, so created_at is its arrival day.
-      arrivedOn: localDate(b.created_at, SITE_TIMEZONE),
+      arrivedOn: localDate(b.created_at, zoneOf(b.site_id)),
       checked: b.checked_at !== null,
       markedDown: b.marked_down_at !== null,
     }));
@@ -105,7 +124,7 @@ Deno.serve(async (request: Request) => {
       settingsRows.map((r) => [r.site_id, settingsFromRow(r)]),
     );
 
-    const planned = planExpiryActions(rows, today, settingsBySite);
+    const planned = planPerSite(rows, todayFor, (siteRows, today) => planExpiryActions(siteRows, today, settingsBySite));
     result.skipped = rows.length - planned.length;
 
     // Delete and regenerate rather than diff. A few thousand rows recompute in
@@ -164,7 +183,7 @@ Deno.serve(async (request: Request) => {
       })
       .map((r) => ({ orgId: r.org_id, siteId: r.site_id, fixture: r.fixture! }));
 
-    const checks = planRotationChecks(fixtures, today);
+    const checks = planPerSite(fixtures, todayFor, planRotationChecks);
     if (checks.length > 0) {
       // Upsert, not insert: a re-run on the same day must not wipe the ticks staff have
       // already made, and the unique index on (site_id, fixture, check_date) enforces it.

@@ -1,7 +1,7 @@
 import { subMonths } from 'date-fns';
 import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { today } from '@/lib/intake/expiry';
+import { todayIn } from '@/lib/intake/expiry';
 import { wasteByMonth, type WasteRow } from '@/lib/analytics/aggregate';
 import { WASTE_REASON_LABEL } from '@/lib/expiry/waste-reasons';
 import { formatAud } from '@/lib/charts/tokens';
@@ -17,7 +17,8 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
   const params = await props.searchParams;
   const site = activeSite(session, firstParam(params.site));
   const supabase = await createClient();
-  const asOf = today();
+  // The site's calendar; with no site there is nothing to count, so any zone will do.
+  const asOf = todayIn(site?.timeZone ?? 'UTC');
   const since = subMonths(new Date(asOf), WINDOW_MONTHS - 1).toISOString();
 
   const { data: events } = site

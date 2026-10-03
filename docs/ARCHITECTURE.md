@@ -208,8 +208,11 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
   RPCs that lock each organisation and skip any that have been archived since the snapshot (full recompute — correct by
   construction, no incremental diffing to get wrong; done/dismissed rows are history and stay),
   then upsert rotation checks the same way (`ignoreDuplicates`, so a same-day re-run never wipes staff ticks).
-- "Today" is computed in `Australia/Melbourne`, not UTC — a 02:00 Melbourne run is still
-  yesterday in UTC and every reminder would shift by a day.
+- **Every date is on the site's own calendar.** Each site has a required timezone
+  (`sites.timezone`, chosen from [timezones.ts](../src/lib/sites/timezones.ts); the database
+  refuses a missing or unknown zone). The app's `todayIn(site.timeZone)` and the jobs'
+  `planPerSite()` work out "today" and a batch's arrival day per site, never from the server's
+  clock: the app runs on UTC servers, where a Melbourne morning is still yesterday.
 - **Every run writes a `job_runs` row, success or failure.** A silently-stopped cron is the
   worst failure mode (nothing looks broken until stock is gone); the admin portal flags an engine
   that has not reported in 36 hours.

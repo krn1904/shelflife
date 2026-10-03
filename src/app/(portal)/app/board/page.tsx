@@ -11,7 +11,7 @@ export default async function StaffBoardPage() {
 
   if (!site) return <PageHeader title="Expiry board" subtitle="You are not assigned to a site yet." />;
 
-  const board = await loadBoard(site.id);
+  const board = await loadBoard(site.id, site.timeZone);
   return (
     <div className="space-y-6">
       <PageHeader
@@ -19,7 +19,7 @@ export default async function StaffBoardPage() {
         subtitle={site.name}
         actions={<Link href="/app/today" className="btn btn-outline">Today&apos;s list</Link>}
       />
-      <ExpiryBoard board={board} />
+      <ExpiryBoard board={board} timeZone={site.timeZone} />
     </div>
   );
 }

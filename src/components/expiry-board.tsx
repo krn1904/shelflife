@@ -23,7 +23,7 @@ const GROUPS: { title: string; columns: BoardColumn[]; grid: string }[] = [
  * Today list and take the same one-tap answers; the last two look ahead, and a card
  * there can be marked sold out if the stock went early.
  */
-export function ExpiryBoard({ board }: { board: Board }) {
+export function ExpiryBoard({ board, timeZone }: { board: Board; timeZone: string }) {
   const { isHidden, error, answer } = useBatchAnswers();
 
   return (
@@ -54,7 +54,7 @@ export function ExpiryBoard({ board }: { board: Board }) {
                   </header>
                   <ul className="space-y-2">
                     {visible.map((card) => (
-                      <ReminderCard key={card.key} card={card} onAnswer={answer} compact />
+                      <ReminderCard key={card.key} card={card} onAnswer={answer} timeZone={timeZone} compact />
                     ))}
                     {visible.length === 0 && <li className="card px-3 py-2.5 text-xs text-muted">Nothing here.</li>}
                   </ul>

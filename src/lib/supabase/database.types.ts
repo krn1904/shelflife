@@ -731,7 +731,7 @@ export type Database = {
           id?: string
           name: string
           org_id: string
-          timezone?: string
+          timezone: string
           updated_at?: string
         }
         Update: {
@@ -1056,6 +1056,7 @@ export type Database = {
         Returns: number
       }
       has_active_membership: { Args: never; Returns: boolean }
+      is_valid_timezone: { Args: { p_timezone: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       record_waste: {
         Args: {

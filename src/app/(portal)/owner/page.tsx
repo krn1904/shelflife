@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { subMonths } from 'date-fns';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { today } from '@/lib/intake/expiry';
+import { todayIn } from '@/lib/intake/expiry';
 import { siteLeague, wasteByMonth, type WasteRow } from '@/lib/analytics/aggregate';
 import { formatAud } from '@/lib/charts/tokens';
 import { HorizontalBars } from '@/components/charts/bar-chart';
@@ -15,7 +15,8 @@ const WINDOW_MONTHS = 6;
 export default async function OwnerPage() {
   const session = await requireRole('owner');
   const supabase = await createClient();
-  const asOf = today();
+  // An owner's sites normally share one zone; the group's months follow its first site.
+  const asOf = todayIn(session.sites[0]?.timeZone ?? 'UTC');
   const since = subMonths(new Date(asOf), WINDOW_MONTHS - 1).toISOString();
 
   // RLS scopes every one of these to the sites this owner can see, so there is no

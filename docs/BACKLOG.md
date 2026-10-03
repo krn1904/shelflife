@@ -62,3 +62,36 @@ when it is picked up, not decided:
 - One row of five columns that each scroll on their own, with the page height fixed.
 - Show only the first few cards per column with a "Show all (N)" link.
 - Put "Coming up" first on a manager's view and "Needs an answer" first on staff's.
+
+---
+
+## Known issue: shelf-life group uses the delivery's close date
+
+**Found in review (2026-10-03), parked:** a batch's group (short / medium / long-life), which
+decides when its half-price reminder comes, is set from the day its delivery was **closed**
+(`stock_batches.created_at`), not the day the stock arrived. The expiry date and the "days left"
+countdown are unaffected; only which reminder plan applies.
+
+**When it matters:** a delivery left open for several days, holding an item close to a group
+boundary. A yoghurt that arrives with 23 days (medium-life, half price 7 days out) in a delivery
+closed 3 days later counts as 20 days (short-life, half price 2 days out).
+
+**Possible fixes, if it shows up in practice:** use the delivery's `received_at`, or the date
+printed on the docket, as the arrival day. Not done yet because it adds a second date to carry
+through intake for a rare case; deliveries are normally closed the same day.
+
+---
+
+## Scheduled jobs for sites outside Melbourne's timezone
+
+**Context (2026-10-03):** every date is now worked out on each site's own calendar (required
+`sites.timezone`), including in the nightly expiry engine and the morning digest. The jobs
+still *run* on Melbourne's clock: the engine at 02:00 and the digest at 06:00 Australia/Melbourne.
+
+**Why it matters later:** at 02:00 in Melbourne it is still the previous evening in Perth, so a
+Perth site's reminders would be planned for the day that is ending, and its digest would arrive
+at 3–4am. All current sites are in Melbourne, so nothing is wrong today.
+
+**When a site outside Melbourne's zone is added:** run the engine hourly (it is a full,
+idempotent recompute, so extra runs are harmless) and have the digest send to each site in the
+run where that site's local hour is 6.

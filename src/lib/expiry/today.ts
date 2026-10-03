@@ -3,9 +3,6 @@ import { localDate } from '@/lib/expiry/engine';
 import type { BoardColumn } from '@/lib/expiry/board';
 import type { ExpiryActionKind } from '@/lib/supabase/types';
 
-// Same zone the nightly job plans in, so dates on a card match the store's calendar.
-const STORE_TIMEZONE = 'Australia/Melbourne';
-
 /** What each Today card is called. */
 export const CARD_TITLE: Record<ExpiryActionKind, string> = {
   pull: 'Last day',
@@ -29,8 +26,11 @@ export function whenText(daysLeft: number): string {
 }
 
 /** The one-line instruction under a card's title. Board-only columns just say where it stands. */
-export function cardInstruction(card: { action: BoardColumn; daysLeft: number; markedDownOn: string | null }): string {
-  const since = card.markedDownOn ? `On half price since ${format(parseISO(localDate(card.markedDownOn, STORE_TIMEZONE)), 'EEE d MMM')}. ` : '';
+export function cardInstruction(
+  card: { action: BoardColumn; daysLeft: number; markedDownOn: string | null },
+  timeZone: string, // the site's, so the date matches the store's calendar
+): string {
+  const since = card.markedDownOn ? `On half price since ${format(parseISO(localDate(card.markedDownOn, timeZone)), 'EEE d MMM')}. ` : '';
   if (card.action === 'check') return `${card.daysLeft} days left. Face it up or put it on special.`;
   if (card.action === 'markdown') return `${whenText(card.daysLeft)}. Put it on half price.`;
   if (card.action === 'onHalfPrice') return `${since}${whenText(card.daysLeft)}.`;

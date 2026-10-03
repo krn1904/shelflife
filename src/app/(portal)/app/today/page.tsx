@@ -1,7 +1,7 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { today } from '@/lib/intake/expiry';
+import { todayIn } from '@/lib/intake/expiry';
 import { PageHeader } from '@/components/ui';
 import { byUrgency } from '@/lib/expiry/today';
 import { TodayList, type TodayItem, type FixtureCheck } from './today-list';
@@ -20,7 +20,7 @@ export default async function TodayPage() {
     );
   }
 
-  const asOf = today();
+  const asOf = todayIn(site.timeZone);
 
   const [{ data: actions }, { data: checks }] = await Promise.all([
     supabase
@@ -64,7 +64,7 @@ export default async function TodayPage() {
     <div>
       <PageHeader title="Today" subtitle={site.name} />
       <div className="mt-6">
-        <TodayList items={items} fixtures={fixtures} />
+        <TodayList items={items} fixtures={fixtures} timeZone={site.timeZone} />
       </div>
     </div>
   );

@@ -60,10 +60,12 @@ export function useBatchAnswers() {
 export function ReminderCard({
   card,
   onAnswer,
+  timeZone,
   compact = false,
 }: {
   card: ReminderCardData;
   onAnswer: (card: ReminderCardData, step: BatchStep, qty?: number | null) => void;
+  timeZone: string; // the site's, for "on half price since <date>"
   compact?: boolean; // tighter layout for board columns
 }) {
   const [left, setLeft] = useState(String(card.qtyRemaining));
@@ -89,7 +91,7 @@ export function ReminderCard({
           <span className="ml-auto text-xs text-muted">{card.qtyRemaining} in stock</span>
         </div>
       )}
-      <p className={`mt-1 text-muted ${compact ? 'text-xs' : 'text-sm'}`}>{cardInstruction({ action: card.kind, ...card })}</p>
+      <p className={`mt-1 text-muted ${compact ? 'text-xs' : 'text-sm'}`}>{cardInstruction({ action: card.kind, ...card }, timeZone)}</p>
       {card.predicted && <p className="mt-1 text-xs text-warning">Date never confirmed</p>}
 
       <div className={`${compact ? 'mt-2' : 'mt-3'} flex flex-wrap items-center gap-2`}>

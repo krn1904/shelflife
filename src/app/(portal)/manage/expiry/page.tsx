@@ -12,7 +12,7 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
 
   if (!site) return <PageHeader title="Expiry board" subtitle="No site assigned" />;
 
-  const board = await loadBoard(site.id);
+  const board = await loadBoard(site.id, site.timeZone);
   const siteSites = session.sites.filter((s) => s.orgId === site.orgId);
 
   return (
@@ -32,7 +32,7 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
       )}
 
       {/* Keyed by site so answered cards from one site do not stay hidden on another. */}
-      <ExpiryBoard key={site.id} board={board} />
+      <ExpiryBoard key={site.id} board={board} timeZone={site.timeZone} />
     </div>
   );
 }

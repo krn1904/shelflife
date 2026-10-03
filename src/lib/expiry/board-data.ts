@@ -1,7 +1,7 @@
 import 'server-only';
 import { createClient } from '@/lib/supabase/server';
 import { fetchAllPages } from '@/lib/pagination';
-import { today } from '@/lib/intake/expiry';
+import { todayIn } from '@/lib/intake/expiry';
 import { settingsFromRow } from '@/lib/expiry/engine';
 import { buildBoard, type Board, type BoardBatch, type OpenReminder } from '@/lib/expiry/board';
 
@@ -10,7 +10,7 @@ import { buildBoard, type Board, type BoardBatch, type OpenReminder } from '@/li
  * Today list shows) and its reminder settings, whose early-check days set how far
  * "Coming up" looks ahead. RLS limits all of it to sites the viewer belongs to.
  */
-export async function loadBoard(siteId: string): Promise<Board> {
+export async function loadBoard(siteId: string, timeZone: string): Promise<Board> {
   const supabase = await createClient();
 
   const [batches, { data: reminders }, { data: settingsRow }] = await Promise.all([
@@ -52,5 +52,5 @@ export async function loadBoard(siteId: string): Promise<Board> {
   }] : []));
 
   const open: OpenReminder[] = (reminders ?? []).map((r) => ({ id: r.id, batchId: r.batch_id, action: r.action }));
-  return buildBoard(rows, open, today(), settingsFromRow(settingsRow).longCheckDays);
+  return buildBoard(rows, open, todayIn(timeZone), settingsFromRow(settingsRow).longCheckDays);
 }

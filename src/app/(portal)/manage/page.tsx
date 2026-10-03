@@ -2,7 +2,7 @@ import Link from 'next/link';
 import { differenceInCalendarDays, parseISO, subMonths } from 'date-fns';
 import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { today } from '@/lib/intake/expiry';
+import { todayIn } from '@/lib/intake/expiry';
 import { bucketFor } from '@/lib/analytics/aggregate';
 import { formatAud } from '@/lib/charts/tokens';
 import { Stat } from '@/components/stat';
@@ -14,7 +14,8 @@ export default async function ManagePage() {
   const session = await requireRole('manager');
   const site = activeSite(session);
   const supabase = await createClient();
-  const asOf = today();
+  // The site's calendar; with no site there is nothing to count, so any zone will do.
+  const asOf = todayIn(site?.timeZone ?? 'UTC');
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
   const [{ count: ranged }, { data: batches }, { data: waste }, { count: openDeliveries }, { data: recent }] =

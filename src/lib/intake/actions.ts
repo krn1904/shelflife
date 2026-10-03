@@ -4,10 +4,11 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { activeSite, requireSession, type Session } from '@/lib/auth/session';
+import { activeSite, requireSession, type Session, type SessionSite } from '@/lib/auth/session';
 import { fetchAllPages } from '@/lib/pagination';
 import { expectedLines, type HistoryLine } from './expected-lines';
-import { proposeExpiry, today, type ExpiryProposal } from './expiry';
+import { proposeExpiry, todayIn, type ExpiryProposal } from './expiry';
+import { localDate } from '@/lib/expiry/engine';
 import { normalise, packOf, type CatalogueItem } from './docket/parse';
 import { ClosingLines, docketRows, planDelivery, readableSize, recordable, type IntakeProduct } from './plan';
 import { docketPhotoPath, parseReading, readingFrom, DocketReadingInput } from './docket/reading';
@@ -38,13 +39,14 @@ async function openDeliveryFor(session: Session, deliveryId: string) {
     .maybeSingle();
 
   if (!delivery) return { ok: false as const, message: 'That delivery no longer exists.' };
-  if (!session.sites.some((s) => s.id === delivery.site_id)) {
+  const site = session.sites.find((s) => s.id === delivery.site_id);
+  if (!site) {
     return { ok: false as const, message: 'That delivery belongs to another site.' };
   }
   if (delivery.status === 'closed') {
     return { ok: false as const, message: 'That delivery is already closed.' };
   }
-  return { ok: true as const, delivery, supabase };
+  return { ok: true as const, delivery, site, supabase };
 }
 
 /**
@@ -125,7 +127,7 @@ export type { DocketRow, IntakeProduct } from './plan';
  * per product tells us the shelf life this site actually receives, which beats the
  * catalogue's generic figure.
  */
-async function intakeProducts(supabase: Db, siteId: string, productIds: string[]): Promise<Map<string, IntakeProduct>> {
+async function intakeProducts(supabase: Db, site: SessionSite, productIds: string[]): Promise<Map<string, IntakeProduct>> {
   if (productIds.length === 0) return new Map();
   const [{ data: products }, { data: lastBatches }] = await Promise.all([
     supabase
@@ -135,7 +137,7 @@ async function intakeProducts(supabase: Db, siteId: string, productIds: string[]
     supabase
       .from('stock_batches')
       .select('product_id, expiry_date, created_at')
-      .eq('site_id', siteId)
+      .eq('site_id', site.id)
       .in('product_id', productIds)
       .not('expiry_date', 'is', null)
       .order('created_at', { ascending: false }),
@@ -145,12 +147,13 @@ async function intakeProducts(supabase: Db, siteId: string, productIds: string[]
   for (const batch of lastBatches ?? []) {
     if (lastSeen.has(batch.product_id) || !batch.expiry_date) continue;
     lastSeen.set(batch.product_id, {
-      receivedOn: batch.created_at.slice(0, 10),
+      // The day it arrived on the site's calendar, not UTC's.
+      receivedOn: localDate(batch.created_at, site.timeZone),
       expiryDate: batch.expiry_date,
     });
   }
 
-  const receivedOn = today();
+  const receivedOn = todayIn(site.timeZone);
   return new Map((products ?? []).map((product) => [product.id, {
     productId: product.id,
     name: product.name,
@@ -203,7 +206,7 @@ export async function suggestLines(deliveryId: string) {
   const suggestions = expectedLines(ordered);
   if (suggestions.length === 0) return { error: null, lines: [] };
 
-  const products = await intakeProducts(supabase, delivery.site_id, suggestions.map((s) => s.productId));
+  const products = await intakeProducts(supabase, resolved.site, suggestions.map((s) => s.productId));
   const lines = suggestions.flatMap((s) => {
     const product = products.get(s.productId);
     if (!product) return [];
@@ -254,7 +257,7 @@ export async function docketLines(deliveryId: string) {
   });
 
   const ids = [...new Set(parsed.lines.flatMap((l) => (l.productId ? [l.productId] : [])))];
-  const products = await intakeProducts(supabase, delivery.site_id, ids);
+  const products = await intakeProducts(supabase, resolved.site, ids);
   const rows = docketRows(parsed.lines, products);
 
   const verdicts: DocketVerdict[] = parsed.verdicts.map((v) => ({
@@ -303,7 +306,7 @@ export async function searchProductsForIntake(deliveryId: string, term: string) 
     .in('product_id', found.map((p) => p.id));
 
   const rangedHere = new Set((ranged ?? []).map((r) => r.product_id));
-  const receivedOn = today();
+  const receivedOn = todayIn(resolved.site.timeZone);
 
   const products = found
     .map((p) => ({

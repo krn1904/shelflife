@@ -49,8 +49,7 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
     .limit(LIST_LIMIT);
   if (filters.supplierId) closedQuery = closedQuery.eq('supplier_id', filters.supplierId);
 
-  const [{ data: siteRow }, { data: open }, { data: closed }, { data: suppliers }] = await Promise.all([
-    supabase.from('sites').select('timezone').eq('id', site.id).maybeSingle(),
+  const [{ data: open }, { data: closed }, { data: suppliers }] = await Promise.all([
     supabase
       .from('deliveries')
       .select('id, received_at, created_at, received_by, suppliers(name)')
@@ -61,7 +60,7 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
     supabase.from('suppliers').select('id, name').eq('org_id', site.orgId).order('name'),
   ]);
 
-  const timeZone = siteRow?.timezone ?? 'Australia/Melbourne';
+  const timeZone = site.timeZone;
   const receiverIds = [...new Set([...(open ?? []), ...(closed ?? [])].flatMap((d) => (d.received_by ? [d.received_by] : [])))];
   const { data: people } = receiverIds.length > 0
     ? await supabase.from('profiles').select('id, full_name').in('id', receiverIds)

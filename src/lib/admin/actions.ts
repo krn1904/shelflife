@@ -6,6 +6,7 @@ import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { requireRole } from '@/lib/auth/session';
 import type { AppRole } from '@/lib/supabase/types';
+import { SITE_TIMEZONE_VALUES } from '@/lib/sites/timezones';
 
 // Roles that live at one site. Owners and platform admins are org-wide, so their
 // membership carries a null site_id, which auth_site_ids() expands to every site.
@@ -80,7 +81,7 @@ const NewOrganisation = z.object({
       message: 'Use lowercase letters, numbers and single hyphens only.',
     }),
   site_name: z.string().trim().min(2, { message: 'Give the first site a name.' }).max(120),
-  timezone: z.string().trim().min(1).max(60),
+  timezone: z.enum(SITE_TIMEZONE_VALUES, { message: 'Choose where the site is.' }),
   address: z.union([z.null(), z.string().max(200)]),
   owner_name: z.string().trim().min(2, { message: 'Enter the owner’s name.' }).max(120),
   owner_email: z.string().trim().toLowerCase().email({ message: 'Enter a valid owner email.' }),
@@ -95,7 +96,7 @@ export async function createOrganisation(
     name: String(formData.get('name') ?? ''),
     slug: String(formData.get('slug') ?? ''),
     site_name: String(formData.get('site_name') ?? ''),
-    timezone: blank(formData.get('timezone')) ?? 'Australia/Melbourne',
+    timezone: formData.get('timezone'),
     address: blank(formData.get('address')),
     owner_name: String(formData.get('owner_name') ?? ''),
     owner_email: String(formData.get('owner_email') ?? ''),
@@ -232,7 +233,7 @@ export type SiteFormState =
 const NewSite = z.object({
   org_id: z.string().uuid(),
   name: z.string().trim().min(2, { message: 'Give the site a name.' }).max(120),
-  timezone: z.string().trim().min(1).max(60),
+  timezone: z.enum(SITE_TIMEZONE_VALUES, { message: 'Choose where the site is.' }),
   address: z.union([z.null(), z.string().max(200)]),
 });
 
@@ -242,7 +243,7 @@ export async function createSite(_prev: SiteFormState, formData: FormData): Prom
   const parsed = NewSite.safeParse({
     org_id: String(formData.get('org_id') ?? ''),
     name: String(formData.get('name') ?? ''),
-    timezone: blank(formData.get('timezone')) ?? 'Australia/Melbourne',
+    timezone: formData.get('timezone'),
     address: blank(formData.get('address')),
   });
   if (!parsed.success) return { status: 'error', message: firstIssue(parsed.error) };

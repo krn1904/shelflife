@@ -4,6 +4,7 @@ import {
   DEFAULT_REMINDER_SETTINGS,
   localDate,
   planExpiryActions,
+  planPerSite,
   planRotationChecks,
   remindersFor,
   settingsFromRow,
@@ -192,4 +193,18 @@ test('fixture names are trimmed so " Dairy" and "Dairy" are one shelf', () => {
   );
   assert.equal(checks.length, 1);
   assert.equal(checks[0].fixture, 'Dairy fridge');
+});
+
+test('each site is planned on its own day', () => {
+  // Same moment, two zones: Melbourne is already on the 15th (expiry day), Perth is still on the 14th.
+  const todayFor = (siteId: string) => (siteId === 'melb' ? '2026-10-15' : '2026-10-14');
+  const plan = planPerSite(
+    [
+      batch('m', '2026-10-15', { siteId: 'melb', arrivedOn: '2026-10-01' }),
+      batch('p', '2026-10-15', { siteId: 'perth', arrivedOn: '2026-10-01' }),
+    ],
+    todayFor,
+    (rows, today) => planExpiryActions(rows, today),
+  );
+  assert.deepEqual(plan.map((p) => [p.batchId, p.action, p.daysLeft]), [['m', 'pull', 0], ['p', 'markdown', 1]]);
 });
