@@ -37,7 +37,7 @@ ShelfLife exists to be that mechanism, while asking as little of staff as possib
 
 | User | Context | Needs |
 |---|---|---|
-| **Console staff** | Phone in hand, mid-shift, often in a store room or cool room with poor signal | Receive a delivery fast; be told what to pull today; record waste in seconds |
+| **Console staff** | Phone in hand, mid-shift, often in a store room or cool room with poor signal | Receive a delivery fast; be told what to discount or pull today, and answer it in a tap |
 | **Site manager** | Desktop or tablet in the back office | See what is expiring, what was received, what was written off and why |
 | **Owner / multi-site** | Owns or franchises several sites | Compare sites, see waste in dollars, spot which site or supplier is the problem |
 | **Platform admin** | Operating the service | Support organisations, moderate the shared product catalogue, monitor scheduled jobs |
@@ -52,7 +52,7 @@ shift, and it is the product's central design decision.
 | Mode | Applies to | At intake | How it surfaces |
 |---|---|---|---|
 | `rotation` | Milk, bread, sandwiches, bakery — short life, high frequency | Nothing captured | A daily tick-list per fixture: "check dairy fridge", "check sandwich cabinet" |
-| `batch` | Drinks, snacks, chilled cases, grocery — real date codes | One expiry date per line | Automatically at 30, 14, 7, 3 and 1 days out |
+| `batch` | Drinks, snacks, chilled cases, grocery — real date codes | One expiry date per line | Half price, then a last-day call; long-life stock also gets an early check |
 | `none` | Cigarettes, accessories, phone cards | Quantity only | Never |
 
 The effect is that staff record dates only for stock that would otherwise go unnoticed.
@@ -112,14 +112,59 @@ The review is read-only: the saved lines are the record.
 ### The daily action list
 
 A scheduled job runs overnight and rebuilds the action list from current stock. Each morning the
-on-shift manager receives a push notification and the owner an email digest. The list groups by
-fixture and states the action plainly: pull, mark down, or check.
+on-shift manager receives a push notification and the owner an email digest.
+
+How early an item is mentioned depends on its **shelf life when it arrived**, because a 14-day
+smoothie and an 8-month bag of chips need very different warnings. Each batch is put in a group
+once, from its expiry date minus the day it arrived, and stays there:
+
+| Group (defaults) | Example | Reminders |
+|---|---|---|
+| Short-life, up to 21 days | Milk drinks, smoothies, protein shakes | Half price 2 days before expiry, then the last day |
+| Medium-life, up to 90 days | Some chilled lines | Half price 7 days before, then the last day |
+| Long-life, longer | Chips, drinks, grocery | Early check 30 days before (time to face it up or put it on special), half price 7 days before, then the last day |
+
+A manager (or the owner) can change the boundaries and the days for their site under
+**Site → Reminder settings**. Settings that would remind staff on the day an item arrives are
+refused with a plain explanation, and changes apply from the next morning's list.
+
+Each card is answered in one tap at the shelf:
+
+- **Check** → *Checked*.
+- **Half price** → *Reduced price* (it is on half price now), or *Gone* (sold, none left).
+- **Last day** → *Pulled out*, with how many were binned (pre-filled with all of them), or
+  *Sold*. The card says when the item went to half price.
+
+An answered card moves the batch on to its next reminder instead of repeating; an item already
+on half price waits quietly for its last day. Answers work without signal and are sent when the
+phone reconnects.
+
+### The expiry board
+
+The same cards, laid out as a board staff and managers can both open (staff from Today or the
+Shift home, managers under **Site → Expiry board**, for any of their sites). Its columns follow
+the same reminder logic, so the board and the Today list never disagree:
+
+| Column | What is in it | Answers |
+|---|---|---|
+| Last day | Expiry day or past | Pulled out (how many) / Sold |
+| Half price | Half price due now | Reduced price / Gone |
+| Check | Long-life early check due now | Checked |
+| On half price | Already marked down, waiting for its last day | Sold out |
+| Coming up | Dated stock with nothing due yet, as far ahead as the site's early check (30 days by default); anything later is counted | Sold out |
+
+The first three columns are exactly the Today list. The last two let staff look ahead, and mark
+stock sold out when it goes early. Dates nobody confirmed at intake are flagged on the card.
 
 ### Recording waste
 
-Anything pulled is scanned out with a reason code and a quantity. Because the system knows unit
-cost, this produces the number the business actually cares about: dollars written off this month,
-split by how much was avoidable.
+Expired stock needs no separate step: answering *Pulled out* on a last-day card records the
+binned quantity as expired waste. Because the system knows unit cost (the site's own, or the unit
+price read off the delivery docket), this produces the number the business cares about: dollars
+written off this month.
+
+Nothing else is logged as waste. Damaged, spoiled or recalled stock is rare at a servo and not
+worth a staff member's time to record, so there is deliberately no separate write-off screen.
 
 ---
 
@@ -129,8 +174,8 @@ Four roles, enforced at the database level so organisation isolation does not de
 
 - **`platform_admin`** — across organisations; provision, archive and restore organisations; support access is audit-logged
 - **`owner`** — every site in their organisation; analytics and user management
-- **`manager`** — one site; deliveries, expiry board, waste, product settings
-- **`staff`** — one site, phone only; receive, action list, waste, rotation checks
+- **`manager`** — one site; deliveries, expiry board, waste, product settings, reminder settings
+- **`staff`** — one site, phone only; receive, action list, expiry board, waste, rotation checks
 
 ---
 

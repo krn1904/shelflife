@@ -531,6 +531,63 @@ export type Database = {
           },
         ]
       }
+      reminder_settings: {
+        Row: {
+          created_at: string
+          long_check_days: number
+          long_markdown_days: number
+          medium_markdown_days: number
+          medium_max_days: number
+          org_id: string
+          short_markdown_days: number
+          short_max_days: number
+          site_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          long_check_days?: number
+          long_markdown_days?: number
+          medium_markdown_days?: number
+          medium_max_days?: number
+          org_id: string
+          short_markdown_days?: number
+          short_max_days?: number
+          site_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          long_check_days?: number
+          long_markdown_days?: number
+          medium_markdown_days?: number
+          medium_max_days?: number
+          org_id?: string
+          short_markdown_days?: number
+          short_max_days?: number
+          site_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "reminder_settings_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "reminder_settings_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: true
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       rotation_checks: {
         Row: {
           check_date: string
@@ -674,7 +731,7 @@ export type Database = {
           id?: string
           name: string
           org_id: string
-          timezone?: string
+          timezone: string
           updated_at?: string
         }
         Update: {
@@ -698,12 +755,14 @@ export type Database = {
       }
       stock_batches: {
         Row: {
+          checked_at: string | null
           created_at: string
           delivery_line_id: string | null
           expiry_date: string | null
           expiry_photo_path: string | null
           expiry_source: Database["public"]["Enums"]["expiry_source"]
           id: string
+          marked_down_at: string | null
           org_id: string
           product_id: string
           qty_received: number
@@ -713,12 +772,14 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          checked_at?: string | null
           created_at?: string
           delivery_line_id?: string | null
           expiry_date?: string | null
           expiry_photo_path?: string | null
           expiry_source?: Database["public"]["Enums"]["expiry_source"]
           id?: string
+          marked_down_at?: string | null
           org_id: string
           product_id: string
           qty_received: number
@@ -728,12 +789,14 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          checked_at?: string | null
           created_at?: string
           delivery_line_id?: string | null
           expiry_date?: string | null
           expiry_photo_path?: string | null
           expiry_source?: Database["public"]["Enums"]["expiry_source"]
           id?: string
+          marked_down_at?: string | null
           org_id?: string
           product_id?: string
           qty_received?: number
@@ -964,6 +1027,10 @@ export type Database = {
       }
       auth_org_ids: { Args: never; Returns: string[] }
       auth_site_ids: { Args: never; Returns: string[] }
+      batch_unit_cost: {
+        Args: { p_batch: Database["public"]["Tables"]["stock_batches"]["Row"] }
+        Returns: number
+      }
       can_manage_org: { Args: { org: string }; Returns: boolean }
       can_manage_site: { Args: { org: string }; Returns: boolean }
       clear_active_expiry_actions: { Args: never; Returns: number }
@@ -989,6 +1056,7 @@ export type Database = {
         Returns: number
       }
       has_active_membership: { Args: never; Returns: boolean }
+      is_valid_timezone: { Args: { p_timezone: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       record_waste: {
         Args: {
@@ -1015,6 +1083,15 @@ export type Database = {
           p_slug: string
         }
         Returns: Json
+      }
+      resolve_batch_step: {
+        Args: {
+          p_batch_id: string
+          p_client_id?: string
+          p_qty?: number
+          p_step: Database["public"]["Enums"]["batch_step"]
+        }
+        Returns: Database["public"]["Enums"]["batch_status"]
       }
       restore_organisation: {
         Args: { p_org_id: string }
@@ -1061,6 +1138,7 @@ export type Database = {
       action_state: "open" | "done" | "dismissed"
       app_role: "platform_admin" | "owner" | "manager" | "staff"
       batch_status: "active" | "pulled" | "sold_through"
+      batch_step: "checked" | "marked_down" | "sold" | "pulled"
       delivery_status: "draft" | "closed"
       expiry_action_kind: "check" | "markdown" | "pull"
       expiry_source: "predicted" | "confirmed" | "manual"
@@ -1206,6 +1284,7 @@ export const Constants = {
       action_state: ["open", "done", "dismissed"],
       app_role: ["platform_admin", "owner", "manager", "staff"],
       batch_status: ["active", "pulled", "sold_through"],
+      batch_step: ["checked", "marked_down", "sold", "pulled"],
       delivery_status: ["draft", "closed"],
       expiry_action_kind: ["check", "markdown", "pull"],
       expiry_source: ["predicted", "confirmed", "manual"],

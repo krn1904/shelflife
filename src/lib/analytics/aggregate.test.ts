@@ -4,7 +4,6 @@ import {
   bucketFor,
   siteLeague,
   wasteByMonth,
-  wasteByReason,
   type WasteRow,
 } from './aggregate';
 
@@ -18,22 +17,6 @@ function row(partial: Partial<WasteRow>): WasteRow {
     ...partial,
   };
 }
-
-test('totals waste by reason, dearest first', () => {
-  const totals = wasteByReason([
-    row({ reason: 'expired', valueAud: 10 }),
-    row({ reason: 'expired', valueAud: 15 }),
-    row({ reason: 'damaged', valueAud: 40 }),
-  ]);
-  assert.deepEqual(totals.map((t) => [t.reason, t.valueAud]), [['damaged', 40], ['expired', 25]]);
-});
-
-test('a null value counts as zero dollars, not as a skipped event', () => {
-  // unit_cost is optional, so value_aud can be null. The quantity is still real.
-  const totals = wasteByReason([row({ valueAud: null, qty: 3 })]);
-  assert.equal(totals[0].qty, 3);
-  assert.equal(totals[0].valueAud, 0);
-});
 
 test('months with no waste appear as zero rather than vanishing', () => {
   // The classic version of this chart being wrong: drop the empty months and the line
@@ -87,4 +70,10 @@ test('expiry board buckets split on the boundaries staff care about', () => {
   assert.equal(bucketFor(7), 'soon');
   assert.equal(bucketFor(8), 'watch');
   assert.equal(bucketFor(30), 'watch');
+});
+
+test('a waste event with no dollar value counts as $0 in its month, not as an error', () => {
+  // value_aud is null when neither the site nor the docket gave a cost.
+  const months = wasteByMonth([row({ valueAud: null }), row({ valueAud: 12 })], 1, '2026-09-20');
+  assert.equal(months[0].valueAud, 12);
 });

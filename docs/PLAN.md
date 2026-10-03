@@ -31,7 +31,7 @@ So every product carries one of three modes:
 | Mode | Applies to | Intake behaviour | Surfacing |
 |---|---|---|---|
 | `rotation` | Milk, bread, sandwiches, bakery | No expiry captured | Daily tick-list per fixture ("check dairy fridge") |
-| `batch` | Drinks, snacks, chilled cases, grocery | Scan + capture expiry once | Auto-surfaces at T-30/14/7/3/1 |
+| `batch` | Drinks, snacks, chilled cases, grocery | Scan + capture expiry once | Reminder plan by shelf life on arrival (see [PRODUCT.md](PRODUCT.md), the daily action list) |
 | `none` | Cigarettes, accessories, phone cards | Quantity only | Never |
 
 Case-study line: *"cut required scanning by ~70% by tracking only what actually goes unnoticed."*
@@ -161,8 +161,8 @@ the snapshot, and the digest rechecks status immediately before dispatch.
 **Staff PWA (phone, offline-capable)**
 - Receive delivery: pick supplier → photo docket → tick pre-populated lines and adjust quantity →
   confirm proposed expiry dates (bulk "apply to all selected") → optional date photo → close
-- Today's list — check / markdown / pull, grouped by fixture
-- Scan to waste — camera scan, quantity + reason code
+- Today's list — check / half price / last day, each answered in one tap
+- ~~Scan to waste~~ — removed 2026-10: expired stock is recorded from the last-day answer, and other write-offs are not tracked
 - Daily rotation checklist
 - Add product — scan an unknown barcode, fill it into the global catalogue once
 

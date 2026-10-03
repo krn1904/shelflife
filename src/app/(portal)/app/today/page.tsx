@@ -1,8 +1,9 @@
 import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { today } from '@/lib/intake/expiry';
-import { ACTION_LABEL } from '@/lib/expiry/engine';
+import { todayIn } from '@/lib/intake/expiry';
+import { PageHeader } from '@/components/ui';
+import { byUrgency } from '@/lib/expiry/today';
 import { TodayList, type TodayItem, type FixtureCheck } from './today-list';
 
 export default async function TodayPage() {
@@ -13,18 +14,18 @@ export default async function TodayPage() {
   if (!site) {
     return (
       <div>
-        <h1 className="text-xl font-semibold">Today</h1>
-        <p className="mt-2 text-sm text-neutral-500">You are not assigned to a site yet.</p>
+        <PageHeader title="Today" />
+        <p className="mt-2 text-sm text-muted">You are not assigned to a site yet.</p>
       </div>
     );
   }
 
-  const asOf = today();
+  const asOf = todayIn(site.timeZone);
 
   const [{ data: actions }, { data: checks }] = await Promise.all([
     supabase
       .from('expiry_actions')
-      .select('id, action, due_date, stock_batches(id, qty_remaining, products(name, brand, size))')
+      .select('id, action, due_date, stock_batches(id, qty_remaining, marked_down_at, products(name, brand, size))')
       .eq('site_id', site.id)
       .eq('state', 'open')
       .order('due_date'),
@@ -36,21 +37,22 @@ export default async function TodayPage() {
       .order('fixture'),
   ]);
 
-  const items: TodayItem[] = (actions ?? []).flatMap((row) => {
-    const batch = row.stock_batches;
-    if (!batch) return [];
-    return [{
-      id: row.id,
-      batchId: batch.id,
-      action: row.action,
-      actionLabel: ACTION_LABEL[row.action],
-      dueDate: row.due_date,
-      daysLeft: differenceInCalendarDays(parseISO(row.due_date), parseISO(asOf)),
-      qtyRemaining: batch.qty_remaining,
-      name: batch.products?.name ?? 'Unknown product',
-      detail: [batch.products?.brand, batch.products?.size].filter(Boolean).join(' · '),
-    }];
-  });
+  const items: TodayItem[] = (actions ?? [])
+    .flatMap((row) => {
+      const batch = row.stock_batches;
+      if (!batch) return [];
+      return [{
+        id: row.id,
+        batchId: batch.id,
+        action: row.action,
+        daysLeft: differenceInCalendarDays(parseISO(row.due_date), parseISO(asOf)),
+        qtyRemaining: batch.qty_remaining,
+        markedDownOn: batch.marked_down_at,
+        name: batch.products?.name ?? 'Unknown product',
+        detail: [batch.products?.brand, batch.products?.size].filter(Boolean).join(' · '),
+      }];
+    })
+    .sort(byUrgency);
 
   const fixtures: FixtureCheck[] = (checks ?? []).map((c) => ({
     id: c.id,
@@ -60,13 +62,9 @@ export default async function TodayPage() {
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Today</h1>
-        <p className="text-sm text-neutral-500">{site.name}</p>
-      </div>
-
+      <PageHeader title="Today" subtitle={site.name} />
       <div className="mt-6">
-        <TodayList items={items} fixtures={fixtures} />
+        <TodayList items={items} fixtures={fixtures} timeZone={site.timeZone} />
       </div>
     </div>
   );

@@ -13,7 +13,7 @@ import {
 function entry(partial: Partial<OutboxEntry>): OutboxEntry {
   return {
     clientId: 'c1',
-    kind: 'waste',
+    kind: 'batch-step',
     payload: {},
     queuedAt: 1000,
     attempts: 0,
@@ -23,8 +23,8 @@ function entry(partial: Partial<OutboxEntry>): OutboxEntry {
 }
 
 test('replays oldest first', () => {
-  // Two write-offs against one batch must land in the order they were made, or the second
-  // is rejected for exceeding a quantity the first had not yet taken away.
+  // Two answers about one batch must land in the order they were made, or a "Pulled out"
+  // can close the batch before its "Reduced price" arrives.
   const order = replayOrder([
     entry({ clientId: 'c', queuedAt: 3000 }),
     entry({ clientId: 'a', queuedAt: 1000 }),

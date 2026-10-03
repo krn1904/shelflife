@@ -60,9 +60,10 @@ export function buildDigest(input: DigestInput): Digest {
   const check = input.actions.filter((a) => a.action === 'check').length;
   const overdue = input.actions.filter((a) => a.daysLeft < 0).length;
 
+  const lastDay = `${plural(pull, 'line', 'lines')} on ${pull === 1 ? 'its' : 'their'} last day`;
   const parts: string[] = [];
-  if (pull > 0) parts.push(`${plural(pull, 'line', 'lines')} to pull`);
-  if (markdown > 0) parts.push(`${plural(markdown, 'line', 'lines')} to mark down`);
+  if (pull > 0) parts.push(lastDay);
+  if (markdown > 0) parts.push(`${plural(markdown, 'line', 'lines')} to put on half price`);
   if (check > 0) parts.push(`${plural(check, 'line', 'lines')} to check`);
   if (input.rotationFixtures > 0) {
     parts.push(`${plural(input.rotationFixtures, 'fixture', 'fixtures')} to walk`);
@@ -71,7 +72,7 @@ export function buildDigest(input: DigestInput): Digest {
   // The title carries the urgent number so it survives truncation on a lock screen.
   const title =
     pull > 0
-      ? `${input.siteName}: ${plural(pull, 'line', 'lines')} to pull`
+      ? `${input.siteName}: ${lastDay}`
       : `${input.siteName}: today's list`;
 
   return {

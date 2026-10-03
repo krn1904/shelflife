@@ -42,3 +42,56 @@ their action runs (`SubmitButton`). This fixes the feedback, not the speed itsel
 **Still to do:** find the actual cause. Measure the slowest pages' queries before optimising:
 several pages page through whole tables (the docket intake loads the whole catalogue to match
 against), and the platform-admin organisation page lists every auth user on each view.
+
+---
+
+## Expiry board layout
+
+**Reported (2026-10-03):** on the expiry board, "Needs an answer today" (Last day, Half price,
+Check) fills the screen, and "Looking ahead" (On half price, Coming up) only appears after a
+long scroll. Nobody will scroll that far, so the look-ahead columns are effectively hidden.
+
+**Current layout:** two groups, each a row of its own columns, stacked one above the other
+([expiry-board.tsx](../src/components/expiry-board.tsx)). It replaced a single grid that left
+large empty gaps beside long columns.
+
+**To do:** redesign the page so both groups are visible without scrolling far. Ideas to weigh
+when it is picked up, not decided:
+
+- Tabs or a toggle between "Today" and "Looking ahead".
+- One row of five columns that each scroll on their own, with the page height fixed.
+- Show only the first few cards per column with a "Show all (N)" link.
+- Put "Coming up" first on a manager's view and "Needs an answer" first on staff's.
+
+---
+
+## Known issue: shelf-life group uses the delivery's close date
+
+**Found in review (2026-10-03), parked:** a batch's group (short / medium / long-life), which
+decides when its half-price reminder comes, is set from the day its delivery was **closed**
+(`stock_batches.created_at`), not the day the stock arrived. The expiry date and the "days left"
+countdown are unaffected; only which reminder plan applies.
+
+**When it matters:** a delivery left open for several days, holding an item close to a group
+boundary. A yoghurt that arrives with 23 days (medium-life, half price 7 days out) in a delivery
+closed 3 days later counts as 20 days (short-life, half price 2 days out).
+
+**Possible fixes, if it shows up in practice:** use the delivery's `received_at`, or the date
+printed on the docket, as the arrival day. Not done yet because it adds a second date to carry
+through intake for a rare case; deliveries are normally closed the same day.
+
+---
+
+## Scheduled jobs for sites outside Melbourne's timezone
+
+**Context (2026-10-03):** every date is now worked out on each site's own calendar (required
+`sites.timezone`), including in the nightly expiry engine and the morning digest. The jobs
+still *run* on Melbourne's clock: the engine at 02:00 and the digest at 06:00 Australia/Melbourne.
+
+**Why it matters later:** at 02:00 in Melbourne it is still the previous evening in Perth, so a
+Perth site's reminders would be planned for the day that is ending, and its digest would arrive
+at 3–4am. All current sites are in Melbourne, so nothing is wrong today.
+
+**When a site outside Melbourne's zone is added:** run the engine hourly (it is a full,
+idempotent recompute, so extra runs are harmless) and have the digest send to each site in the
+run where that site's local hour is 6.

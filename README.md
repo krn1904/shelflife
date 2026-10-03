@@ -19,7 +19,7 @@ Every product carries one of three tracking modes, so staff only do work that pa
 | Mode | Applies to | At intake | Surfacing |
 |---|---|---|---|
 | `rotation` | Milk, bread, sandwiches, bakery | Nothing captured | Daily fixture tick-list |
-| `batch` | Drinks, snacks, chilled, grocery | One expiry per line | Auto-surfaces at T-30/14/7/3/1 |
+| `batch` | Drinks, snacks, chilled, grocery | One expiry per line | Half price, then a last-day call (long-life also gets an early check) |
 | `none` | Cigarettes, accessories | Quantity only | Never |
 
 Intake is **docket-driven, not scan-driven**. The docket already lists what arrived, so staff
@@ -96,6 +96,25 @@ recompute over a few thousand rows takes milliseconds and is always correct, so 
 no incremental diffing to get wrong. It also creates the day's rotation checks. Both writes
 lock each organisation and skip any that have been archived since the job's snapshot.
 
+Reminders follow each batch's **shelf life on arrival** (expiry date minus the day it came
+in), fixed once so long-life stock keeps its long-life reminders to the end:
+
+| Group (defaults) | Reminders |
+|---|---|
+| Short-life, up to 21 days | Half price 2 days before → last day |
+| Medium-life, up to 90 days | Half price 7 days before → last day |
+| Long-life, longer | Early check 30 days before → half price 7 days before → last day |
+
+Each site can change these under **Site → Reminder settings**; a site that never does uses
+the defaults. Staff answer each card in one tap — *Reduced price* or *Gone*, then on the last
+day *Pulled out* or *Sold* — and a batch moves on to its next reminder instead of repeating.
+*Pulled out* records the leftover as expired waste automatically, valued at the site's unit
+cost or, failing that, the price read off the docket.
+
+The **expiry board** shows the same cards as columns (Last day, Half price, Check, On half
+price, Coming up) and takes the same answers. Staff open it from Today; managers under
+**Site → Expiry board**.
+
 The function is a thin wrapper. Every rule it applies lives in `src/lib/expiry/engine.ts`
 as plain TypeScript covered by `npm test`, so the logic is testable even though the
 function itself only runs under Deno.
@@ -135,8 +154,8 @@ the home screen first — Safari only allows push for installed apps.
 
 ### Offline
 
-Shelf-side mutations — writing off stock and ticking an action — are queued in an
-IndexedDB outbox and replayed in order when the connection returns. Every queued write
+Answers on the Today list are sent straight away, or kept in an IndexedDB outbox when
+there is no signal and replayed in order when the connection returns. Every queued write
 carries a client-generated id the server treats as an idempotency key, because a request
 that timed out may or may not have been applied: the only safe design is to retry it and
 make retrying harmless. A persistent strip shows what is still on the device, and says
@@ -191,6 +210,9 @@ supabase functions deploy daily-digest
 supabase secrets set CRON_SECRET=... VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
 ```
 
+When a branch adds a migration, run `supabase db push` before testing its Vercel preview: the
+preview runs the new code against the hosted database, and pages fail until it has the migration.
+
 Vercel needs `NEXT_PUBLIC_SUPABASE_URL`, the anon/publishable key, the service/secret
 key, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, and the `TEXTRACT_*` keys if docket reading should offer
 AWS Textract. Supabase renamed its keys in 2025 and both
@@ -232,7 +254,8 @@ same data. `npm test` checks the world's invariants without a database.
 | Liberty Oil (`liberty-oil`) | **archived** 18 days ago | Archived list and Restore; its members are locked out |
 | Ampol Eastern (`ampol-eastern`) | active, new | Onboarded 2 days ago: every empty state, a removable site |
 
-Across them: every waste reason (including a supplier recall), short deliveries
+Across them: every reminder card (stock already on half price, long-life checks answered),
+the demo's Coburg site with its own reminder settings, every waste reason (including a supplier recall), short deliveries
 (`qty_received` < `qty_docketed`), site tracking-mode overrides, ranged-off lines, an
 inactive supplier, a supplier with no history yet (the manual-entry intake path),
 products added by staff scans, suppliers with ABNs (all but Local Bakehouse, the no-ABN case), done/dismissed action history, three weeks of rotation

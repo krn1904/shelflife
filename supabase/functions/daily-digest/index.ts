@@ -14,7 +14,6 @@ import type { JobResult } from '../_shared/engine.ts';
 import { fetchAllPages } from '../_shared/pagination.ts';
 
 const JOB = 'daily-digest';
-const SITE_TIMEZONE = 'Australia/Melbourne';
 const DEAD_SUBSCRIPTION_CODES = [404, 410];
 
 function todayAt(timeZone: string): string {
@@ -49,20 +48,21 @@ Deno.serve(async (request: Request) => {
       Deno.env.get('VAPID_PRIVATE_KEY')!,
     );
 
-    const today = todayAt(SITE_TIMEZONE);
+    // Each site's own date. The sites are read first because that is where the zone is.
+    const sites = await fetchAllPages<{ id: string; org_id: string; name: string; timezone: string }>((from, to) =>
+      supabase
+        .from('sites')
+        .select('id, org_id, name, timezone, orgs!inner(status)')
+        .eq('orgs.status', 'active')
+        .order('id')
+        .range(from, to)
+    );
+    const todayOf = new Map(sites.map((s) => [s.id, todayAt(s.timezone)]));
+    const days = [...new Set(todayOf.values())];
 
     // The service role bypasses RLS. Join active lifecycle scope into every query and
     // page results so PostgREST's max_rows cap cannot skip later organisations.
-    const [sites, actions, checks, subscriptions] = await Promise.all([
-      fetchAllPages<{ id: string; org_id: string; name: string }>((from, to) =>
-        supabase
-          .from('sites')
-          .select('id, org_id, name, orgs!inner(status)')
-          .eq('orgs.status', 'active')
-          .order('id')
-          .range(from, to)
-      ),
-      fetchAllPages<{ site_id: string; action: 'check' | 'markdown' | 'pull'; due_date: string }>((from, to) =>
+    const [actions, checks, subscriptions] = await Promise.all([      fetchAllPages<{ site_id: string; action: 'check' | 'markdown' | 'pull'; due_date: string }>((from, to) =>
         supabase
           .from('expiry_actions')
           .select('site_id, action, due_date, orgs!inner(status)')
@@ -71,12 +71,15 @@ Deno.serve(async (request: Request) => {
           .order('id')
           .range(from, to)
       ),
-      fetchAllPages<{ site_id: string }>((from, to) =>
+      // Every site's "today" at once (sites in different zones can be on different days);
+      // each site then counts only the checks dated its own today.
+      // No active sites means no dates to ask about (an empty IN list is an error).
+      days.length === 0 ? Promise.resolve([]) : fetchAllPages<{ site_id: string; check_date: string }>((from, to) =>
         supabase
           .from('rotation_checks')
-          .select('site_id, orgs!inner(status)')
+          .select('site_id, check_date, orgs!inner(status)')
           .eq('orgs.status', 'active')
-          .eq('check_date', today)
+          .in('check_date', days)
           .eq('state', 'open')
           .order('id')
           .range(from, to)
@@ -100,6 +103,7 @@ Deno.serve(async (request: Request) => {
     ]);
 
     for (const site of sites) {
+      const today = todayOf.get(site.id)!;
       const siteActions = actions
         .filter((a) => a.site_id === site.id)
         .map((a) => ({
@@ -110,7 +114,7 @@ Deno.serve(async (request: Request) => {
       const digest = buildDigest({
         siteName: site.name,
         actions: siteActions,
-        rotationFixtures: checks.filter((c) => c.site_id === site.id).length,
+        rotationFixtures: checks.filter((c) => c.site_id === site.id && c.check_date === today).length,
       });
 
       if (!digest.worthSending) {

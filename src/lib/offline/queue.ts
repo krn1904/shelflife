@@ -8,7 +8,7 @@
  * key, and replay order is preserved so a decrement never overtakes the write it depends on.
  */
 
-export type OutboxKind = 'waste' | 'action-state' | 'rotation-check';
+export type OutboxKind = 'action-state' | 'rotation-check' | 'batch-step';
 
 export type OutboxEntry = {
   /** Generated on the device, before the write is attempted. The idempotency key. */
@@ -51,8 +51,8 @@ export function backoffMs(attempts: number): number {
 /**
  * Replay order: oldest first, always.
  *
- * Two write-offs against the same batch must land in the order they were made, or the
- * second can be rejected for exceeding a quantity the first had not yet taken away.
+ * Two answers about the same batch must land in the order they were made: "Reduced price"
+ * then "Pulled out" replayed the other way round would close the batch before it was marked down.
  */
 export function replayOrder(entries: OutboxEntry[]): OutboxEntry[] {
   return [...entries].sort((a, b) => a.queuedAt - b.queuedAt || a.clientId.localeCompare(b.clientId));

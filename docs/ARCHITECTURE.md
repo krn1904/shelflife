@@ -32,8 +32,8 @@ key and bypasses RLS; they run on a cron, not in a request.
 src/
   app/                         Next.js App Router
     (portal)/                  authenticated shell; layout gates the session
-      app/                       staff PWA  — deliveries, today, scan, waste, settings
-      manage/                    manager    — delivery review, expiry board, waste, products
+      app/                       staff PWA  — deliveries, today, expiry board, scan, waste, settings
+      manage/                    manager    — delivery review, expiry board, waste, products, reminder settings
       owner/                     owner      — multi-site rollup + CSV export route
       admin/                     platform admin — organisations, lifecycle, job history
     login/                     one public route (+ demo one-click logins)
@@ -180,18 +180,39 @@ or a database in sight. When you touch engine or digest rules, edit the `_shared
 Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
 [expiry-engine/index.ts](../supabase/functions/expiry-engine/index.ts).
 
-- `planExpiryActions(batches, today)` emits **exactly one action per batch** — the most urgent
-  tier on the T-30/14/7/3/1 ladder it currently qualifies for (already-expired ⇒ always `pull`).
-  Not one row per threshold crossed. This pairs with a partial unique index on `(batch_id) where
-  state = 'open'`.
+- `planExpiryActions(batches, today, settingsBySite)` emits **at most one action per batch**. The
+  batch's group (`shelfLifeGroup()`: short / medium / long) is fixed by its shelf life on arrival —
+  expiry minus the Melbourne date of `stock_batches.created_at`, which is when its delivery closed —
+  so it never drifts into a shorter group as the date nears. Then: expiry day or past ⇒ `pull`
+  (shown as *Last day*); within the group's half-price days and not yet `marked_down_at` ⇒
+  `markdown`; long-life within the early-check days and not yet `checked_at` ⇒ `check`. A
+  marked-down batch waits for its last day. This pairs with a partial unique index on
+  `(batch_id) where state = 'open'`.
+- Per-site settings come from `reminder_settings` (`settingsFromRow()`); a site without a row uses
+  `DEFAULT_REMINDER_SETTINGS`, the same defaults as the table's columns. `validateReminderSettings()`
+  holds the same rules as the table's checks (no reminder may fire the day the shortest item of
+  its group arrives) and drives the settings screen.
+- The Today list and the expiry board share one card and answer hook
+  ([reminder-card.tsx](../src/components/reminder-card.tsx)). The board
+  ([board.ts](../src/lib/expiry/board.ts), loaded by `loadBoard()` in
+  [board-data.ts](../src/lib/expiry/board-data.ts)) adds two look-ahead columns, *On half price*
+  and *Coming up* (within the site's early-check days), to the three reminder columns.
+- Staff answer through `resolve_batch_step(batch, step, qty, client_id)`: `checked` and
+  `marked_down` stamp the batch, `sold` closes it as `sold_through`, `pulled` writes the binned
+  quantity as `expired` waste (valued by `batch_unit_cost()`: site cost, else the docket line's
+  `unit_cost`) and closes it as `pulled`. It closes the batch's open action, is idempotent for
+  offline replay, and runs as the caller so RLS applies.
 - `planRotationChecks(fixtures, today)` emits one check per fixture per site per day.
 - The wrapper is thin: authenticate the cron call (`x-cron-secret`, else 403), scope to active
   organisations, read active batches, **delete their `open` `expiry_actions` and re-insert** through
   RPCs that lock each organisation and skip any that have been archived since the snapshot (full recompute — correct by
   construction, no incremental diffing to get wrong; done/dismissed rows are history and stay),
   then upsert rotation checks the same way (`ignoreDuplicates`, so a same-day re-run never wipes staff ticks).
-- "Today" is computed in `Australia/Melbourne`, not UTC — a 02:00 Melbourne run is still
-  yesterday in UTC and the whole ladder would shift by a day.
+- **Every date is on the site's own calendar.** Each site has a required timezone
+  (`sites.timezone`, chosen from [timezones.ts](../src/lib/sites/timezones.ts); the database
+  refuses a missing or unknown zone). The app's `todayIn(site.timeZone)` and the jobs'
+  `planPerSite()` work out "today" and a batch's arrival day per site, never from the server's
+  clock: the app runs on UTC servers, where a Melbourne morning is still yesterday.
 - **Every run writes a `job_runs` row, success or failure.** A silently-stopped cron is the
   worst failure mode (nothing looks broken until stock is gone); the admin portal flags an engine
   that has not reported in 36 hours.
@@ -265,7 +286,10 @@ One expiry per SKU line, covering every box of that SKU ⇒ normally one `stock_
 
 ## Offline sync
 
-Only shelf-side mutations — **waste and action-state ticks** — are queued. Intake is
+Only shelf-side mutations are queued: today that is **answers on the Today list**
+(`batch-step`, sent through [send.ts](../src/lib/offline/send.ts), which tries the server first and
+queues under the same id when there is no signal). Fixture ticks are sent
+directly. Intake is
 deliberately *not* (its draft lives on the server; a multi-step flow is a bigger promise than the
 outbox can keep). Split in two on purpose:
 
@@ -301,7 +325,7 @@ the flag unset anywhere real.
 
 ## Data model
 
-17 tables, all with `org_id` + RLS, created across the migrations. The schema calls a customer
+18 tables, all with `org_id` + RLS, created across the migrations. The schema calls a customer
 organisation an `org`; “tenant” appears only where describing the standard multi-tenant
 architecture:
 
@@ -310,7 +334,9 @@ architecture:
 barcode, plus each organisation's own products added from dockets, which carry `org_id`),
 `site_products` (per-site overrides incl. `tracking_mode_override`), `deliveries`,
 `delivery_lines` (`qty_docketed` vs `qty_received` kept separate from day one — this is what
-makes v2 reconciliation need no migration), `stock_batches`, `expiry_actions`, `rotation_checks`,
+makes v2 reconciliation need no migration; `unit_cost` is the unit price read off the docket when
+the reader is certain of it), `stock_batches` (`checked_at` / `marked_down_at` record staff
+answers), `reminder_settings` (one row per site that changed the defaults), `expiry_actions`, `rotation_checks`,
 `waste_events`, `job_runs`, `push_subscriptions`, `audit_log`.
 
 `memberships` is `unique nulls not distinct (user_id, org_id, site_id)`. Organisation-wide
@@ -328,7 +354,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, expiry ladder, digest text, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload) |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, digest text, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost) |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

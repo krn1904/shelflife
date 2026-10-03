@@ -94,7 +94,7 @@ async function main() {
       `got ${s?.length}: ${JSON.stringify(s?.map((x) => x.name))}`);
 
     const { error } = await owner.from('sites')
-      .insert({ org_id: united.id, name: 'Injected site' });
+      .insert({ org_id: united.id, name: 'Injected site', timezone: 'Australia/Melbourne' });
     check('cannot insert a site into another org', error !== null,
       error ? '' : 'insert unexpectedly succeeded');
 
@@ -108,7 +108,7 @@ async function main() {
     const ownerSiteName = `Owner site ${Date.now()}`;
     const { error: ownerSiteInsert } = await owner
       .from('sites')
-      .insert({ org_id: metro.id, name: ownerSiteName });
+      .insert({ org_id: metro.id, name: ownerSiteName, timezone: 'Australia/Melbourne' });
     const { data: createdSite } = await owner
       .from('sites')
       .select('id')
@@ -409,6 +409,65 @@ async function main() {
     await admin.from('suppliers').delete().eq('id', supplierId!);
   }
 
+  console.log('\nsite timezones:');
+  {
+    // Even the service role, which skips RLS, cannot create a site without a real zone:
+    // every date the site sees is worked out in it.
+    const { error: madeUp } = await admin.from('sites')
+      .insert({ org_id: metro.id, name: 'RLS zone check', timezone: 'Perth' });
+    check('a made-up timezone is refused', madeUp !== null, madeUp ? '' : 'insert unexpectedly succeeded');
+
+    const { error: missing } = await admin.from('sites')
+      .insert({ org_id: metro.id, name: 'RLS zone check', timezone: null as unknown as string });
+    check('a site needs a timezone (no silent Melbourne default)', missing !== null,
+      missing ? '' : 'insert unexpectedly succeeded');
+  }
+
+  console.log('\nreminder settings and Today answers:');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    // Cleared first in case an earlier run stopped part-way.
+    await admin.from('reminder_settings').delete().in('site_id', [brunswick.id, coburg.id]);
+
+    const brunswickManager = await signIn('manager@metro-petroleum.test');
+    const { error: ownSave } = await brunswickManager.from('reminder_settings')
+      .insert({ site_id: brunswick.id, org_id: metro.id, short_max_days: 14 });
+    check('a manager can save their own site\'s reminder settings', ownSave === null, ownSave?.message ?? '');
+
+    const { error: otherSiteSave } = await brunswickManager.from('reminder_settings')
+      .insert({ site_id: coburg.id, org_id: metro.id });
+    check('but not another site\'s, even in the same organisation', otherSiteSave !== null,
+      otherSiteSave ? '' : 'insert unexpectedly succeeded');
+
+    const { data: staffEdit } = await staff.from('reminder_settings')
+      .update({ short_max_days: 30 }).eq('site_id', brunswick.id).select('site_id');
+    check('staff can read but not change them', (staffEdit?.length ?? 0) === 0,
+      `updated ${staffEdit?.length} rows`);
+
+    const { data: foreignSettings } = await other.from('reminder_settings').select('site_id').eq('site_id', brunswick.id);
+    check('another organisation cannot see them', (foreignSettings?.length ?? 0) === 0);
+
+    const { error: plantedSettings } = await other.from('reminder_settings')
+      .insert({ site_id: coburg.id, org_id: united.id });
+    check('nor file settings against a foreign site under its own org_id', plantedSettings !== null,
+      plantedSettings ? '' : 'insert unexpectedly succeeded');
+
+    // A Today answer closes a batch, so it must never reach another tenant's stock.
+    const { data: theirBatch } = await admin.from('stock_batches')
+      .select('id').eq('org_id', united.id).eq('status', 'active').limit(1).single();
+    const { error: foreignAnswer } = await staff.rpc('resolve_batch_step', {
+      p_batch_id: theirBatch!.id, p_step: 'sold',
+    });
+    const { data: stillActive } = await admin.from('stock_batches').select('status').eq('id', theirBatch!.id).single();
+    check('cannot answer a reminder for another organisation\'s batch',
+      foreignAnswer !== null && stillActive?.status === 'active',
+      foreignAnswer ? '' : `rpc succeeded; batch is ${stillActive?.status}`);
+
+    await admin.from('reminder_settings').delete().in('site_id', [brunswick.id, coburg.id]);
+  }
+
   console.log('\norganisation lifecycle:');
   {
     const platform = await signIn('admin@shelflife.test');
@@ -480,7 +539,7 @@ async function main() {
       .single();
     const { data: cascadeSite } = await admin
       .from('sites')
-      .insert({ org_id: cascadeOrg!.id, name: 'Cascade site' })
+      .insert({ org_id: cascadeOrg!.id, name: 'Cascade site', timezone: 'Australia/Melbourne' })
       .select('id')
       .single();
     await admin.from('memberships').insert({
@@ -501,7 +560,7 @@ async function main() {
       .single();
     const { data: jobSite } = await admin
       .from('sites')
-      .insert({ org_id: jobOrg!.id, name: 'Job site' })
+      .insert({ org_id: jobOrg!.id, name: 'Job site', timezone: 'Australia/Melbourne' })
       .select('id')
       .single();
     const { data: jobProduct } = await admin.from('products').select('id').limit(1).single();
@@ -589,7 +648,7 @@ async function main() {
 
     const { error: directSiteWrite } = await platform
       .from('sites')
-      .insert({ org_id: united.id, name: 'Unaudited site' });
+      .insert({ org_id: united.id, name: 'Unaudited site', timezone: 'Australia/Melbourne' });
     check('platform admin cannot bypass audited site creation',
       directSiteWrite !== null, directSiteWrite ? '' : 'insert unexpectedly succeeded');
 
@@ -891,7 +950,7 @@ async function main() {
 
     const { error: archivedServiceWrite } = await admin
       .from('sites')
-      .insert({ org_id: united.id, name: 'Post-archive service write' });
+      .insert({ org_id: united.id, name: 'Post-archive service write', timezone: 'Australia/Melbourne' });
     check('service role cannot add a site after archival', archivedServiceWrite !== null,
       archivedServiceWrite ? '' : 'insert unexpectedly succeeded');
 

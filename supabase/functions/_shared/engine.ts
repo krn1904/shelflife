@@ -9,34 +9,148 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 
 export type ExpiryActionKind = 'check' | 'markdown' | 'pull';
 
-/**
- * The T-30/14/7/3/1 ladder, most urgent first.
- *
- * The action escalates with the date because the useful response does: a month out you
- * face it forward, a week out you discount it, a day out it comes off the shelf. Ordered
- * most-urgent-first so the first match wins.
- */
-const LADDER: { withinDays: number; action: ExpiryActionKind }[] = [
-  { withinDays: 1, action: 'pull' },
-  { withinDays: 3, action: 'markdown' },
-  { withinDays: 7, action: 'markdown' },
-  { withinDays: 14, action: 'check' },
-  { withinDays: 30, action: 'check' },
-];
-
-export const HORIZON_DAYS = LADDER[LADDER.length - 1].withinDays;
-
 export const ACTION_LABEL: Record<ExpiryActionKind, string> = {
   check: 'Check',
-  markdown: 'Mark down',
-  pull: 'Pull',
+  markdown: 'Half price',
+  pull: 'Last day',
 };
+
+/** Groups by shelf life on arrival: how long the batch had left the day it came in. */
+export type ShelfLifeGroup = 'short' | 'medium' | 'long';
+
+/** One site's reminder plan. Mirrors public.reminder_settings. */
+export type ReminderSettings = {
+  shortMaxDays: number;       // arrives with up to this many days → short-life
+  mediumMaxDays: number;      // up to this many → medium-life; longer → long-life
+  shortMarkdownDays: number;  // short-life: half price this many days before expiry
+  mediumMarkdownDays: number; // medium-life: half price this many days before expiry
+  longCheckDays: number;      // long-life: early check this many days before expiry
+  longMarkdownDays: number;   // long-life: half price this many days before expiry
+};
+
+// A site with no saved settings uses these. Same defaults as the table's columns.
+export const DEFAULT_REMINDER_SETTINGS: ReminderSettings = {
+  shortMaxDays: 21,
+  mediumMaxDays: 90,
+  shortMarkdownDays: 2,
+  mediumMarkdownDays: 7,
+  longCheckDays: 30,
+  longMarkdownDays: 7,
+};
+
+/** Furthest ahead the default plan looks (the long-life early check). */
+export const HORIZON_DAYS = DEFAULT_REMINDER_SETTINGS.longCheckDays;
+
+export type ReminderSettingsRow = {
+  short_max_days: number;
+  medium_max_days: number;
+  short_markdown_days: number;
+  medium_markdown_days: number;
+  long_check_days: number;
+  long_markdown_days: number;
+};
+
+/** Database row → settings. No row means the site never changed them: defaults. */
+export function settingsFromRow(row: ReminderSettingsRow | null | undefined): ReminderSettings {
+  if (!row) return DEFAULT_REMINDER_SETTINGS;
+  return {
+    shortMaxDays: row.short_max_days,
+    mediumMaxDays: row.medium_max_days,
+    shortMarkdownDays: row.short_markdown_days,
+    mediumMarkdownDays: row.medium_markdown_days,
+    longCheckDays: row.long_check_days,
+    longMarkdownDays: row.long_markdown_days,
+  };
+}
+
+export type SettingsProblem = { field: keyof ReminderSettings; message: string };
+
+/**
+ * Settings that make sense, or what is wrong with them. Same rules as the table's
+ * checks: no reminder may fire the day the shortest item in its group arrives.
+ */
+export function validateReminderSettings(s: ReminderSettings): SettingsProblem[] {
+  const problems: SettingsProblem[] = [];
+  const whole = (n: number) => Number.isInteger(n) && n >= 1;
+
+  for (const [field, value] of Object.entries(s) as [keyof ReminderSettings, number][]) {
+    if (!whole(value)) problems.push({ field, message: 'Must be a whole number of days, 1 or more.' });
+  }
+  if (problems.length > 0) return problems;
+
+  if (s.shortMaxDays < 2) {
+    problems.push({ field: 'shortMaxDays', message: 'Short-life needs to cover at least 2 days.' });
+  }
+  if (s.mediumMaxDays <= s.shortMaxDays) {
+    problems.push({ field: 'mediumMaxDays', message: `Must be more than short-life (${s.shortMaxDays} days).` });
+  }
+  if (s.mediumMaxDays > 3650) {
+    problems.push({ field: 'mediumMaxDays', message: 'Must be 3650 days (10 years) or less.' });
+  }
+  if (s.shortMarkdownDays >= s.shortMaxDays) {
+    problems.push({
+      field: 'shortMarkdownDays',
+      message: `Must be less than ${s.shortMaxDays}, or a ${s.shortMaxDays}-day item goes half price the day it arrives.`,
+    });
+  }
+  if (s.mediumMarkdownDays > s.shortMaxDays) {
+    problems.push({
+      field: 'mediumMarkdownDays',
+      message: `Must be ${s.shortMaxDays} or less, or the shortest medium-life item goes half price the day it arrives.`,
+    });
+  }
+  if (s.longCheckDays > s.mediumMaxDays) {
+    problems.push({
+      field: 'longCheckDays',
+      message: `Must be ${s.mediumMaxDays} or less, or the shortest long-life item is checked the day it arrives.`,
+    });
+  }
+  if (s.longMarkdownDays >= s.longCheckDays) {
+    problems.push({ field: 'longMarkdownDays', message: `Must be less than the early check (${s.longCheckDays} days).` });
+  }
+  return problems;
+}
+
+/** The group a batch belongs to, fixed by its shelf life on the day it arrived. */
+export function shelfLifeGroup(arrivedOn: string, expiryDate: string, settings: ReminderSettings): ShelfLifeGroup {
+  const shelfLife = differenceInCalendarDays(parseISO(expiryDate), parseISO(arrivedOn));
+  if (shelfLife <= settings.shortMaxDays) return 'short';
+  if (shelfLife <= settings.mediumMaxDays) return 'medium';
+  return 'long';
+}
+
+/** A group's reminders, earliest first, as days before expiry (0 = the expiry day). */
+export function remindersFor(
+  group: ShelfLifeGroup,
+  settings: ReminderSettings,
+): { action: ExpiryActionKind; daysBefore: number }[] {
+  if (group === 'short') return [{ action: 'markdown', daysBefore: settings.shortMarkdownDays }, { action: 'pull', daysBefore: 0 }];
+  if (group === 'medium') return [{ action: 'markdown', daysBefore: settings.mediumMarkdownDays }, { action: 'pull', daysBefore: 0 }];
+  return [
+    { action: 'check', daysBefore: settings.longCheckDays },
+    { action: 'markdown', daysBefore: settings.longMarkdownDays },
+    { action: 'pull', daysBefore: 0 },
+  ];
+}
+
+/** A timestamp's calendar date in a time zone, e.g. a batch's arrival day in Melbourne. */
+export function localDate(timestamp: string, timeZone: string): string {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date(timestamp));
+}
 
 export type BatchRow = {
   id: string;
   orgId: string;
   siteId: string;
   expiryDate: string | null;
+  arrivedOn: string;     // the day it arrived (store's date)
+  checked: boolean;      // long-life early check already answered
+  markedDown: boolean;   // already on half price
 };
 
 export type PlannedAction = {
@@ -49,39 +163,66 @@ export type PlannedAction = {
 };
 
 /**
- * Exactly one action per batch — the most urgent tier it currently qualifies for.
+ * Today's reminder for each batch, at most one.
  *
- * Not one per threshold: a batch that has crossed 30, 14 and 7 needs one instruction,
- * not three. This pairs with the partial unique index on (batch_id) where state = 'open',
- * so a re-run cannot stack duplicates.
+ *   expiry day or past  → last day (pull or sold)
+ *   within half price   → half price, unless already marked down
+ *   long-life, within the early check → check, unless already checked
+ *
+ * A batch already marked down waits quietly for its last day. Settings come per site;
+ * a site missing from the map uses the defaults. The unique index on open actions per
+ * batch backs up the "at most one".
  */
-export function planExpiryActions(batches: BatchRow[], today: string): PlannedAction[] {
+export function planExpiryActions(
+  batches: BatchRow[],
+  today: string,
+  settingsBySite: Map<string, ReminderSettings> = new Map(),
+): PlannedAction[] {
   const asOf = parseISO(today);
 
   return batches.flatMap((batch) => {
-    // A batch with no date was never given one at intake. It cannot be scheduled, and
-    // inventing a date for it would be worse than leaving it off the list.
+    // No date was given at intake. Inventing one would put a made-up deadline in front of staff.
     if (!batch.expiryDate) return [];
 
+    const settings = settingsBySite.get(batch.siteId) ?? DEFAULT_REMINDER_SETTINGS;
     const daysLeft = differenceInCalendarDays(parseISO(batch.expiryDate), asOf);
+    const group = shelfLifeGroup(batch.arrivedOn, batch.expiryDate, settings);
+    const markdownDays = {
+      short: settings.shortMarkdownDays,
+      medium: settings.mediumMarkdownDays,
+      long: settings.longMarkdownDays,
+    }[group];
 
-    // Already expired: always a pull, however far past.
-    const tier =
-      daysLeft < 0
-        ? { withinDays: 0, action: 'pull' as const }
-        : LADDER.find((step) => daysLeft <= step.withinDays);
+    let action: ExpiryActionKind | null = null;
+    if (daysLeft <= 0) action = 'pull';
+    else if (batch.markedDown) action = null;
+    else if (daysLeft <= markdownDays) action = 'markdown';
+    else if (group === 'long' && !batch.checked && daysLeft <= settings.longCheckDays) action = 'check';
 
-    if (!tier) return []; // beyond the horizon — nothing to say about it yet
-
+    if (!action) return [];
     return [{
       batchId: batch.id,
       orgId: batch.orgId,
       siteId: batch.siteId,
-      action: tier.action,
+      action,
       dueDate: batch.expiryDate,
       daysLeft,
     }];
   });
+}
+
+/**
+ * Runs a planner once per site, each with that site's own "today". Sites can sit in
+ * different timezones, so one shared date would plan a Perth site on Melbourne's day.
+ */
+export function planPerSite<T extends { siteId: string }, R>(
+  rows: T[],
+  todayFor: (siteId: string) => string,
+  plan: (siteRows: T[], today: string) => R[],
+): R[] {
+  const bySite = new Map<string, T[]>();
+  for (const row of rows) bySite.set(row.siteId, [...(bySite.get(row.siteId) ?? []), row]);
+  return [...bySite].flatMap(([siteId, siteRows]) => plan(siteRows, todayFor(siteId)));
 }
 
 export type FixtureRow = { orgId: string; siteId: string; fixture: string };

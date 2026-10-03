@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { allEntries, drain, forget } from '@/lib/offline/outbox';
+import { OUTBOX_CHANGED, allEntries, drain, forget } from '@/lib/offline/outbox';
 import { pendingCount, stuck, type OutboxEntry } from '@/lib/offline/queue';
 import { replayOutboxEntry } from '@/lib/offline/actions';
 import { singleFlight } from '@/lib/offline/single-flight';
@@ -52,6 +52,9 @@ export function PendingChanges() {
     // get wrong — waking from sleep, a captive portal, a flaky mobile handover.
     const onOnline = () => void sync();
     window.addEventListener('online', onOnline);
+    // Something was just queued on this device: show it straight away.
+    const onQueued = () => void refresh();
+    window.addEventListener(OUTBOX_CHANGED, onQueued);
     const timer = setInterval(() => void sync(), POLL_MS);
 
     // The first read is deferred to the next tick rather than run in the effect body, so
@@ -63,6 +66,7 @@ export function PendingChanges() {
 
     return () => {
       window.removeEventListener('online', onOnline);
+      window.removeEventListener(OUTBOX_CHANGED, onQueued);
       clearInterval(timer);
       clearTimeout(kickoff);
     };

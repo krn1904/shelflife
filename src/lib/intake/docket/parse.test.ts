@@ -187,6 +187,62 @@ test('table: without headings the rows go through the line parser', () => {
   assert.equal(lines[0].productId, 'coke-zero-125');
 });
 
+test('table: a Unit Price column gives each line its unit price', () => {
+  const { lines } = parseDocketTable(grid([
+    ['Description', 'Qty', 'Unit Price', 'Amount'],
+    ['Pura Milk Full Cream 2L', '12', '$3.20', '$38.40'],
+    ['Oak Chocolate Milk 600ml', '8', '2.95', '23.60'],
+  ]), fixtures.catalogue);
+  assert.deepEqual(lines.map((l) => l.unitPrice), [3.2, 2.95]);
+  assert.deepEqual(lines.map((l) => l.supplied), [12, 8]); // money columns are not counts
+});
+
+test('table: a bare Price column counts only when an amount proves it is per unit', () => {
+  // Price × Qty = Amount: per unit.
+  const checked = parseDocketTable(grid([
+    ['Description', 'Qty', 'Price', 'Ext'],
+    ['Pura Milk Full Cream 2L', '12', '3.20', '38.40'],
+  ]), fixtures.catalogue).lines[0];
+  assert.equal(checked.unitPrice, 3.2);
+
+  // No amount: "Price" may be the line total (38.40 for 12), so it is not used.
+  const unproven = parseDocketTable(grid([
+    ['Description', 'Qty', 'Price'],
+    ['Pura Milk Full Cream 2L', '12', '38.40'],
+  ]), fixtures.catalogue).lines[0];
+  assert.equal(unproven.unitPrice, null);
+});
+
+test('table: a price that does not match its amount is dropped, not guessed', () => {
+  // $19.20 a carton beside a count of 12 units: 12 × 19.20 is not the $38.40 printed.
+  const { lines } = parseDocketTable(grid([
+    ['Description', 'Qty', 'Unit Price', 'Total'],
+    ['Pura Milk Full Cream 2L', '12', '19.20', '38.40'],
+  ]), fixtures.catalogue);
+  assert.equal(lines[0].unitPrice, null);
+});
+
+test('table: "Total Qty" and "Total Delivered" are quantity headings, not money', () => {
+  for (const heading of ['Total Qty', 'Total Delivered', 'Total Supplied']) {
+    const { lines } = parseDocketTable(grid([
+      ['Description', heading],
+      ['Pura Milk Full Cream 2L', '12'],
+    ]), fixtures.catalogue);
+    assert.equal(lines[0].supplied, 12, heading);
+  }
+  // Cases are a carton count, not money either.
+  const cases = parseDocketTable(grid([['Description', 'Total Cases'], ['Pura Milk Full Cream 2L', '12']]), fixtures.catalogue);
+  assert.equal(cases.lines[0].cartons, 12);
+});
+
+test('table: "Order Total" is money, and proves the unit price beside it', () => {
+  const { lines } = parseDocketTable(grid([
+    ['Description', 'Qty', 'Price', 'Order Total'],
+    ['Pura Milk Full Cream 2L', '12', '3.20', '38.40'],
+  ]), fixtures.catalogue);
+  assert.deepEqual([lines[0].supplied, lines[0].unitPrice], [12, 3.2]);
+});
+
 test('tells a product table from a letterhead table', () => {
   assert.equal(isProductTable(grid([['Description', 'Qty'], ['Pura Milk 2L', '2']])), true);
   assert.equal(isProductTable(grid([['Customer #', '256582'], ['Route', 'MELO11']]).map((r) => r.map((c) => ({ ...c, header: false })))), false);
