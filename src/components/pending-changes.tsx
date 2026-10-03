@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { allEntries, drain, forget } from '@/lib/offline/outbox';
 import { pendingCount, stuck, type OutboxEntry } from '@/lib/offline/queue';
 import { replayOutboxEntry } from '@/lib/offline/actions';
+import { singleFlight } from '@/lib/offline/single-flight';
 
 const POLL_MS = 20_000;
 
@@ -24,15 +25,27 @@ export function PendingChanges() {
     setEntries(await allEntries());
   }, []);
 
+  // `syncing` is only the label. Whether a drain is running is kept outside React state, so
+  // `sync` keeps one identity and the effect below installs its listeners exactly once.
+  const [drainOnce] = useState(() =>
+    singleFlight(async () => {
+      setSyncing(true);
+      try {
+        return await drain(async (entry) => replayOutboxEntry(entry.clientId, entry.kind, entry.payload));
+      } finally {
+        setSyncing(false);
+      }
+    }),
+  );
+
   const sync = useCallback(async () => {
-    if (!navigator.onLine || syncing) return;
-    setSyncing(true);
-    const result = await drain(async (entry) => replayOutboxEntry(entry.clientId, entry.kind, entry.payload));
-    setSyncing(false);
+    if (!navigator.onLine) return;
+    const result = await drainOnce();
+    if (!result) return; // a sync was already running
     await refresh();
     // Server data has moved, so the page behind this strip is now stale.
     if (result.sent > 0) router.refresh();
-  }, [refresh, router, syncing]);
+  }, [drainOnce, refresh, router]);
 
   useEffect(() => {
     // 'online' is the signal that matters; the poll is a backstop for the cases browsers
