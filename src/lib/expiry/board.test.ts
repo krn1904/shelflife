@@ -57,3 +57,18 @@ test('soonest expiry first in each column', () => {
   assert.deepEqual(columnsOf(board).comingUp, ['a', 'b', 'c']);
   assert.deepEqual(board.columns[4].cards.map((c) => c.daysLeft), [4, 10, 20]);
 });
+
+test('stock on or past its date is a Last day card even before the nightly job has run', () => {
+  // E.g. straight after a demo time jump, or a failed nightly run: no open reminder yet.
+  const board = buildBoard(
+    [
+      batch('expired', '2026-10-08'),
+      batch('today', '2026-10-10', { markedDownOn: '2026-10-08T09:00:00Z' }),
+      batch('tomorrow', '2026-10-11'),
+    ],
+    [], TODAY, 30,
+  );
+  assert.deepEqual(columnsOf(board).pull, ['expired', 'today']);
+  assert.deepEqual(columnsOf(board).comingUp, ['tomorrow']);
+  assert.equal(board.columns[0].cards[0].reminderId, null); // answering still works: it goes by batch
+});

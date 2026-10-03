@@ -46,6 +46,7 @@ export type Board = {
  * Sorts dated stock into the board's columns.
  *
  *   open reminder today         → its column (Last day / Half price / Check)
+ *   on or past expiry, no reminder → Last day (the nightly job has not caught up)
  *   already marked down         → On half price (waiting for its last day)
  *   within the look-ahead days  → Coming up
  *   further out                 → counted, not shown
@@ -68,6 +69,9 @@ export function buildBoard(
 
     let column: BoardColumn;
     if (reminder) column = reminder.action;
+    // On or past its date with no reminder yet (the nightly job has not run since, or it
+    // failed): still a last-day call, never "nothing to do yet".
+    else if (daysLeft <= 0) column = 'pull';
     else if (batch.markedDownOn) column = 'onHalfPrice';
     else if (daysLeft <= lookAheadDays) column = 'comingUp';
     else {
