@@ -300,7 +300,10 @@ outbox can keep). Split in two on purpose:
 Every entry carries a client-generated UUID (`crypto.randomUUID()`) used as an **idempotency
 key**: a request whose outcome was never learned is safe to retry because the server treats a
 replay as a no-op. `PendingChanges` surfaces what is still on the device and why anything is
-stuck.
+stuck. It syncs on `online`, on a 20 s poll and once on mount; overlapping calls are dropped by
+[single-flight.ts](../src/lib/offline/single-flight.ts), which keeps the "running" flag out of
+React state. (Keeping it in state once made the strip's effect reinstall itself on every flip
+and drain IndexedDB thousands of times a second on every portal page.)
 
 ---
 
@@ -348,7 +351,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, digest text, intake proposal, outbox queue, docket parsing (incl. the real Bega table), supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload) |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, digest text, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost) |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

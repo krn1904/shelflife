@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { parseDocket, type CatalogueItem, type DocketParse } from '@/lib/intake/docket/parse';
 import type { TextractReading } from '@/lib/intake/docket/textract-shape';
 import { TextractView } from './textract-view';
@@ -22,6 +22,8 @@ async function readWithTextract(file: File): Promise<TextractReading> {
 export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
   const [stage, setStage] = useState<Stage>({ status: 'idle' });
   const [photo, setPhoto] = useState<string | null>(null);
+  // Each preview holds the whole photo in memory until revoked: on a retake and on leaving.
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo); }, [photo]);
   const [result, setResult] = useState<(DocketParse & { ms: number }) | null>(null);
   const [engine, setEngine] = useState<Engine>('textract');
   const [textract, setTextract] = useState<{ reading: TextractReading; ms: number } | null>(null);
@@ -29,7 +31,7 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
   async function run(file: File) {
     setResult(null);
     setTextract(null);
-    setPhoto((old) => { if (old) URL.revokeObjectURL(old); return URL.createObjectURL(file); });
+    setPhoto(URL.createObjectURL(file));
     setStage({ status: 'reading', progress: 0 });
     const started = performance.now();
     try {

@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState, useMemo, useState } from 'react';
+import { useActionState, useEffect, useMemo, useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { startDelivery, type IntakeState } from '@/lib/intake/actions';
 import {
@@ -91,6 +91,8 @@ export function ReceiveDelivery({
   const photoPath = docketPhotoPath(orgId, siteId, deliveryId);
 
   const [photo, setPhoto] = useState<{ blob: Blob; preview: string } | null>(null);
+  // Each preview holds the whole photo in memory until revoked: on a retake and on leaving.
+  useEffect(() => () => { if (photo) URL.revokeObjectURL(photo.preview); }, [photo]);
   const [engine, setEngine] = useState<OcrEngine>(textractReady ? 'textract' : 'tesseract');
   const [stage, setStage] = useState<Stage>({ status: 'idle' });
   const [text, setText] = useState<string[] | null>(null);
@@ -140,10 +142,7 @@ export function ReceiveDelivery({
         .from('dockets')
         .upload(photoPath, blob, { upsert: true, contentType: 'image/jpeg' });
       if (error) throw new Error(`Upload failed: ${error.message}`);
-      setPhoto((old) => {
-        if (old) URL.revokeObjectURL(old.preview);
-        return { blob, preview: URL.createObjectURL(blob) };
-      });
+      setPhoto({ blob, preview: URL.createObjectURL(blob) });
       setStage({ status: 'idle' });
     } catch (e) {
       setStage({ status: 'error', message: e instanceof Error ? e.message : String(e) });
