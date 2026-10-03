@@ -42,3 +42,23 @@ their action runs (`SubmitButton`). This fixes the feedback, not the speed itsel
 **Still to do:** find the actual cause. Measure the slowest pages' queries before optimising:
 several pages page through whole tables (the docket intake loads the whole catalogue to match
 against), and the platform-admin organisation page lists every auth user on each view.
+
+---
+
+## Expiry board layout
+
+**Reported (2026-10-03):** on the expiry board, "Needs an answer today" (Last day, Half price,
+Check) fills the screen, and "Looking ahead" (On half price, Coming up) only appears after a
+long scroll. Nobody will scroll that far, so the look-ahead columns are effectively hidden.
+
+**Current layout:** two groups, each a row of its own columns, stacked one above the other
+([expiry-board.tsx](../src/components/expiry-board.tsx)). It replaced a single grid that left
+large empty gaps beside long columns.
+
+**To do:** redesign the page so both groups are visible without scrolling far. Ideas to weigh
+when it is picked up, not decided:
+
+- Tabs or a toggle between "Today" and "Looking ahead".
+- One row of five columns that each scroll on their own, with the page height fixed.
+- Show only the first few cards per column with a "Show all (N)" link.
+- Put "Coming up" first on a manager's view and "Needs an answer" first on staff's.
