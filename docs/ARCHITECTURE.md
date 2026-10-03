@@ -32,7 +32,7 @@ key and bypasses RLS; they run on a cron, not in a request.
 src/
   app/                         Next.js App Router
     (portal)/                  authenticated shell; layout gates the session
-      app/                       staff PWA  — deliveries, today, scan, waste, settings
+      app/                       staff PWA  — deliveries, today, expiry board, scan, waste, settings
       manage/                    manager    — delivery review, expiry board, waste, products, reminder settings
       owner/                     owner      — multi-site rollup + CSV export route
       admin/                     platform admin — organisations, lifecycle, job history
@@ -192,6 +192,11 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
   `DEFAULT_REMINDER_SETTINGS`, the same defaults as the table's columns. `validateReminderSettings()`
   holds the same rules as the table's checks (no reminder may fire the day the shortest item of
   its group arrives) and drives the settings screen.
+- The Today list and the expiry board share one card and answer hook
+  ([reminder-card.tsx](../src/components/reminder-card.tsx)). The board
+  ([board.ts](../src/lib/expiry/board.ts), loaded by `loadBoard()` in
+  [board-data.ts](../src/lib/expiry/board-data.ts)) adds two look-ahead columns, *On half price*
+  and *Coming up* (within the site's early-check days), to the three reminder columns.
 - Staff answer through `resolve_batch_step(batch, step, qty, client_id)`: `checked` and
   `marked_down` stamp the batch, `sold` closes it as `sold_through`, `pulled` writes the binned
   quantity as `expired` waste (valued by `batch_unit_cost()`: site cost, else the docket line's

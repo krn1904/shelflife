@@ -139,6 +139,23 @@ An answered card moves the batch on to its next reminder instead of repeating; a
 on half price waits quietly for its last day. Answers work without signal and are sent when the
 phone reconnects.
 
+### The expiry board
+
+The same cards, laid out as a board staff and managers can both open (staff from Today or the
+Shift home, managers under **Site → Expiry board**, for any of their sites). Its columns follow
+the same reminder logic, so the board and the Today list never disagree:
+
+| Column | What is in it | Answers |
+|---|---|---|
+| Last day | Expiry day or past | Pulled out (how many) / Sold |
+| Half price | Half price due now | Reduced price / Gone |
+| Check | Long-life early check due now | Checked |
+| On half price | Already marked down, waiting for its last day | Sold out |
+| Coming up | Dated stock with nothing due yet, as far ahead as the site's early check (30 days by default); anything later is counted | Sold out |
+
+The first three columns are exactly the Today list. The last two let staff look ahead, and mark
+stock sold out when it goes early. Dates nobody confirmed at intake are flagged on the card.
+
 ### Recording waste
 
 Expired stock needs no separate step: answering *Pulled out* on a last-day card records the
@@ -158,7 +175,7 @@ Four roles, enforced at the database level so organisation isolation does not de
 - **`platform_admin`** — across organisations; provision, archive and restore organisations; support access is audit-logged
 - **`owner`** — every site in their organisation; analytics and user management
 - **`manager`** — one site; deliveries, expiry board, waste, product settings, reminder settings
-- **`staff`** — one site, phone only; receive, action list, waste, rotation checks
+- **`staff`** — one site, phone only; receive, action list, expiry board, waste, rotation checks
 
 ---
 

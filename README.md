@@ -111,6 +111,10 @@ day *Pulled out* or *Sold* — and a batch moves on to its next reminder instead
 *Pulled out* records the leftover as expired waste automatically, valued at the site's unit
 cost or, failing that, the price read off the docket.
 
+The **expiry board** shows the same cards as columns (Last day, Half price, Check, On half
+price, Coming up) and takes the same answers. Staff open it from Today; managers under
+**Site → Expiry board**.
+
 The function is a thin wrapper. Every rule it applies lives in `src/lib/expiry/engine.ts`
 as plain TypeScript covered by `npm test`, so the logic is testable even though the
 function itself only runs under Deno.
