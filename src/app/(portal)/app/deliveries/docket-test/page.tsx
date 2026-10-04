@@ -19,11 +19,11 @@ export default async function DocketTestPage() {
 
   return (
     <div>
-      <Link href="/app/deliveries" className="text-sm text-neutral-500 underline">
+      <Link href="/app/deliveries" className="inline-flex min-h-8 items-center text-sm font-semibold text-muted hover:text-ink">
         ← Deliveries
       </Link>
-      <h1 className="mt-3 text-xl font-semibold">Docket OCR test</h1>
-      <p className="mt-1 text-sm text-neutral-500">
+      <h1 className="mt-3 text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Docket OCR test</h1>
+      <p className="mt-1 text-sm text-muted">
         Upload a photo of a supplier docket. It is read on this device and nothing is saved.
         Matching uses the {catalogue.length} products in the catalogue.
       </p>

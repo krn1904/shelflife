@@ -24,10 +24,10 @@ export default async function DeliveryPage(props: PageProps<'/app/deliveries/[de
   if (delivery.status === 'closed') {
     return (
       <div>
-        <Link href="/app/deliveries" className="text-sm text-muted underline">
+        <Link href="/app/deliveries" className="inline-flex min-h-8 items-center text-sm font-semibold text-muted hover:text-ink">
           ← Deliveries
         </Link>
-        <h1 className="mt-3 text-xl font-semibold">{supplierName}</h1>
+        <h1 className="mt-3 text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">{supplierName}</h1>
         <p className="mt-2 text-sm text-muted">
           This delivery is closed{delivery.docket_number ? ` (docket #${delivery.docket_number})` : ''}.
           Closed dockets are the audit trail, so they are not edited here.
@@ -49,10 +49,10 @@ export default async function DeliveryPage(props: PageProps<'/app/deliveries/[de
 
   return (
     <div>
-      <Link href="/app/deliveries" className="text-sm text-muted underline">
+      <Link href="/app/deliveries" className="inline-flex min-h-8 items-center text-sm font-semibold text-muted hover:text-ink">
         ← Deliveries
       </Link>
-      <h1 className="mt-3 text-xl font-semibold">{supplierName}</h1>
+      <h1 className="mt-3 text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">{supplierName}</h1>
 
       <div className="mt-6">
         <IntakeClient

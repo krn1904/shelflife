@@ -50,7 +50,7 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
   return (
     <div className="space-y-6">
       <fieldset className="flex flex-wrap gap-4 text-sm" disabled={stage.status === 'reading'}>
-        <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Read with</legend>
+        <legend className="mb-1 section-title">Read with</legend>
         {([['textract', 'AWS Textract (tables as printed; about 2.5 cents a photo)'], ['free', 'Free OCR on this device']] as const).map(([value, label]) => (
           <label key={value} className="flex items-center gap-2">
             <input type="radio" name="engine" value={value} checked={engine === value} onChange={() => setEngine(value)} />
@@ -80,7 +80,7 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
         </p>
       )}
       {stage.status === 'error' && (
-        <p className="rounded border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical-ink">
+        <p className="alert alert-critical">
           Could not read the photo: {stage.message}
         </p>
       )}
@@ -95,8 +95,8 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
           </p>
 
           <section>
-            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">What was delivered</h2>
-            <div className="mt-2 overflow-x-auto rounded border border-line">
+            <h2 className="section-title">What was delivered</h2>
+            <div className="mt-2 overflow-x-auto card">
               <table className="w-full text-sm">
                 <thead className="bg-surface-2 text-left text-xs text-muted">
                   <tr>
@@ -134,7 +134,7 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
                           placeholder="?"
                           inputMode="numeric"
                           aria-label={`Supplied, line ${i + 1}`}
-                          className="w-14 rounded border border-transparent bg-transparent px-1 text-right hover:border-line-strong focus:border-brand focus:bg-surface focus:outline-none"
+                          className="w-14 rounded border border-transparent bg-transparent px-1 text-right hover:border-line-strong focus:border-focus focus:bg-surface focus:outline-none"
                         />
                       </td>
                       <td className="px-3 py-2 whitespace-nowrap text-xs">
@@ -159,8 +159,8 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
           </section>
 
           <section>
-            <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Every line the OCR read</h2>
-            <ol className="mt-2 divide-y divide-line rounded border border-line font-mono text-xs">
+            <h2 className="section-title">Every line the OCR read</h2>
+            <ol className="mt-2 divide-y divide-line card font-mono text-xs">
               {result.verdicts.map((v) => (
                 <li key={v.index} className={`flex gap-3 px-3 py-1.5 ${v.kept === false ? 'text-faint' : ''}`}>
                   <span className="w-40 shrink-0 font-sans">
@@ -178,7 +178,7 @@ export function DocketTest({ catalogue }: { catalogue: CatalogueItem[] }) {
 
       {photo && (result || textract) && (
         <section>
-          <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Photo</h2>
+          <h2 className="section-title">Photo</h2>
           {/* eslint-disable-next-line @next/next/no-img-element -- a local blob URL, not an optimisable asset */}
           <img src={photo} alt="The docket photo that was read" className="mt-2 max-w-full rounded border border-line" />
         </section>

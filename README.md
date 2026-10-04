@@ -41,7 +41,8 @@ See [docs/PLAN.md](docs/PLAN.md) for the full build plan, and
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for a developer's map of the codebase.
 Platform operations are documented in
 [docs/PLATFORM-ADMIN.md](docs/PLATFORM-ADMIN.md), and agreed-but-unscheduled work is in
-[docs/BACKLOG.md](docs/BACKLOG.md).
+[docs/BACKLOG.md](docs/BACKLOG.md). The agreed visual redesign and its rollout are in
+[docs/DESIGN.md](docs/DESIGN.md).
 
 ## Stack
 

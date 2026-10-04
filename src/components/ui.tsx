@@ -14,7 +14,7 @@ export function PageHeader({
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+        <h1 className="text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">{title}</h1>
         {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
@@ -47,11 +47,11 @@ export function QuickAction({
     <Link
       href={href}
       prefetch={prefetch}
-      className="card group flex flex-col gap-1 p-4 transition hover:border-line-strong hover:shadow-md"
+      className="card group flex min-h-11 flex-col gap-1 p-4 transition hover:border-line-strong"
     >
-      <span className="flex items-center justify-between text-sm font-medium">
+      <span className="flex items-center justify-between text-[0.9375rem] font-semibold">
         {title}
-        <span aria-hidden className="text-faint transition group-hover:translate-x-0.5 group-hover:text-brand">
+        <span aria-hidden className="text-faint transition group-hover:translate-x-0.5 group-hover:text-brand-text">
           →
         </span>
       </span>

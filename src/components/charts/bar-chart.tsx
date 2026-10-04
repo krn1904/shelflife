@@ -11,7 +11,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { CHART_INK, SERIES, formatAud } from '@/lib/charts/tokens';
+import { SERIES, TOOLTIP_STYLE, formatAud } from '@/lib/charts/tokens';
 
 export type BarDatum = { label: string; value: number; tone?: string };
 
@@ -33,7 +33,7 @@ export function HorizontalBars({
   money?: boolean;
 }) {
   if (data.length === 0 || data.every((d) => d.value === 0)) {
-    return <p className="py-8 text-center text-sm text-neutral-500">{emptyNote}</p>;
+    return <p className="py-8 text-center text-sm text-muted">{emptyNote}</p>;
   }
 
   // Recharts hands formatters a widened value type, so coerce here rather than lying
@@ -53,27 +53,22 @@ export function HorizontalBars({
   );
 
   return (
-    <div style={{ height: Math.max(140, data.length * 44 + 30) }}>
+    <div className="chart" style={{ height: Math.max(140, data.length * 44 + 30) }}>
       <ResponsiveContainer width="100%" height="100%">
         <BarChart data={data} layout="vertical" margin={{ top: 4, right: 64, bottom: 4, left: 8 }}>
-          <CartesianGrid horizontal={false} stroke={CHART_INK.grid} />
+          <CartesianGrid horizontal={false} />
           <XAxis type="number" hide />
           <YAxis
             type="category"
             dataKey="label"
             width={axisWidth}
             tickLine={false}
-            axisLine={{ stroke: CHART_INK.axis }}
-            tick={{ fill: CHART_INK.muted, fontSize: 12 }}
+            axisLine
+            tick={{ fontSize: 12 }}
           />
           <Tooltip
-            cursor={{ fill: 'rgba(11,11,11,0.04)' }}
             formatter={(value) => [show(value), '']}
-            contentStyle={{
-              border: '1px solid rgba(11,11,11,0.10)',
-              borderRadius: 6,
-              fontSize: 12,
-            }}
+            contentStyle={TOOLTIP_STYLE}
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={18} isAnimationActive={false}>
             {data.map((d) => (
@@ -83,7 +78,7 @@ export function HorizontalBars({
               dataKey="value"
               position="right"
               formatter={(value) => show(value)}
-              style={{ fill: '#52514e', fontSize: 12 }}
+              style={{ fontSize: 12 }}
             />
           </Bar>
         </BarChart>

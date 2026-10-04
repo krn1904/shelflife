@@ -81,7 +81,7 @@ export function BarcodeScanner({
 
   return (
     <div className="space-y-4">
-      <div className="overflow-hidden rounded border border-neutral-200 bg-neutral-900">
+      <div className="overflow-hidden rounded-[0.875rem] border border-line bg-black">
         <video
           ref={videoRef}
           className={`aspect-[4/3] w-full object-cover ${kind ? '' : 'hidden'}`}
@@ -94,7 +94,7 @@ export function BarcodeScanner({
               type="button"
               onClick={startCamera}
               disabled={disabled}
-              className="rounded bg-white px-4 py-2 text-sm font-medium text-neutral-900 disabled:opacity-50"
+              className="btn btn-primary"
             >
               Start camera
             </button>
@@ -103,7 +103,7 @@ export function BarcodeScanner({
       </div>
 
       {kind && (
-        <div className="flex items-center justify-between text-xs text-neutral-500">
+        <div className="flex items-center justify-between text-xs text-muted">
           <span>{KIND_NOTE[kind]}</span>
           <button type="button" onClick={stopCamera} className="underline">
             Stop camera
@@ -112,7 +112,7 @@ export function BarcodeScanner({
       )}
 
       {failure && (
-        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="alert alert-warning">
           {SCAN_FAILURE_MESSAGE[failure]}
         </p>
       )}
@@ -129,17 +129,17 @@ export function BarcodeScanner({
             inputMode="numeric"
             autoComplete="off"
             placeholder="9300675024235"
-            className="w-full rounded border border-neutral-300 px-3 py-2 text-sm tabular-nums"
+            className="w-full field tabular-nums"
           />
           <button
             type="submit"
             disabled={disabled || typed.trim() === ''}
-            className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             Look up
           </button>
         </div>
-        {typedError && <p className="text-sm text-red-700">{typedError}</p>}
+        {typedError && <p className="text-sm text-critical-ink">{typedError}</p>}
       </form>
     </div>
   );

@@ -9,7 +9,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts';
-import { CHART_INK, SERIES, formatAud } from '@/lib/charts/tokens';
+import { SERIES, TOOLTIP_STYLE, formatAud } from '@/lib/charts/tokens';
 
 export type TrendPoint = { label: string; value: number };
 
@@ -22,34 +22,30 @@ export type TrendPoint = { label: string; value: number };
  */
 export function TrendChart({ data, emptyNote }: { data: TrendPoint[]; emptyNote: string }) {
   if (data.length === 0 || data.every((d) => d.value === 0)) {
-    return <p className="py-8 text-center text-sm text-neutral-500">{emptyNote}</p>;
+    return <p className="py-8 text-center text-sm text-muted">{emptyNote}</p>;
   }
 
   return (
-    <div className="h-56">
+    <div className="chart h-56">
       <ResponsiveContainer width="100%" height="100%">
         <LineChart data={data} margin={{ top: 8, right: 16, bottom: 4, left: 8 }}>
-          <CartesianGrid vertical={false} stroke={CHART_INK.grid} />
+          <CartesianGrid vertical={false} />
           <XAxis
             dataKey="label"
             tickLine={false}
-            axisLine={{ stroke: CHART_INK.axis }}
-            tick={{ fill: CHART_INK.muted, fontSize: 12 }}
+            axisLine
+            tick={{ fontSize: 12 }}
           />
           <YAxis
             tickLine={false}
             axisLine={false}
             width={64}
-            tick={{ fill: CHART_INK.muted, fontSize: 12 }}
+            tick={{ fontSize: 12 }}
             tickFormatter={(v) => formatAud(Number(v ?? 0))}
           />
           <Tooltip
             formatter={(value) => [formatAud(Number(value ?? 0)), 'Waste']}
-            contentStyle={{
-              border: '1px solid rgba(11,11,11,0.10)',
-              borderRadius: 6,
-              fontSize: 12,
-            }}
+            contentStyle={TOOLTIP_STYLE}
           />
           <Line
             type="monotone"

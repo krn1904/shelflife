@@ -41,8 +41,8 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Products</h1>
-        <p className="text-sm text-neutral-500">
+        <h1 className="text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Products</h1>
+        <p className="text-sm text-muted">
           Ranging and prices for {site?.name ?? 'your site'}
         </p>
       </div>
@@ -52,7 +52,7 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
           <select
             name="site"
             defaultValue={site.id}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
+            className="field"
           >
             {session.sites.map((s) => (
               <option key={s.id} value={s.id}>{s.name}</option>
@@ -63,23 +63,23 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
           name="q"
           defaultValue={firstParam(params.q) ?? ''}
           placeholder="Search name, brand or barcode"
-          className="min-w-64 flex-1 rounded border border-neutral-300 px-3 py-2 text-sm"
+          className="min-w-64 flex-1 field"
         />
         <button
           type="submit"
-          className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white"
+          className="btn btn-primary"
         >
           Search
         </button>
       </form>
 
       {error && (
-        <p className="mt-4 rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="mt-4 alert alert-critical">
           Could not load the catalogue ({error.code ?? 'unknown'}).
         </p>
       )}
 
-      <ul className="mt-6 divide-y divide-neutral-200 rounded border border-neutral-200">
+      <ul className="mt-6 divide-y divide-line card">
         {(products ?? []).map((product) => {
           const ranged = product.site_products[0];
           const mode = effectiveTrackingMode(product.tracking_mode, ranged?.tracking_mode_override);
@@ -88,18 +88,18 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
             <li key={product.id}>
               <Link
                 href={`/manage/products/${product.id}${site ? `?site=${site.id}` : ''}`}
-                className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3 hover:bg-neutral-50"
+                className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-4 py-3 hover:bg-surface-2"
               >
                 <span className="text-sm font-medium">{product.name}</span>
-                <span className="text-xs text-neutral-500">
+                <span className="text-xs text-muted">
                   {[product.brand, product.size].filter(Boolean).join(' · ')}
                 </span>
                 <span className="ml-auto flex items-center gap-2 text-xs">
-                  <span className="rounded bg-neutral-100 px-2 py-0.5">{TRACKING_LABEL[mode]}</span>
+                  <span className="badge badge-neutral">{TRACKING_LABEL[mode]}</span>
                   {ranged?.active ? (
-                    <span className="text-neutral-500">{ranged.fixture ?? 'Ranged'}</span>
+                    <span className="text-muted">{ranged.fixture ?? 'Ranged'}</span>
                   ) : (
-                    <span className="text-amber-700">Not ranged</span>
+                    <span className="text-warning">Not ranged</span>
                   )}
                 </span>
               </Link>
@@ -108,14 +108,14 @@ export default async function ProductsPage(props: PageProps<'/manage/products'>)
         })}
 
         {!error && products?.length === 0 && (
-          <li className="px-4 py-3 text-sm text-neutral-500">
+          <li className="px-4 py-3 text-sm text-muted">
             {query ? 'Nothing matched that search.' : 'The catalogue is empty.'}
           </li>
         )}
       </ul>
 
       {products?.length === RESULT_LIMIT && (
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-muted">
           Showing the first {RESULT_LIMIT}. Narrow the search to see more.
         </p>
       )}

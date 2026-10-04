@@ -98,7 +98,7 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
           <SectionTitle>What was received</SectionTitle>
           <div className="card overflow-x-auto">
             <table className="w-full min-w-[40rem] text-sm">
-              <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+              <thead className="border-b border-line text-left text-xs font-semibold text-muted">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Product</th>
                   <th className="px-4 py-2.5 text-right font-medium">Docket</th>
@@ -174,7 +174,7 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
             <summary className="cursor-pointer font-medium">What the reader found</summary>
             <p className="mt-2 text-xs text-muted">As read when the delivery was received.</p>
             {reading.table ? (
-              <div className="mt-2 overflow-x-auto rounded border border-line">
+              <div className="mt-2 overflow-x-auto card">
                 <table className="w-max min-w-full text-xs">
                   <tbody className="divide-y divide-line">
                     {reading.table.map((row, r) => (

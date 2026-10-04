@@ -22,7 +22,7 @@ export function AddOrganisationForm() {
 
       <div className="mt-4 grid gap-5 lg:grid-cols-3">
         <fieldset className="space-y-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-faint">
+          <legend className="section-title">
             Organisation
           </legend>
           <label className="block text-sm font-medium">
@@ -46,7 +46,7 @@ export function AddOrganisationForm() {
         </fieldset>
 
         <fieldset className="space-y-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-faint">
+          <legend className="section-title">
             First site
           </legend>
           <label className="block text-sm font-medium">
@@ -64,7 +64,7 @@ export function AddOrganisationForm() {
         </fieldset>
 
         <fieldset className="space-y-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-faint">
+          <legend className="section-title">
             Initial owner
           </legend>
           <label className="block text-sm font-medium">

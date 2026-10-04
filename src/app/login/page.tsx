@@ -13,7 +13,7 @@ export default async function LoginPage() {
       <div className="mb-6 flex items-center gap-2.5">
         <span aria-hidden className="inline-block h-7 w-7 rounded-lg bg-brand" />
         <div>
-          <h1 className="text-xl font-semibold leading-tight tracking-tight">ShelfLife</h1>
+          <h1 className="text-xl font-bold leading-tight tracking-tight">ShelfLife</h1>
           <p className="text-xs text-muted">Back-of-house operations for retail</p>
         </div>
       </div>

@@ -7,7 +7,7 @@ import type { LineItem, Table, TextractReading } from '@/lib/intake/docket/textr
 const SURE_AT = 80;
 
 // field-sizing-content: each input as wide as its own text, so nothing is cut short.
-const cellInput = 'field-sizing-content min-w-full rounded border border-transparent bg-transparent px-1.5 py-1 hover:border-line-strong focus:border-brand focus:bg-surface focus:outline-none';
+const cellInput = 'field-sizing-content min-w-full rounded border border-transparent bg-transparent px-1.5 py-1 hover:border-line-strong focus:border-focus focus:bg-surface focus:outline-none';
 
 /** One table exactly as Textract found it on the page, every cell editable. */
 function EditableTable({ table, index }: { table: Table; index: number }) {
@@ -23,7 +23,7 @@ function EditableTable({ table, index }: { table: Table; index: number }) {
       <p className="text-xs text-muted">
         Table {index + 1} · {table.rows.length} rows · {Math.round(table.confidence)}% confident
       </p>
-      <div className="mt-1 overflow-x-auto rounded border border-line">
+      <div className="mt-1 overflow-x-auto card">
         {/* Natural width, scrolling sideways when wider than the screen: never squeezed. */}
         <table className="w-max min-w-full text-sm">
           <tbody className="divide-y divide-line">
@@ -64,7 +64,7 @@ function EditableLineItems({ items }: { items: LineItem[] }) {
 
   if (items.length === 0) return <p className="text-sm text-muted">No line items found.</p>;
   return (
-    <div className="overflow-x-auto rounded border border-line">
+    <div className="overflow-x-auto card">
       <table className="w-full text-sm">
         <thead className="bg-surface-2 text-left text-xs text-muted">
           <tr>{ITEM_COLUMNS.map(([key, label]) => <th key={key} className="px-2 py-2">{label}</th>)}<th className="px-2 py-2">Sure</th></tr>
@@ -97,7 +97,7 @@ export function TextractView({ reading, ms }: { reading: TextractReading; ms: nu
       </p>
 
       <section>
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Tables, as printed</h2>
+        <h2 className="section-title">Tables, as printed</h2>
         <div className="mt-2 space-y-4">
           {tables.map((t, i) => <EditableTable key={i} table={t} index={i} />)}
           {tables.length === 0 && <p className="text-sm text-muted">No tables found on the page.</p>}
@@ -105,7 +105,7 @@ export function TextractView({ reading, ms }: { reading: TextractReading; ms: nu
       </section>
 
       <section>
-        <h2 className="text-sm font-medium uppercase tracking-wide text-muted">Line items (invoice model)</h2>
+        <h2 className="section-title">Line items (invoice model)</h2>
         <p className="mt-1 text-xs text-muted">
           Supplier: {expense.vendor ?? '—'} · Docket: {expense.docketNumber ?? '—'} · Date: {expense.date ?? '—'}
         </p>

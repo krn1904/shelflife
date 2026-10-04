@@ -100,25 +100,25 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
   }
 
   return (
-    <div className="rounded border border-neutral-200 p-4">
+    <div className="card p-4">
       <h2 className="text-sm font-medium">Morning digest on this device</h2>
-      <p className="mt-1 text-xs text-neutral-500">
+      <p className="mt-1 text-xs text-muted">
         What needs pulling or marking down, at 6am. Per device, not per account — the store
         tablet and your own phone are separate switches.
       </p>
 
       <div className="mt-3">
-        {state === 'checking' && <p className="text-sm text-neutral-500">Checking…</p>}
+        {state === 'checking' && <p className="text-sm text-muted">Checking…</p>}
 
         {state === 'unsupported' && (
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted">
             This browser cannot receive push notifications. On iPhone, add ShelfLife to your
             home screen first — Safari only allows push for installed apps.
           </p>
         )}
 
         {state === 'blocked' && (
-          <p className="text-sm text-amber-700">
+          <p className="text-sm text-warning">
             Notifications are blocked for this site. Allow them in your browser settings,
             then come back.
           </p>
@@ -129,7 +129,7 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
             type="button"
             onClick={enable}
             disabled={state === 'working'}
-            className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {state === 'working' ? 'Just a moment…' : 'Turn on'}
           </button>
@@ -137,15 +137,15 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string | null }
 
         {state === 'on' && (
           <div className="flex items-center gap-3">
-            <span className="text-sm text-green-700">On for this device.</span>
-            <button type="button" onClick={disable} className="text-sm text-neutral-600 underline">
+            <span className="text-sm text-good">On for this device.</span>
+            <button type="button" onClick={disable} className="text-sm text-muted underline">
               Turn off
             </button>
           </div>
         )}
       </div>
 
-      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="mt-2 text-sm text-critical-ink">{error}</p>}
     </div>
   );
 }

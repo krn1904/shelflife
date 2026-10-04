@@ -63,8 +63,8 @@ export function PendingChanges() {
   if (pending === 0 && failed.length === 0) return null;
 
   return (
-    <div className="border-b border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-3">
+    <div className="border-b border-line bg-warning-soft px-4 py-2 text-sm text-warning">
+      <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-3">
         {pending > 0 && (
           <span>
             {pending} {pending === 1 ? 'change' : 'changes'} saved on this device
@@ -73,7 +73,7 @@ export function PendingChanges() {
         )}
 
         {failed.length > 0 && (
-          <span className="text-red-800">
+          <span className="text-critical-ink">
             {failed.length} could not be saved: {failed[0].lastError ?? 'unknown reason'}
           </span>
         )}
@@ -82,7 +82,7 @@ export function PendingChanges() {
           type="button"
           onClick={() => void sync()}
           disabled={syncing}
-          className="ml-auto underline disabled:opacity-50"
+          className="ml-auto min-h-9 font-semibold underline disabled:opacity-50"
         >
           Try now
         </button>
@@ -94,7 +94,7 @@ export function PendingChanges() {
               for (const entry of failed) await forget(entry.clientId);
               await refresh();
             }}
-            className="underline"
+            className="min-h-9 font-semibold underline"
           >
             Discard the {failed.length === 1 ? 'failed one' : 'failed ones'}
           </button>

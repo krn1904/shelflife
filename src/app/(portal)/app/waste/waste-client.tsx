@@ -47,34 +47,34 @@ export function WasteClient({
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Waste</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <h1 className="text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Waste</h1>
+        <p className="mt-1 text-sm text-muted">
           {siteName ? `Writing off at ${siteName}.` : 'No site assigned to you yet.'}
         </p>
       </div>
 
       {!initialBatchId && <BarcodeScanner onScan={onScan} disabled={pending} />}
 
-      {pending && <p className="text-sm text-neutral-500">Finding that stock…</p>}
+      {pending && <p className="text-sm text-muted">Finding that stock…</p>}
 
       {!pending && searched && !product && (
-        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="alert alert-warning">
           That barcode is not in the catalogue. Add it from the Scan screen first.
         </p>
       )}
 
       {!pending && product && batches.length === 0 && (
-        <p className="rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+        <p className="alert alert-warning">
           {product.name} has no stock recorded at this site, so there is nothing to write off.
         </p>
       )}
 
       {(chosen || batches.length > 0) && (
-        <form action={formAction} className="space-y-4 rounded border border-neutral-200 p-4">
+        <form action={formAction} className="space-y-4 card p-4">
           {product && (
             <div>
               <p className="text-base font-semibold">{product.name}</p>
-              <p className="text-sm text-neutral-500">
+              <p className="text-sm text-muted">
                 {[product.brand, product.size].filter(Boolean).join(' · ')}
               </p>
             </div>
@@ -85,7 +85,7 @@ export function WasteClient({
               <legend className="text-sm font-medium">Which batch?</legend>
               <div className="mt-2 space-y-2">
                 {batches.map((b) => (
-                  <label key={b.id} className="flex items-center gap-3 rounded border border-neutral-200 px-3 py-2">
+                  <label key={b.id} className="flex items-center gap-3 min-h-11 rounded-[var(--radius)] border border-line px-3 py-2">
                     <input
                       type="radio"
                       name="batch_id"
@@ -95,7 +95,7 @@ export function WasteClient({
                     />
                     <span className="text-sm">
                       {b.expiry_date ? `Expires ${b.expiry_date}` : 'No date recorded'}
-                      <span className="ml-2 text-neutral-500">{b.qty_remaining} left</span>
+                      <span className="ml-2 text-muted">{b.qty_remaining} left</span>
                     </span>
                   </label>
                 ))}
@@ -112,7 +112,7 @@ export function WasteClient({
                 name="qty"
                 inputMode="numeric"
                 defaultValue={1}
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm tabular-nums"
+                className="mt-1 w-full field tabular-nums"
               />
             </div>
             <div>
@@ -121,7 +121,7 @@ export function WasteClient({
                 id="reason"
                 name="reason"
                 defaultValue="expired"
-                className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+                className="mt-1 w-full field"
               >
                 {WASTE_REASONS.map((r) => (
                   <option key={r} value={r}>{WASTE_REASON_LABEL[r]}</option>
@@ -132,18 +132,18 @@ export function WasteClient({
 
           <div>
             <label htmlFor="note" className="block text-sm font-medium">
-              Note <span className="font-normal text-neutral-500">(optional)</span>
+              Note <span className="font-normal text-muted">(optional)</span>
             </label>
             <input
               id="note"
               name="note"
               maxLength={280}
-              className="mt-1 w-full rounded border border-neutral-300 px-3 py-2 text-sm"
+              className="mt-1 w-full field"
             />
           </div>
 
           {state.status === 'error' && (
-            <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+            <p className="alert alert-critical">
               {state.message}
             </p>
           )}
@@ -151,7 +151,7 @@ export function WasteClient({
           <button
             type="submit"
             disabled={saving || !chosen}
-            className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+            className="btn btn-primary"
           >
             {saving ? 'Recording…' : 'Record waste'}
           </button>

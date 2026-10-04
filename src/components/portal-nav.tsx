@@ -46,8 +46,8 @@ export function PortalNav({ links }: { links: NavLink[] }) {
             }}
             className={
               active || going === n.href
-                ? 'rounded-lg bg-brand-soft px-3 py-1.5 text-sm font-medium text-brand-soft-ink'
-                : 'rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-ink'
+                ? 'rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink'
+                : 'rounded-lg px-3 py-1.5 text-sm font-semibold text-muted transition hover:text-ink'
             }
           >
             {n.label}

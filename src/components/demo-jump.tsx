@@ -18,11 +18,11 @@ export function DemoJump() {
   const router = useRouter();
 
   return (
-    <div className="rounded border border-dashed border-neutral-400 bg-neutral-50 px-4 py-3">
+    <div className="rounded-[0.875rem] border border-dashed border-line-strong bg-surface px-4 py-3">
       <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium">Demo mode</p>
-          <p className="text-xs text-neutral-600">
+          <p className="text-sm font-semibold">Demo mode</p>
+          <p className="text-xs text-muted">
             Jump the calendar forward to watch stock cross the expiry thresholds. The engine
             is not told anything — only the dates move.
           </p>
@@ -38,14 +38,14 @@ export function DemoJump() {
               else router.refresh();
             })
           }
-          className="ml-auto rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+          className="btn btn-outline ml-auto"
         >
           {pending ? 'Moving…' : `Jump ${JUMP_DAYS} days forward`}
         </button>
       </div>
-      {error && <p className="mt-2 text-sm text-red-700">{error}</p>}
+      {error && <p className="mt-2 text-sm text-critical-ink">{error}</p>}
       {!error && (
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-2 text-xs text-faint">
           Re-run the expiry engine afterwards to rebuild today’s list.
         </p>
       )}

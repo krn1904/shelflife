@@ -27,12 +27,12 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Deliveries</h1>
-        <p className="text-sm text-neutral-500">{site?.name ?? 'No site assigned'}</p>
+        <h1 className="text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Deliveries</h1>
+        <p className="text-sm text-muted">{site?.name ?? 'No site assigned'}</p>
       </div>
 
       {justClosed && (
-        <p className="mt-4 rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
+        <p className="mt-4 alert alert-good">
           Delivery closed. Any batch-tracked lines are now on the expiry board.
         </p>
       )}
@@ -48,18 +48,18 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
 
       {open.length > 0 && (
         <>
-          <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">
+          <h2 className="mt-8 section-title">
             Still open
           </h2>
-          <ul className="mt-2 divide-y divide-neutral-200 rounded border border-amber-300">
+          <ul className="mt-2 divide-y divide-line card border-warning/40">
             {open.map((d) => (
               <li key={d.id}>
-                <Link href={`/app/deliveries/${d.id}`} className="flex items-baseline gap-3 px-4 py-3 hover:bg-amber-50">
+                <Link href={`/app/deliveries/${d.id}`} className="flex items-baseline gap-3 px-4 py-3 hover:bg-warning-soft">
                   <span className="text-sm font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
-                  <span className="text-xs text-neutral-500">
+                  <span className="text-xs text-muted">
                     started {d.received_at ? new Date(d.received_at).toLocaleString('en-AU') : '—'}
                   </span>
-                  <span className="ml-auto text-xs font-medium text-amber-700">Finish</span>
+                  <span className="ml-auto text-xs font-medium text-warning">Finish</span>
                 </Link>
               </li>
             ))}
@@ -67,21 +67,21 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
         </>
       )}
 
-      <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">Recent</h2>
-      <ul className="mt-2 divide-y divide-neutral-200 rounded border border-neutral-200">
+      <h2 className="mt-8 section-title">Recent</h2>
+      <ul className="mt-2 divide-y divide-line card">
         {closed.map((d) => (
           <li key={d.id} className="flex flex-wrap items-baseline gap-3 px-4 py-3">
             <span className="text-sm font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
             {d.docket_number && (
-              <span className="font-mono text-xs text-neutral-500">#{d.docket_number}</span>
+              <span className="font-mono text-xs text-muted">#{d.docket_number}</span>
             )}
-            <span className="ml-auto text-xs text-neutral-500">
+            <span className="ml-auto text-xs text-muted">
               {d.closed_at ? new Date(d.closed_at).toLocaleDateString('en-AU') : '—'}
             </span>
           </li>
         ))}
         {closed.length === 0 && (
-          <li className="px-4 py-3 text-sm text-neutral-500">
+          <li className="px-4 py-3 text-sm text-muted">
             No deliveries received yet. The first one from a supplier is typed in by hand;
             after that the app pre-fills the lines from what they sent before.
           </li>

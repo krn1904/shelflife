@@ -1,29 +1,25 @@
 /**
  * Chart colours, validated rather than chosen by eye.
  *
- * `SERIES` was checked with the dataviz validator against this app's actual white
- * surface (not the reference off-white) and clears the lightness band, chroma floor and
- * the 3:1 contrast gate. Every chart here is single-series, so there is no adjacent-pair
- * problem to solve and no legend to draw — the chart title names the one series.
+ * `SERIES` was checked with the dataviz validator against both theme surfaces — light
+ * `#ffffff` and dark `#181b1f` — and clears the lightness band, chroma floor and the 3:1
+ * contrast gate on each, so one value serves both themes. Every chart here is single-series,
+ * so there is no adjacent-pair problem to solve and no legend to draw — the chart title names
+ * the one series.
  *
- * STATUS is the fixed status palette. On white, `warning` (1.83:1) and `serious` (2.64:1)
- * sit below 3:1, so they are used as block accents beside a written label and never as
- * text and never as the only thing distinguishing one row from another.
+ * Grid, axis, tick and label colours are not set here: they come from the theme tokens
+ * through the `.chart` rules in globals.css, so they follow light and dark.
  */
 
 export const SERIES = '#2a78d6';
 
-export const STATUS = {
-  good: '#0ca30c',
-  warning: '#fab219',
-  serious: '#ec835a',
-  critical: '#d03b3b',
-} as const;
-
-export const CHART_INK = {
-  muted: '#898781',
-  grid: '#e1e0d9',
-  axis: '#c3c2b7',
+/** Recharts tooltips are inline-styled HTML, so CSS variables resolve and follow the theme. */
+export const TOOLTIP_STYLE = {
+  background: 'var(--surface)',
+  color: 'var(--ink)',
+  border: '1px solid var(--line-strong)',
+  borderRadius: 8,
+  fontSize: 12,
 } as const;
 
 export function formatAud(value: number): string {

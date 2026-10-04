@@ -1,4 +1,5 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
+import { PageHeader } from '@/components/ui';
 import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { today } from '@/lib/intake/expiry';
@@ -12,10 +13,7 @@ export default async function TodayPage() {
 
   if (!site) {
     return (
-      <div>
-        <h1 className="text-xl font-semibold">Today</h1>
-        <p className="mt-2 text-sm text-neutral-500">You are not assigned to a site yet.</p>
-      </div>
+      <PageHeader title="Today" subtitle="You are not assigned to a site yet." />
     );
   }
 
@@ -59,15 +57,12 @@ export default async function TodayPage() {
   }));
 
   return (
-    <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Today</h1>
-        <p className="text-sm text-neutral-500">{site.name}</p>
-      </div>
-
-      <div className="mt-6">
-        <TodayList items={items} fixtures={fixtures} />
-      </div>
+    <div className="mx-auto max-w-xl space-y-5">
+      <PageHeader
+        title="Today"
+        subtitle={`${site.name} · ${format(parseISO(asOf), 'EEE d MMM')}`}
+      />
+      <TodayList items={items} fixtures={fixtures} />
     </div>
   );
 }

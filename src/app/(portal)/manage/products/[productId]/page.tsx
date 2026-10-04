@@ -34,18 +34,18 @@ export default async function ProductDetailPage(props: PageProps<'/manage/produc
 
   return (
     <div>
-      <Link href="/manage/products" className="text-sm text-neutral-500 underline">
+      <Link href="/manage/products" className="inline-flex min-h-8 items-center text-sm font-semibold text-muted hover:text-ink">
         ← All products
       </Link>
 
-      <h1 className="mt-3 text-xl font-semibold">{product.name}</h1>
-      <p className="mt-1 text-sm text-neutral-500">
+      <h1 className="mt-3 text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">{product.name}</h1>
+      <p className="mt-1 text-sm text-muted">
         {[product.brand, product.size, product.category].filter(Boolean).join(' · ') || 'No details recorded.'}
       </p>
-      <p className="mt-1 font-mono text-sm tabular-nums text-neutral-500">{product.barcode}</p>
+      <p className="mt-1 font-mono text-sm tabular-nums text-muted">{product.barcode}</p>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
+      <section className="mt-6 card p-4">
+        <h2 className="section-title">
           Catalogue defaults
         </h2>
         <p className="mt-2 text-sm">
@@ -54,18 +54,18 @@ export default async function ProductDetailPage(props: PageProps<'/manage/produc
             <> · typically {product.default_shelf_life_days} days shelf life</>
           )}
         </p>
-        <p className="mt-1 text-xs text-neutral-500">{TRACKING_HINT[product.tracking_mode]}</p>
-        <p className="mt-2 text-xs text-neutral-500">
+        <p className="mt-1 text-xs text-muted">{TRACKING_HINT[product.tracking_mode]}</p>
+        <p className="mt-2 text-xs text-muted">
           Shared with every organisation. Change it at your site below rather than here.
         </p>
       </section>
 
-      <section className="mt-6 rounded border border-neutral-200 p-4">
+      <section className="mt-6 card p-4">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
+          <h2 className="section-title">
             At {site?.name ?? 'your site'}
           </h2>
-          <span className="text-xs text-neutral-500">
+          <span className="text-xs text-muted">
             Effective tracking: <span className="font-medium">{TRACKING_LABEL[mode]}</span>
           </span>
         </div>
@@ -79,7 +79,7 @@ export default async function ProductDetailPage(props: PageProps<'/manage/produc
               values={ranged ?? null}
             />
           ) : (
-            <p className="text-sm text-neutral-500">
+            <p className="text-sm text-muted">
               You are not assigned to a site, so there is nothing to range this against.
             </p>
           )}

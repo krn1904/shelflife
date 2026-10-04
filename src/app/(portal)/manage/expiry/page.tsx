@@ -1,21 +1,25 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import Link from 'next/link';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { today } from '@/lib/intake/expiry';
 import { BUCKET_LABEL, bucketFor, type ExpiryBucket } from '@/lib/analytics/aggregate';
-import { STATUS } from '@/lib/charts/tokens';
+import { daysLeftShort, daysLeftTone } from '@/lib/expiry/display';
 import { firstParam } from '@/lib/search-params';
+import { PageHeader } from '@/components/ui';
 
-const COLUMNS: ExpiryBucket[] = ['overdue', 'today', 'soon', 'watch'];
+const GROUPS: ExpiryBucket[] = ['overdue', 'today', 'soon', 'watch'];
 
-// Status colour is a block accent beside a written column heading, never the only thing
-// telling two columns apart — warning and serious sit under 3:1 on white.
-const ACCENT: Record<ExpiryBucket, string> = {
-  overdue: STATUS.critical,
-  today: STATUS.serious,
-  soon: STATUS.warning,
-  watch: STATUS.good,
+// The filter dot beside each bucket name. It is never the only cue: the name is written.
+const DOT: Record<ExpiryBucket, string> = {
+  overdue: 'bg-critical-fill',
+  today: 'bg-warning-fill',
+  soon: 'bg-ink',
+  watch: 'bg-line-strong',
 };
+
+/** Days-left bars are scaled to the board's horizon: a full bar is a month away. */
+const HORIZON_DAYS = 30;
 
 type BoardCard = {
   id: string;
@@ -31,6 +35,7 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
   const session = await requireRole('manager');
   const params = await props.searchParams;
   const site = activeSite(session, firstParam(params.site));
+  const shown = GROUPS.find((g) => g === firstParam(params.show)) ?? null;
   const supabase = await createClient();
   const asOf = today();
 
@@ -60,74 +65,126 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
     }];
   });
 
-  const board = COLUMNS.map((bucket) => ({
+  const groups = GROUPS.map((bucket) => ({
     bucket,
     cards: cards.filter((c) => bucketFor(c.daysLeft) === bucket),
   }));
+  const visible = groups.filter((g) => (shown ? g.bucket === shown : g.cards.length > 0));
+
+  // Filters are plain links that keep the chosen site, so the board stays a server page.
+  const filterHref = (bucket: ExpiryBucket | null) => {
+    const query = new URLSearchParams();
+    if (site && session.sites.length > 1) query.set('site', site.id);
+    if (bucket) query.set('show', bucket);
+    const qs = query.toString();
+    return qs ? `/manage/expiry?${qs}` : '/manage/expiry';
+  };
 
   return (
-    <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Expiry board</h1>
-        <p className="text-sm text-neutral-500">{site?.name ?? 'No site'}</p>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Expiry board"
+        subtitle={site ? `${site.name} · ${cards.length} dated ${cards.length === 1 ? 'batch' : 'batches'} on shelf` : 'No site'}
+        actions={
+          session.sites.length > 1 && site ? (
+            <form className="flex items-end gap-2">
+              {shown && <input type="hidden" name="show" value={shown} />}
+              <label className="flex flex-col gap-1 text-xs font-semibold text-muted">
+                Site
+                <select name="site" defaultValue={site.id} className="field min-w-44">
+                  {session.sites.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </label>
+              <button type="submit" className="btn btn-outline">Show</button>
+            </form>
+          ) : undefined
+        }
+      />
 
-      {session.sites.length > 1 && site && (
-        <form className="mt-4">
-          <select
-            name="site"
-            defaultValue={site.id}
-            className="rounded border border-neutral-300 px-3 py-2 text-sm"
+      <nav aria-label="Filter by days left" className="flex flex-wrap gap-2">
+        <Link
+          href={filterHref(null)}
+          aria-current={shown === null ? 'true' : undefined}
+          className={`btn btn-sm ${shown === null ? 'bg-ink text-paper' : 'btn-outline'}`}
+        >
+          All · <span className="font-mono">{cards.length}</span>
+        </Link>
+        {groups.map(({ bucket, cards: rows }) => (
+          <Link
+            key={bucket}
+            href={filterHref(bucket)}
+            aria-current={shown === bucket ? 'true' : undefined}
+            className={`btn btn-sm ${shown === bucket ? 'bg-ink text-paper' : 'btn-outline'}`}
           >
-            {session.sites.map((s) => (
-              <option key={s.id} value={s.id}>{s.name}</option>
-            ))}
-          </select>
-          <button type="submit" className="ml-2 rounded border border-neutral-300 px-3 py-2 text-sm">
-            Show
-          </button>
-        </form>
-      )}
-
-      <div className="mt-6 grid gap-4 lg:grid-cols-4">
-        {board.map(({ bucket, cards: column }) => (
-          <section key={bucket} className="rounded border border-neutral-200">
-            <header className="flex items-center gap-2 border-b border-neutral-200 px-3 py-2">
-              <span
-                aria-hidden
-                className="inline-block size-3 rounded-sm"
-                style={{ backgroundColor: ACCENT[bucket] }}
-              />
-              <h2 className="text-sm font-medium">{BUCKET_LABEL[bucket]}</h2>
-              <span className="ml-auto text-xs tabular-nums text-neutral-500">{column.length}</span>
-            </header>
-
-            <ul className="divide-y divide-neutral-100">
-              {column.map((card) => (
-                <li key={card.id} className="px-3 py-2">
-                  <p className="text-sm font-medium">{card.name}</p>
-                  <p className="text-xs text-neutral-500">{card.detail}</p>
-                  <p className="mt-1 text-xs tabular-nums text-neutral-600">
-                    {card.qty} left · {card.expiryDate}
-                  </p>
-                  {card.predicted && (
-                    <p className="mt-1 text-xs text-amber-700">Date never confirmed</p>
-                  )}
-                </li>
-              ))}
-              {column.length === 0 && (
-                <li className="px-3 py-3 text-xs text-neutral-500">Nothing here.</li>
-              )}
-            </ul>
-          </section>
+            <span aria-hidden className={`size-2 rounded-[2px] ${DOT[bucket]}`} />
+            {BUCKET_LABEL[bucket]} · <span className="font-mono">{rows.length}</span>
+          </Link>
         ))}
-      </div>
+      </nav>
 
-      {cards.length === 0 && (
-        <p className="mt-6 text-sm text-neutral-500">
+      {cards.length === 0 ? (
+        <p className="card px-5 py-6 text-sm text-muted">
           No dated stock yet. Batches appear here once a delivery with batch-tracked lines
           is closed.
         </p>
+      ) : (
+        <div className="card overflow-x-auto">
+          <table className="table min-w-[40rem]">
+            <thead>
+              <tr>
+                <th scope="col">Product</th>
+                <th scope="col">Left</th>
+                <th scope="col">Expires</th>
+                <th scope="col">Days left</th>
+                <th scope="col"><span className="sr-only">Note</span></th>
+              </tr>
+            </thead>
+            {visible.map(({ bucket, cards: rows }) => (
+              <tbody key={bucket}>
+                <tr>
+                  <th colSpan={5} scope="colgroup" className="bg-surface-2 !py-2 text-xs !font-bold !text-ink">
+                    {BUCKET_LABEL[bucket]}
+                  </th>
+                </tr>
+                {rows.map((card) => (
+                  <tr key={card.id}>
+                    <td>
+                      <div className="font-semibold">{card.name}</div>
+                      {card.detail && <div className="text-xs text-muted">{card.detail}</div>}
+                    </td>
+                    <td className="font-mono">{card.qty}</td>
+                    <td className="font-mono">{format(parseISO(card.expiryDate), 'dd/MM')}</td>
+                    <td>
+                      {card.daysLeft <= 0 ? (
+                        <span className={`pill pill-${daysLeftTone(card.daysLeft)}`}>{daysLeftShort(card.daysLeft)}</span>
+                      ) : (
+                        <div className="flex items-center gap-2.5">
+                          <span className={`w-6 font-mono ${bucket === 'watch' ? 'text-muted' : ''}`}>{card.daysLeft}</span>
+                          <span aria-hidden className="h-1.5 w-32 rounded-full bg-surface-2">
+                            <span
+                              className={`block h-1.5 rounded-full ${bucket === 'watch' ? 'bg-faint' : 'bg-ink'}`}
+                              style={{ width: `${Math.min(100, (card.daysLeft / HORIZON_DAYS) * 100)}%` }}
+                            />
+                          </span>
+                        </div>
+                      )}
+                    </td>
+                    <td className="text-xs font-semibold text-warning">
+                      {card.predicted && 'Date never confirmed'}
+                    </td>
+                  </tr>
+                ))}
+                {rows.length === 0 && (
+                  <tr>
+                    <td colSpan={5} className="text-sm text-muted">Nothing here.</td>
+                  </tr>
+                )}
+              </tbody>
+            ))}
+          </table>
+        </div>
       )}
     </div>
   );

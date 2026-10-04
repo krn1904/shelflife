@@ -20,11 +20,11 @@ export default async function NewDeliveryPage() {
 
   return (
     <div>
-      <Link href="/app/deliveries" className="text-sm text-muted underline">
+      <Link href="/app/deliveries" className="inline-flex min-h-8 items-center text-sm font-semibold text-muted hover:text-ink">
         ← Deliveries
       </Link>
 
-      <h1 className="mt-3 text-xl font-semibold">Receive a delivery</h1>
+      <h1 className="mt-3 text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Receive a delivery</h1>
       <p className="mt-1 text-sm text-muted">
         {site ? `Receiving at ${site.name}.` : 'You are not assigned to a site.'}
       </p>

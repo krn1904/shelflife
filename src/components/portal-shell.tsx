@@ -1,7 +1,10 @@
 import { signOut } from '@/lib/auth/actions';
 import { PendingChanges } from '@/components/pending-changes';
 import { PortalNav, type NavLink } from '@/components/portal-nav';
+import { BottomTabs } from '@/components/bottom-tabs';
+import { ThemePicker } from '@/components/theme-picker';
 import { roleAtLeast, type Session } from '@/lib/auth/session';
+import { currentTheme } from '@/lib/theme/server';
 import type { AppRole } from '@/lib/supabase/types';
 import { SubmitButton } from '@/components/submit-button';
 
@@ -19,20 +22,23 @@ const ROLE_LABEL: Record<AppRole, string> = {
   staff: 'Staff',
 };
 
-export function PortalShell({ session, children }: { session: Session; children: React.ReactNode }) {
+export async function PortalShell({ session, children }: { session: Session; children: React.ReactNode }) {
   const links = NAV.filter((n) => roleAtLeast(session.primaryRole, n.bar));
   const org = session.memberships[0];
   const contextName = session.primaryRole === 'platform_admin'
     ? 'ShelfLife Platform'
     : org?.orgName;
+  // Staff live in the shift portal on a phone, so they get thumb-reach tabs instead.
+  const staffTabs = session.primaryRole === 'staff';
+  const theme = await currentTheme();
 
   return (
     <div className="min-h-dvh">
       <PendingChanges />
-      <header className="sticky top-0 z-20 border-b border-line bg-paper/85 backdrop-blur">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
-          <span className="flex items-center gap-2 font-semibold tracking-tight">
-            <span aria-hidden className="inline-block h-4 w-4 rounded-[5px] bg-brand" />
+      <header className="sticky top-0 z-20 border-b border-line bg-paper/90 backdrop-blur">
+        <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
+          <span className="flex items-center gap-2 font-bold tracking-tight">
+            <span aria-hidden className="inline-block size-2.5 rounded-[3px] bg-brand" />
             ShelfLife
           </span>
 
@@ -43,15 +49,21 @@ export function PortalShell({ session, children }: { session: Session; children:
               <div className="font-medium text-ink">{contextName}</div>
               <div className="text-xs text-faint">{ROLE_LABEL[session.primaryRole]}</div>
             </div>
+            <div className="hidden md:block">
+              <ThemePicker initial={theme} compact />
+            </div>
             <form action={signOut}>
-              <SubmitButton className="btn btn-ghost px-2.5 py-1.5 text-sm" pendingLabel="Signing out…">
+              <SubmitButton className="btn btn-ghost btn-sm" pendingLabel="Signing out…">
                 Sign out
               </SubmitButton>
             </form>
           </div>
         </div>
       </header>
-      <main className="mx-auto max-w-5xl px-4 py-8">{children}</main>
+      <main className={`mx-auto max-w-6xl px-4 py-6 sm:py-8 ${staffTabs ? 'pb-28 sm:pb-8' : ''}`}>
+        {children}
+      </main>
+      {staffTabs && <BottomTabs />}
     </div>
   );
 }
