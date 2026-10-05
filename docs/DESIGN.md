@@ -162,7 +162,8 @@ writes them as SVG attributes that CSS overrides. Tooltips use `TOOLTIP_STYLE` f
    30–50, with the same cards in the same columns (checked on all three demo sites).
 5. **Delivery review** (`/manage/deliveries/[id]`): on a phone the table keeps Product,
    Against the docket (with "received of docketed") and Expiry. Docket and Received columns
-   join from `sm` up.
+   join from `sm` up. Correction mode (`?edit=1`) swaps the table for one card per line, so
+   the inputs fit a phone.
 6. **Site, Products, Waste, Deliveries, Group, Platform, organisation detail, login**:
    rethemed.
 

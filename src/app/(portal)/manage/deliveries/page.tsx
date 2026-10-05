@@ -16,12 +16,14 @@ import {
 
 // Enough for a busy site's quarter; the date range, not paging, is what narrows it.
 const LIST_LIMIT = 300;
+const REVIEW_LIMIT = 50; // new items waiting for a manager; more than this is a backlog, not a list
 
 const RANGE_LABEL: Record<RangeKey, string> = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days' };
 
 /**
- * Deliveries as staff recorded them, for the manager to check: what is still open, and what
- * arrived short of its docket. Everything a row links to is read-only here.
+ * Deliveries as staff recorded them, for the manager to check: what is still open, what
+ * arrived short of its docket, and the items staff added from dockets that nobody has
+ * reviewed yet. A closed delivery is corrected from its own page.
  */
 export default async function ManageDeliveriesPage(props: PageProps<'/manage/deliveries'>) {
   const session = await requireRole('manager');
@@ -41,7 +43,7 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
 
   let closedQuery = supabase
     .from('deliveries')
-    .select('id, docket_number, closed_at, received_by, supplier_id, suppliers(name), delivery_lines(qty_docketed, qty_received)')
+    .select('id, docket_number, closed_at, received_by, supplier_id, suppliers(name), delivery_lines(qty_docketed, qty_received, corrected_at)')
     .eq('site_id', site.id)
     .eq('status', 'closed')
     .gte('closed_at', rangeStart(filters.range, now))
@@ -49,7 +51,7 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
     .limit(LIST_LIMIT);
   if (filters.supplierId) closedQuery = closedQuery.eq('supplier_id', filters.supplierId);
 
-  const [{ data: open }, { data: closed }, { data: suppliers }] = await Promise.all([
+  const [{ data: open }, { data: closed }, { data: suppliers }, { data: unreviewed }] = await Promise.all([
     supabase
       .from('deliveries')
       .select('id, received_at, created_at, received_by, suppliers(name)')
@@ -58,7 +60,29 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
       .order('created_at', { ascending: false }),
     closedQuery,
     supabase.from('suppliers').select('id, name').eq('org_id', site.orgId).order('name'),
+    supabase
+      .from('products')
+      .select('id, name, size, tracking_mode, created_at')
+      .eq('org_id', site.orgId)
+      .is('reviewed_at', null)
+      .order('created_at', { ascending: false })
+      .limit(REVIEW_LIMIT),
   ]);
+
+  // The delivery each new item last came in on at this site, so the review has its context.
+  const { data: arrivals } = (unreviewed ?? []).length > 0
+    ? await supabase
+        .from('delivery_lines')
+        .select('product_id, delivery_id, deliveries!inner(site_id, closed_at, suppliers(name))')
+        .in('product_id', (unreviewed ?? []).map((p) => p.id))
+        .eq('deliveries.site_id', site.id)
+    : { data: [] };
+  const lastArrival = new Map<string, NonNullable<typeof arrivals>[number]>();
+  for (const a of arrivals ?? []) {
+    const seen = lastArrival.get(a.product_id);
+    if (!seen || (a.deliveries.closed_at ?? '') > (seen.deliveries.closed_at ?? '')) lastArrival.set(a.product_id, a);
+  }
+  const toReview = (unreviewed ?? []).filter((p) => lastArrival.has(p.id));
 
   const timeZone = site.timeZone;
   const receiverIds = [...new Set([...(open ?? []), ...(closed ?? [])].flatMap((d) => (d.received_by ? [d.received_by] : [])))];
@@ -68,7 +92,11 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
   const nameOf = new Map((people ?? []).map((p) => [p.id, p.full_name]));
   const who = (id: string | null) => (id ? nameOf.get(id) ?? 'Someone at this site' : '—');
 
-  const rows = (closed ?? []).map((d) => ({ ...d, totals: deliveryTotals(d.delivery_lines ?? []) }));
+  const rows = (closed ?? []).map((d) => ({
+    ...d,
+    totals: deliveryTotals(d.delivery_lines ?? []),
+    corrected: (d.delivery_lines ?? []).some((l) => l.corrected_at),
+  }));
   const listed = filters.shortOnly ? rows.filter((r) => r.totals.short > 0) : rows;
   const shortDeliveries = rows.filter((r) => r.totals.short > 0).length;
   const unitsShort = rows.reduce((sum, r) => sum + r.totals.unitsShort, 0);
@@ -114,6 +142,36 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
           hint={`${unitsShort} ${unitsShort === 1 ? 'unit' : 'units'} not delivered`} />
       </div>
 
+      {toReview.length > 0 && (
+        <section>
+          <SectionTitle>New items to review</SectionTitle>
+          <p className="mb-3 text-sm text-muted">
+            Staff added these from dockets, named as the docket printed them and tracked by expiry date
+            until someone says otherwise. Check the name, barcode and tracking, and give rotation stock a fixture.
+          </p>
+          <ul className="card divide-y divide-line overflow-hidden">
+            {toReview.map((p) => {
+              const arrival = lastArrival.get(p.id)!;
+              return (
+                <li key={p.id}>
+                  <Link href={`/manage/products/${p.id}?site=${site.id}&from=${arrival.delivery_id}`}
+                    className="flex flex-wrap items-baseline gap-3 px-4 py-3 text-sm hover:bg-surface-2">
+                    <span className="font-medium">{p.name}</span>
+                    <span className="text-xs text-muted">
+                      from {arrival.deliveries.suppliers?.name ?? 'a supplier'} · {atSite(arrival.deliveries.closed_at, timeZone, false)}
+                    </span>
+                    <span className="ml-auto text-xs font-semibold text-brand-text">Review →</span>
+                  </Link>
+                </li>
+              );
+            })}
+          </ul>
+          {(unreviewed ?? []).length === REVIEW_LIMIT && (
+            <p className="mt-2 text-xs text-muted">Showing the newest {REVIEW_LIMIT}.</p>
+          )}
+        </section>
+      )}
+
       {(open ?? []).length > 0 && (
         <section>
           <SectionTitle>Still open</SectionTitle>
@@ -157,6 +215,7 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
                       {d.suppliers?.name ?? 'Unknown supplier'}
                     </Link>
                     {d.docket_number && <span className="ml-2 font-mono text-xs text-faint">#{d.docket_number}</span>}
+                    {d.corrected && <span className="badge badge-neutral ml-2">corrected</span>}
                   </td>
                   <td className="px-4 py-2.5 text-muted">{who(d.received_by)}</td>
                   <td className="px-4 py-2.5 text-right tabular-nums">{d.totals.lines}</td>

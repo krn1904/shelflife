@@ -107,7 +107,20 @@ A manager (or an owner, per site) checks what staff received under **Site → De
    docketed against received quantity, the expiry dates entered and whether someone checked
    them, items first added from a docket, the docket photo, and what the reader found on it.
 
-The review is read-only: the saved lines are the record.
+The saved lines are the record, and a manager can correct them. **Correct this delivery** opens
+every line for editing: the docketed and received counts, and for dated stock its expiry dates
+(change one, split the line across two dates, or add a date staff skipped). A line can also be
+removed. The stock and the expiry board move with the correction, but stock already written off
+or sold cannot be taken back off a delivery. Each corrected line shows who corrected it, when,
+and what staff had entered.
+
+**New items to review.** A product staff added from a docket is named as the docket printed it
+and tracked by expiry date until someone says otherwise. Deliveries lists these until a manager
+reviews each one: fix the name, brand and size, attach a barcode so a scan finds it, set its
+typical shelf life, and choose how it is tracked. Rotation stock needs the fixture it is checked
+on at this site, so both are set in the same step. If the item stops being dated, its dated stock
+at this site leaves the expiry board. A barcode that already belongs to a catalogue product is
+refused for now; merging the two is not built.
 
 ### The daily action list
 

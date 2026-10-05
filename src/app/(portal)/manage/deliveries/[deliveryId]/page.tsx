@@ -6,6 +6,8 @@ import { PageHeader, SectionTitle } from '@/components/ui';
 import { Stat } from '@/components/stat';
 import { atSite, deliveryTotals, lineStatus, type LineStatus } from '@/lib/deliveries/review';
 import { readingFrom } from '@/lib/intake/docket/reading';
+import { firstParam } from '@/lib/search-params';
+import { LineEditor } from './line-editor';
 
 const STATUS: Record<LineStatus, { label: string; className: string }> = {
   ok: { label: 'as docketed', className: 'text-xs text-good' },
@@ -14,17 +16,25 @@ const STATUS: Record<LineStatus, { label: string; className: string }> = {
   over: { label: 'over', className: 'badge badge-neutral' },
 };
 
+const SOURCE_LABEL: Record<'predicted' | 'confirmed' | 'manual', string> = {
+  predicted: 'proposed',
+  confirmed: 'checked',
+  manual: 'typed in',
+};
+
 // Long enough to look at the photo; the link is not meant to be kept.
 const PHOTO_LINK_SECONDS = 15 * 60;
 
 /**
  * One delivery as staff recorded it. The saved lines are the record: the docket reading is
  * shown as it was read, never matched against today's catalogue again, which may have
- * changed since.
+ * changed since. With ?edit=1 a manager corrects the lines; what staff first entered stays
+ * visible beside each correction.
  */
 export default async function ManageDeliveryPage(props: PageProps<'/manage/deliveries/[deliveryId]'>) {
   const session = await requireRole('manager');
   const { deliveryId } = await props.params;
+  const editing = firstParam((await props.searchParams).edit) === '1';
   const supabase = await createClient();
 
   // RLS limits this to the manager's own sites: someone else's delivery reads as not found.
@@ -37,24 +47,33 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
 
   // The joined site, or the same site from the session if the join came back empty.
   const timeZone = delivery.sites?.timezone ?? session.sites.find((s) => s.id === delivery.site_id)?.timeZone ?? 'UTC';
-  const [{ data: lines }, { data: receiver }, photo] = await Promise.all([
+  const [{ data: lines }, photo] = await Promise.all([
     supabase
       .from('delivery_lines')
-      .select('id, qty_docketed, qty_received, products(name, brand, size, org_id, tracking_mode), stock_batches(id, expiry_date, expiry_source, qty_received)')
+      .select(`id, qty_docketed, qty_received, staff_qty_docketed, staff_qty_received, corrected_at, corrected_by,
+        products(id, name, brand, size, org_id, reviewed_at, tracking_mode),
+        stock_batches(id, expiry_date, expiry_source, qty_received, qty_remaining)`)
       .eq('delivery_id', delivery.id),
-    delivery.received_by
-      ? supabase.from('profiles').select('full_name').eq('id', delivery.received_by).maybeSingle()
-      : Promise.resolve({ data: null }),
     delivery.docket_photo_path
       ? supabase.storage.from('dockets').createSignedUrl(delivery.docket_photo_path, PHOTO_LINK_SECONDS)
       : Promise.resolve({ data: null }),
   ]);
 
+  const peopleIds = [...new Set([delivery.received_by, ...(lines ?? []).map((l) => l.corrected_by)].flatMap((id) => (id ? [id] : [])))];
+  const { data: people } = peopleIds.length > 0
+    ? await supabase.from('profiles').select('id, full_name').in('id', peopleIds)
+    : { data: [] };
+  const nameOf = (id: string | null) => (people ?? []).find((p) => p.id === id)?.full_name ?? null;
+
   const sorted = [...(lines ?? [])].sort((a, b) => (a.products?.name ?? '').localeCompare(b.products?.name ?? ''));
   const totals = deliveryTotals(sorted);
   const reading = readingFrom(delivery.docket_reading);
   const open = delivery.status === 'draft';
-  const newItems = sorted.filter((l) => l.products?.org_id).length;
+  const newProducts = sorted.flatMap((l) => (l.products?.org_id ? [l.products] : []));
+  const toReview = newProducts.filter((p) => !p.reviewed_at).length;
+  const corrected = sorted.filter((l) => l.corrected_at).length;
+  const sortedBatches = (l: (typeof sorted)[number]) =>
+    [...(l.stock_batches ?? [])].sort((a, b) => (a.expiry_date ?? '').localeCompare(b.expiry_date ?? ''));
 
   return (
     <div className="space-y-8">
@@ -73,9 +92,10 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
           />
         </div>
         <p className="mt-2 text-sm text-muted">
-          Received by {receiver?.full_name ?? 'someone at this site'} · started {atSite(delivery.received_at ?? delivery.created_at, timeZone)}
+          Received by {nameOf(delivery.received_by) ?? 'someone at this site'} · started {atSite(delivery.received_at ?? delivery.created_at, timeZone)}
           {delivery.closed_at && <> · closed {atSite(delivery.closed_at, timeZone)}</>}
           {reading && <> · docket read with {reading.engine === 'textract' ? 'AWS Textract' : 'the free reader'}</>}
+          {corrected > 0 && <> · {corrected} {corrected === 1 ? 'line' : 'lines'} corrected by a manager</>}
         </p>
       </div>
 
@@ -90,13 +110,63 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
           <Stat label="Units received" value={totals.received} hint={`${totals.docketed} on the docket`} />
           <Stat label="Short lines" value={totals.short} tone={totals.short ? 'critical' : 'default'}
             hint={totals.unitsShort ? `${totals.unitsShort} units not delivered` : undefined} />
-          <Stat label="New items" value={newItems} hint="added from this organisation's dockets" />
+          <Stat label="New items" value={newProducts.length} tone={toReview ? 'critical' : 'default'}
+            hint={toReview ? `${toReview} to review` : "added from this organisation's dockets"} />
         </div>
       )}
 
-      {!open && (
+      {!open && editing && (
         <section>
-          <SectionTitle>What was received</SectionTitle>
+          <SectionTitle actions={<Link href={`/manage/deliveries/${delivery.id}`} className="btn btn-outline btn-sm">Done</Link>}>
+            Correct what was received
+          </SectionTitle>
+          <p className="mb-3 text-sm text-muted">
+            Each line saves on its own, and its stock and expiry dates move with it. Stock already written
+            off or sold cannot be taken back off the delivery.
+          </p>
+          <ul className="space-y-3">
+            {sorted.map((l) => (
+              <li key={l.id} className="card p-4">
+                <div className="mb-3 flex flex-wrap items-baseline gap-2">
+                  <span className="font-medium">{l.products?.name ?? 'Unknown product'}</span>
+                  <span className="text-xs text-muted">{[l.products?.brand, l.products?.size].filter(Boolean).join(' · ')}</span>
+                  {l.products?.org_id && (
+                    <Link href={`/manage/products/${l.products.id}?site=${delivery.site_id}&from=${delivery.id}`}
+                      className="badge badge-brand ml-auto">
+                      {l.products.reviewed_at ? 'new from a docket' : 'review this product'}
+                    </Link>
+                  )}
+                </div>
+                {/* Remounts with the saved figures after each save. */}
+                <LineEditor
+                  key={`${l.id}:${l.corrected_at ?? ''}`}
+                  line={{
+                    id: l.id,
+                    qtyDocketed: l.qty_docketed,
+                    qtyReceived: l.qty_received,
+                    trackingMode: l.products?.tracking_mode ?? 'none',
+                    batches: sortedBatches(l).map((b) => ({
+                      id: b.id,
+                      expiryDate: b.expiry_date,
+                      qty: b.qty_received,
+                      used: b.qty_received - b.qty_remaining,
+                    })),
+                  }}
+                />
+              </li>
+            ))}
+            {sorted.length === 0 && <li className="card px-4 py-6 text-center text-sm text-muted">No lines were recorded.</li>}
+          </ul>
+        </section>
+      )}
+
+      {!open && !editing && (
+        <section>
+          <SectionTitle actions={sorted.length > 0 && (
+            <Link href={`/manage/deliveries/${delivery.id}?edit=1`} className="btn btn-outline btn-sm">Correct this delivery</Link>
+          )}>
+            What was received
+          </SectionTitle>
           <div className="card overflow-x-auto">
             {/* Phones keep the verdict and expiry in view; the raw counts join from `sm` up. */}
             <table className="w-full text-sm sm:min-w-[40rem]">
@@ -117,10 +187,21 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
                     <tr key={l.id} className="align-top">
                       <td className="px-4 py-2.5">
                         <span className="font-medium">{l.products?.name ?? 'Unknown product'}</span>
-                        {l.products?.org_id && <span className="badge badge-brand ml-2">new from a docket</span>}
+                        {l.products?.org_id && (
+                          <Link href={`/manage/products/${l.products.id}?site=${delivery.site_id}&from=${delivery.id}`}
+                            className={`badge ml-2 ${l.products.reviewed_at ? 'badge-brand' : 'bg-warning-soft text-warning'}`}>
+                            {l.products.reviewed_at ? 'new from a docket' : 'new · review'}
+                          </Link>
+                        )}
                         <span className="block text-xs text-muted">
                           {[l.products?.brand, l.products?.size].filter(Boolean).join(' · ')}
                         </span>
+                        {l.corrected_at && (
+                          <span className="block text-xs text-brand-text">
+                            Corrected by {nameOf(l.corrected_by) ?? 'a manager'} {atSite(l.corrected_at, timeZone)}
+                            {' '}· staff entered {l.staff_qty_received ?? l.qty_received} of {l.staff_qty_docketed ?? l.qty_docketed}
+                          </span>
+                        )}
                       </td>
                       <td className="px-4 py-2.5">
                         <span className={status.className}>
@@ -139,11 +220,11 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
                           <span className="text-warning">{l.qty_received > 0 ? 'no date entered' : '—'}</span>
                         ) : (
                           <ul className="space-y-0.5">
-                            {(l.stock_batches ?? []).map((b) => (
+                            {sortedBatches(l).map((b) => (
                               <li key={b.id}>
                                 {b.expiry_date ? atSite(`${b.expiry_date}T12:00:00Z`, timeZone, false) : '—'}
-                                <span className={b.expiry_source === 'confirmed' ? 'text-good' : 'text-muted'}>
-                                  {' '}· {b.expiry_source === 'confirmed' ? 'checked' : 'proposed'}
+                                <span className={b.expiry_source === 'predicted' ? 'text-muted' : 'text-good'}>
+                                  {' '}· {SOURCE_LABEL[b.expiry_source]}
                                 </span>
                                 {(l.stock_batches ?? []).length > 1 && <span className="text-faint"> · {b.qty_received}</span>}
                               </li>
