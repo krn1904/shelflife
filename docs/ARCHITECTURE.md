@@ -309,7 +309,15 @@ It starts at the docket, not a supplier list:
    Staff create suppliers through the `add_supplier()` RPC, which returns the existing supplier
    for a known ABN or name instead of duplicating it; `suppliers_insert` still limits direct
    writes to managers. Starting the delivery calls `remember_supplier_docket()`, which saves the
-   printed name as an alias and fills in a missing ABN.
+   printed name as an alias and fills in a missing ABN. Managers tidy suppliers afterwards at
+   `/manage/suppliers` through two audited RPCs in
+   [supplier_upkeep.sql](../supabase/migrations/20261007000001_supplier_upkeep.sql):
+   `update_supplier()` (rename, ABN, on/off; names unique ignoring case, as `add_supplier()`
+   matches them) and, for owners, `merge_suppliers()` (moves deliveries, then aliases, then
+   deletes the duplicate; refuses two different ABNs). Both store the old name as an alias
+   normalised by `aliasToKeep()` ([upkeep.ts](../src/lib/suppliers/upkeep.ts)), so recognition
+   survives the change. `supplier_activity()` is `security invoker`, so its delivery counts are
+   the caller's own sites.
 4. **Lines from the reading.** The rules below live in [plan.ts](../src/lib/intake/plan.ts), free of the
    database and the browser, and are covered by `plan.test.ts`. The delivery keeps the reading in `deliveries.docket_reading`, and
    `docketLines()` parses it on every render: `parseDocketTable()` reads Textract's grid by column
@@ -457,7 +465,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, reminder text and who sees it, site message validation and read summaries, who may add or remove whom, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, reminder text and who sees it, site message validation and read summaries, who may add or remove whom, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition and upkeep (old-name aliases, look-alikes), intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

@@ -1111,6 +1111,10 @@ export type Database = {
       has_active_membership: { Args: never; Returns: boolean }
       is_valid_timezone: { Args: { p_timezone: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
+      merge_suppliers: {
+        Args: { p_alias?: string | null; p_keep_id: string; p_remove_id: string }
+        Returns: number
+      }
       record_waste: {
         Args: {
           p_batch_id: string
@@ -1164,6 +1168,14 @@ export type Database = {
         }
         Returns: number
       }
+      supplier_activity: {
+        Args: { p_org_id: string }
+        Returns: {
+          deliveries: number
+          last_delivered_at: string | null
+          supplier_id: string
+        }[]
+      }
       update_organisation_member: {
         Args: {
           p_membership_id: string
@@ -1171,6 +1183,16 @@ export type Database = {
           p_site_id: string | null
         }
         Returns: string
+      }
+      update_supplier: {
+        Args: {
+          p_abn: string | null
+          p_active: boolean
+          p_name: string
+          p_old_alias?: string | null
+          p_supplier_id: string
+        }
+        Returns: undefined
       }
       upsert_active_rotation_checks: {
         Args: { p_checks: Json }

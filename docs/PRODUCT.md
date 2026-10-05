@@ -124,6 +124,23 @@ rotation, and a manager who runs only one site asks an owner to make the change.
 stops being dated, its dated stock leaves the expiry board. A barcode that already belongs to a catalogue product is
 refused for now; merging the two is not built.
 
+### Suppliers
+
+Staff add suppliers as their dockets arrive, so an organisation collects near-duplicates
+("CCEP" and "Coca-Cola Europacific") and names the way a docket printed them. **Site →
+Deliveries → Suppliers** lists them with how many deliveries each brought and when the last one
+came (for the sites the viewer runs), and points out ones that look like the same business.
+
+- **Rename** a supplier or set its ABN (managers and owners). The old name stays recognised, so
+  a docket that still prints it is matched straight away. A name or ABN another supplier already
+  has is refused, with a pointer to merging.
+- **Switch off** a supplier that no longer delivers: it leaves the list staff pick from. A docket
+  from it later switches it back on, because it evidently still delivers.
+- **Merge** a duplicate into the supplier to keep (owners only, since it rewrites every site's
+  history): its deliveries and the docket names it was recognised by move across, its name
+  becomes one more, it passes on its ABN if the kept one has none, and it is removed. Two
+  suppliers with different ABNs are different businesses and cannot be merged.
+
 ### The daily action list
 
 A scheduled job runs overnight and rebuilds the action list from current stock. When staff and

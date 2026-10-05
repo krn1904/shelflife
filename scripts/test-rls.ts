@@ -619,6 +619,88 @@ async function main() {
     await admin.from('suppliers').delete().eq('id', supplierId!);
   }
 
+  console.log('\nsupplier upkeep (rename, switch off, merge):');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    const { data: made } = await admin.from('suppliers').insert([
+      { org_id: metro.id, name: 'RLS Upkeep CCEP Pty Ltd', abn: '90000000001' },
+      { org_id: metro.id, name: 'RLS Upkeep Coca-Cola' },
+      { org_id: metro.id, name: 'RLS Upkeep Lion', abn: '90000000002' },
+    ]).select('id, name');
+    const ccep = made!.find((s) => s.name.includes('CCEP'))!;
+    const coke = made!.find((s) => s.name.includes('Coca'))!;
+    const lion = made!.find((s) => s.name.includes('Lion'))!;
+    await admin.from('supplier_aliases').insert({ org_id: metro.id, supplier_id: ccep.id, alias: 'rls upkeep ccep printed' });
+    const delivered = (siteId: string, supplierId: string) => ({
+      org_id: metro.id, site_id: siteId, supplier_id: supplierId, status: 'closed' as const,
+      received_at: '2026-09-02T03:00:00Z', closed_at: '2026-09-02T03:00:00Z',
+    });
+    await admin.from('deliveries').insert([delivered(brunswick.id, ccep.id), delivered(coburg.id, ccep.id), delivered(brunswick.id, coke.id)]);
+
+    const edit = (db: Db, supplierId: string, name: string, abn: string | null, active = true, alias: string | null = null) =>
+      db.rpc('update_supplier', { p_supplier_id: supplierId, p_name: name, p_abn: abn, p_active: active, p_old_alias: alias });
+    const brunswickManager = await signIn('manager@metro-petroleum.test');
+    const coburgManager = await signIn('coburg.manager@metro-petroleum.test');
+
+    const { error: byStaff } = await edit(staff, lion.id, 'RLS Upkeep Lion Dairy', '90000000002');
+    check('staff cannot change a supplier', byStaff?.code === '42501', byStaff?.message ?? 'no error');
+    const { error: byOther } = await edit(other, lion.id, 'RLS Upkeep Lion Dairy', '90000000002');
+    check('another organisation cannot', byOther?.code === '42501', byOther?.message ?? 'no error');
+
+    const { error: renamed } = await edit(brunswickManager, lion.id, 'RLS Upkeep Lion Dairy', '90000000002', true, 'rls upkeep lion');
+    const { data: lionAliases } = await admin.from('supplier_aliases').select('alias').eq('supplier_id', lion.id);
+    check('a manager renames it, and the old name stays recognised on dockets',
+      renamed === null && lionAliases?.some((a) => a.alias === 'rls upkeep lion') === true,
+      renamed?.message ?? JSON.stringify(lionAliases));
+    const { error: sameName } = await edit(brunswickManager, lion.id, 'rls upkeep coca-cola', '90000000002');
+    check('a name another supplier has, in any case, is refused', sameName?.code === '23505', sameName?.message ?? 'no error');
+    const { error: sameAbn } = await edit(brunswickManager, lion.id, 'RLS Upkeep Lion Dairy', '90000000001');
+    check('so is another supplier\'s ABN', sameAbn?.code === '23505', sameAbn?.message ?? 'no error');
+    const { error: off } = await edit(brunswickManager, lion.id, 'RLS Upkeep Lion Dairy', '90000000002', false);
+    const { data: lionAfter } = await admin.from('suppliers').select('active').eq('id', lion.id).single();
+    check('a manager switches a supplier off', off === null && lionAfter?.active === false, off?.message ?? '');
+
+    const { data: fromCoburg } = await coburgManager.rpc('supplier_activity', { p_org_id: metro.id });
+    const { data: fromOwner } = await owner.rpc('supplier_activity', { p_org_id: metro.id });
+    check('delivery counts follow the sites someone runs',
+      fromCoburg?.find((a) => a.supplier_id === ccep.id)?.deliveries === 1
+        && fromOwner?.find((a) => a.supplier_id === ccep.id)?.deliveries === 2,
+      JSON.stringify({ coburg: fromCoburg?.find((a) => a.supplier_id === ccep.id), owner: fromOwner?.find((a) => a.supplier_id === ccep.id) }));
+
+    const merge = (db: Db, keep: string, remove: string, alias: string | null = null) =>
+      db.rpc('merge_suppliers', { p_keep_id: keep, p_remove_id: remove, p_alias: alias });
+    const { error: managerMerge } = await merge(brunswickManager, coke.id, ccep.id);
+    check('a manager cannot merge suppliers', managerMerge?.code === '42501', managerMerge?.message ?? 'no error');
+    const { error: otherMerge } = await merge(other, coke.id, ccep.id);
+    check('nor can another organisation', otherMerge?.code === '42501', otherMerge?.message ?? 'no error');
+    const { error: twoAbns } = await merge(owner, lion.id, ccep.id);
+    check('two different ABNs are two businesses: refused', twoAbns?.code === '23514', twoAbns?.message ?? 'no error');
+
+    await admin.from('suppliers').update({ active: false }).eq('id', coke.id);
+    const { data: moved, error: merged } = await merge(owner, coke.id, ccep.id, 'rls upkeep ccep');
+    const [{ data: gone }, { data: kept }, { count: keptDeliveries }, { data: keptAliases }, { data: mergeAudit }] = await Promise.all([
+      admin.from('suppliers').select('id').eq('id', ccep.id),
+      admin.from('suppliers').select('abn, active').eq('id', coke.id).single(),
+      admin.from('deliveries').select('*', { count: 'exact', head: true }).eq('supplier_id', coke.id),
+      admin.from('supplier_aliases').select('alias').eq('supplier_id', coke.id),
+      admin.from('audit_log').select('id').eq('action', 'supplier.merged').eq('subject_id', coke.id),
+    ]);
+    check('the owner merges a duplicate: its deliveries move and it is gone',
+      merged === null && moved === 2 && gone?.length === 0 && keptDeliveries === 3, merged?.message ?? `moved ${moved}, kept ${keptDeliveries}`);
+    check('its docket names and its own name now recognise the kept supplier',
+      ['rls upkeep ccep printed', 'rls upkeep ccep'].every((a) => keptAliases?.some((k) => k.alias === a)),
+      JSON.stringify(keptAliases));
+    check('the kept supplier takes its ABN and is switched back on',
+      kept?.abn === '90000000001' && kept.active === true, JSON.stringify(kept));
+    check('the merge is in the audit log', mergeAudit?.length === 1);
+
+    await admin.from('deliveries').delete().in('supplier_id', [ccep.id, coke.id, lion.id]);
+    await admin.from('suppliers').delete().in('id', [ccep.id, coke.id, lion.id]);
+    await admin.from('audit_log').delete().in('subject_id', [ccep.id, coke.id, lion.id]);
+  }
+
   console.log('\nsite timezones:');
   {
     // Even the service role, which skips RLS, cannot create a site without a real zone:
