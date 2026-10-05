@@ -306,12 +306,12 @@ checks, and three weeks of `expiry-engine` runs including one failure.
 | `staff@demo.shelflife.app` | `shelflife-demo` | staff | Demo · Brunswick |
 | `manager@demo.shelflife.app` | `shelflife-demo` | manager | Demo · Brunswick |
 | `owner@demo.shelflife.app` | `shelflife-demo` | owner | all three demo sites |
-| `admin@demo.shelflife.app` | `shelflife-demo` | platform admin | every organisation |
 | `coburg.manager@demo.shelflife.app`, `coburg.staff@…`, `preston.staff@…` | `shelflife-demo` | manager / staff | their demo site |
-| `admin@shelflife.test` | `shelflife-dev-password` | platform admin | every organisation |
 | `owner@metro-petroleum.test` | `shelflife-dev-password` | owner | all three Metro Petroleum sites |
 | `manager@metro-petroleum.test` / `staff@metro-petroleum.test` | `shelflife-dev-password` | manager / staff | Metro Petroleum · Brunswick |
 | `coburg.manager@metro-petroleum.test` / `preston.staff@metro-petroleum.test` | `shelflife-dev-password` | manager / staff | their Metro Petroleum site |
 | `owner@united-petroleum.test` / `staff@united-petroleum.test` | `shelflife-dev-password` | owner / staff | St Kilda (separate organisation) |
 | `owner@liberty-oil.test` / `manager@liberty-oil.test` | `shelflife-dev-password` | owner / manager | nothing — organisation archived |
 | `owner@ampol-eastern.test` | `shelflife-dev-password` | owner | Ringwood (empty) |
+
+Platform-admin logins are not listed here; ask the project owner for them.
