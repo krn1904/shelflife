@@ -29,27 +29,27 @@ export function ScanClient({ siteId, siteName }: { siteId: string | null; siteNa
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-semibold">Scan</h1>
-        <p className="mt-1 text-sm text-neutral-500">
+        <h1 className="text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Scan</h1>
+        <p className="mt-1 text-sm text-muted">
           {siteName ? `Checking against ${siteName}.` : 'No site assigned to you yet.'}
         </p>
       </div>
 
       <BarcodeScanner onScan={onScan} disabled={pending} />
 
-      {pending && <p className="text-sm text-neutral-500">Looking that up…</p>}
+      {pending && <p className="text-sm text-muted">Looking that up…</p>}
 
       {!pending && lookup?.status === 'invalid' && (
-        <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="alert alert-critical">
           <span className="font-mono tabular-nums">{lookup.barcode}</span> is not a valid product
           barcode. Try scanning again.
         </p>
       )}
 
       {!pending && lookup?.status === 'unknown' && (
-        <section className="rounded border border-neutral-200 p-4">
+        <section className="card p-4">
           <h2 className="text-sm font-medium">New to the catalogue</h2>
-          <p className="mt-1 text-sm text-neutral-500">
+          <p className="mt-1 text-sm text-muted">
             Nobody has added this barcode yet. Fill it in once and every site gets it.
           </p>
           <div className="mt-4">
@@ -59,9 +59,9 @@ export function ScanClient({ siteId, siteName }: { siteId: string | null; siteNa
       )}
 
       {!pending && lookup?.status === 'found' && (
-        <section className="rounded border border-neutral-200 p-4">
+        <section className="card p-4">
           <h2 className="text-base font-semibold">{lookup.product.name}</h2>
-          <p className="text-sm text-neutral-500">
+          <p className="text-sm text-muted">
             {[lookup.product.brand, lookup.product.size, lookup.product.category]
               .filter(Boolean)
               .join(' · ') || 'No further details recorded.'}
@@ -69,7 +69,7 @@ export function ScanClient({ siteId, siteName }: { siteId: string | null; siteNa
 
           <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-neutral-500">Tracking</dt>
+              <dt className="text-xs font-semibold text-muted">Tracking</dt>
               <dd className="mt-0.5 font-medium">
                 {TRACKING_LABEL[
                   effectiveTrackingMode(
@@ -78,12 +78,12 @@ export function ScanClient({ siteId, siteName }: { siteId: string | null; siteNa
                   )
                 ]}
                 {lookup.ranged?.tracking_mode_override && (
-                  <span className="ml-1 font-normal text-neutral-500">(set by your site)</span>
+                  <span className="ml-1 font-normal text-muted">(set by your site)</span>
                 )}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-neutral-500">At {lookup.siteName ?? 'your site'}</dt>
+              <dt className="text-xs font-semibold text-muted">At {lookup.siteName ?? 'your site'}</dt>
               <dd className="mt-0.5 font-medium">
                 {lookup.ranged
                   ? lookup.ranged.active
@@ -95,7 +95,7 @@ export function ScanClient({ siteId, siteName }: { siteId: string | null; siteNa
           </dl>
 
           {!lookup.ranged && (
-            <p className="mt-4 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            <p className="mt-4 alert alert-warning">
               Your site does not stock this yet. A manager can range it from{' '}
               <Link href={`/manage/products/${lookup.product.id}`} className="underline">
                 the product page

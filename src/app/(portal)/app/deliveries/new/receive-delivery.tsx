@@ -42,7 +42,7 @@ function TablePreview({ rows }: { rows: FoundTable['rows'] }) {
   const shown = all ? rows : rows.slice(0, PREVIEW_ROWS);
   return (
     <div>
-      <div className="overflow-x-auto rounded border border-line">
+      <div className="overflow-x-auto card">
         <table className="w-max min-w-full text-xs">
           <tbody className="divide-y divide-line">
             {shown.map((row, r) => (
@@ -239,7 +239,7 @@ export function ReceiveDelivery({
         {photo && (
           <div className="card space-y-3 p-4">
             <fieldset className="space-y-2 text-sm" disabled={busy}>
-              <legend className="mb-1 text-xs font-medium uppercase tracking-wide text-muted">Read with</legend>
+              <legend className="mb-1 section-title">Read with</legend>
               <label className={`flex items-start gap-2 ${textractReady ? '' : 'text-faint'}`}>
                 <input type="radio" name="engine" className="mt-1" checked={engine === 'textract'}
                   disabled={!textractReady} onChange={() => setEngine('textract')} />
@@ -265,7 +265,7 @@ export function ReceiveDelivery({
         )}
 
         {stage.status === 'error' && (
-          <p className="rounded border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">{stage.message}</p>
+          <p className="alert alert-critical">{stage.message}</p>
         )}
 
         {text && (
@@ -285,7 +285,7 @@ export function ReceiveDelivery({
               <div
                 key={i}
                 onClick={() => setTableIndex(i)}
-                className={`card cursor-pointer space-y-2 p-3 text-sm ${tableIndex === i ? 'ring-2 ring-brand' : ''}`}
+                className={`card cursor-pointer space-y-2 p-3 text-sm ${tableIndex === i ? 'ring-2 ring-focus' : ''}`}
               >
                 <label className="flex cursor-pointer items-center gap-3">
                   <input type="radio" name="table" checked={tableIndex === i} onChange={() => setTableIndex(i)} />
@@ -401,7 +401,7 @@ export function ReceiveDelivery({
           <input type="hidden" name="docket_photo_path" value={photo ? photoPath : ''} />
           <input type="hidden" name="docket_reading" value={reading ? JSON.stringify(reading) : ''} />
           {state.status === 'error' && (
-            <p className="rounded border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">{state.message}</p>
+            <p className="alert alert-critical">{state.message}</p>
           )}
           <button type="submit" className="btn btn-primary" disabled={starting || busy}>
             {starting ? 'Starting…' : `Start delivery from ${supplierName(chosen)}`}

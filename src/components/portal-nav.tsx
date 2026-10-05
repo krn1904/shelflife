@@ -4,7 +4,8 @@ import { useState } from 'react';
 import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 
-export type NavLink = { href: string; label: string };
+/** `exact`: active only on this path itself, not below it (the Shift home sits above every shift page). */
+export type NavLink = { href: string; label: string; exact?: boolean };
 
 /** A dot that pulses beside a tab while its page is on the way. */
 function PendingDot() {
@@ -33,7 +34,7 @@ export function PortalNav({ links }: { links: NavLink[] }) {
   return (
     <nav className="flex items-center gap-1" aria-busy={going !== null}>
       {links.map((n) => {
-        const active = pathname === n.href || pathname.startsWith(`${n.href}/`);
+        const active = pathname === n.href || (!n.exact && pathname.startsWith(`${n.href}/`));
         return (
           <Link
             key={n.href}
@@ -46,8 +47,8 @@ export function PortalNav({ links }: { links: NavLink[] }) {
             }}
             className={
               active || going === n.href
-                ? 'rounded-lg bg-brand-soft px-3 py-1.5 text-sm font-medium text-brand-soft-ink'
-                : 'rounded-lg px-3 py-1.5 text-sm font-medium text-muted transition hover:bg-surface-2 hover:text-ink'
+                ? 'rounded-lg bg-surface-2 px-3 py-1.5 text-sm font-semibold text-ink'
+                : 'rounded-lg px-3 py-1.5 text-sm font-semibold text-muted transition hover:text-ink'
             }
           >
             {n.label}

@@ -147,12 +147,12 @@ function ResetPasswordForm({ person }: { person: Person }) {
       </form>
 
       {state.status === 'error' && (
-        <p className="mt-2 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+        <p className="mt-2 alert alert-critical">
           {state.message}
         </p>
       )}
       {state.status === 'reset' && (
-        <p className="mt-2 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+        <p className="mt-2 alert alert-good">
           New temporary password for <strong>{state.email}</strong> (shown once):{' '}
           <code className="rounded bg-surface px-1 font-mono text-ink">{state.tempPassword}</code>
           {state.auditWarning && (
@@ -216,19 +216,19 @@ function AddPersonForm({ orgId, sites }: { orgId: string; sites: SiteOption[] })
       </div>
 
       {state.status === 'error' && (
-        <p className="mt-3 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+        <p className="mt-3 alert alert-critical">
           {state.message}
         </p>
       )}
       {state.status === 'created' && (
-        <p className="mt-3 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+        <p className="mt-3 alert alert-good">
           Added <strong>{state.email}</strong>. Temporary password (shown once):{' '}
           <code className="rounded bg-surface px-1 font-mono text-ink">{state.tempPassword}</code> — share it
           and have them reset it.
         </p>
       )}
       {state.status === 'linked' && (
-        <p className="mt-3 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+        <p className="mt-3 alert alert-good">
           Linked existing account <strong>{state.email}</strong> to this organisation. Their password is unchanged.
         </p>
       )}

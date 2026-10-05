@@ -23,7 +23,7 @@ export function AddOrganisationForm() {
 
       <div className="mt-4 grid gap-5 lg:grid-cols-3">
         <fieldset className="space-y-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-faint">
+          <legend className="section-title">
             Organisation
           </legend>
           <label className="block text-sm font-medium">
@@ -47,7 +47,7 @@ export function AddOrganisationForm() {
         </fieldset>
 
         <fieldset className="space-y-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-faint">
+          <legend className="section-title">
             First site
           </legend>
           <label className="block text-sm font-medium">
@@ -65,7 +65,7 @@ export function AddOrganisationForm() {
         </fieldset>
 
         <fieldset className="space-y-3">
-          <legend className="text-xs font-semibold uppercase tracking-wide text-faint">
+          <legend className="section-title">
             Initial owner
           </legend>
           <label className="block text-sm font-medium">
@@ -80,12 +80,12 @@ export function AddOrganisationForm() {
       </div>
 
       {state.status === 'error' && (
-        <p className="mt-4 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+        <p className="mt-4 alert alert-critical">
           {state.message}
         </p>
       )}
       {state.status === 'created' && (
-        <div className="mt-4 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+        <div className="mt-4 alert alert-good">
           <p>
             Organisation created with <strong>{state.email}</strong> as owner.
           </p>

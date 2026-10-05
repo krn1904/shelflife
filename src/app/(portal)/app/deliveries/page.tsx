@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { format } from 'date-fns';
+import { PageHeader } from '@/components/ui';
 import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { firstParam } from '@/lib/search-params';
@@ -26,40 +28,36 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Deliveries</h1>
-        <p className="text-sm text-neutral-500">{site?.name ?? 'No site assigned'}</p>
-      </div>
+      <PageHeader title="Deliveries" subtitle={site?.name ?? 'No site assigned'} />
 
       {justClosed && (
-        <p className="mt-4 rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
+        <p className="mt-4 alert alert-good">
           Delivery closed. Any batch-tracked lines are now on the expiry board.
         </p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6">
         <Link href="/app/deliveries/new" className="btn btn-primary">
           Receive a delivery
-        </Link>
-        <Link href="/app/deliveries/docket-test" className="btn btn-ghost">
-          Test docket OCR
         </Link>
       </div>
 
       {open.length > 0 && (
         <>
-          <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">
+          <h2 className="mt-8 section-title">
             Still open
           </h2>
-          <ul className="mt-2 divide-y divide-neutral-200 rounded border border-amber-300">
+          <ul className="mt-2 divide-y divide-line card overflow-hidden border-warning/40">
             {open.map((d) => (
               <li key={d.id}>
-                <Link href={`/app/deliveries/${d.id}`} className="flex items-baseline gap-3 px-4 py-3 hover:bg-amber-50">
-                  <span className="text-sm font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
-                  <span className="text-xs text-neutral-500">
-                    started {d.received_at ? new Date(d.received_at).toLocaleString('en-AU') : '—'}
+                <Link href={`/app/deliveries/${d.id}`} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-surface-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">{d.suppliers?.name ?? 'Unknown supplier'}</span>
+                    <span className="block font-mono text-xs text-muted">
+                      started {d.received_at ? format(new Date(d.received_at), 'dd/MM HH:mm') : '—'}
+                    </span>
                   </span>
-                  <span className="ml-auto text-xs font-medium text-amber-700">Finish</span>
+                  <span className="badge badge-warning">Finish →</span>
                 </Link>
               </li>
             ))}
@@ -67,21 +65,23 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
         </>
       )}
 
-      <h2 className="mt-8 text-sm font-medium uppercase tracking-wide text-neutral-500">Recent</h2>
-      <ul className="mt-2 divide-y divide-neutral-200 rounded border border-neutral-200">
+      <h2 className="mt-8 section-title">Recent</h2>
+      <ul className="mt-2 divide-y divide-line card overflow-hidden">
         {closed.map((d) => (
-          <li key={d.id} className="flex flex-wrap items-baseline gap-3 px-4 py-3">
-            <span className="text-sm font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
-            {d.docket_number && (
-              <span className="font-mono text-xs text-neutral-500">#{d.docket_number}</span>
-            )}
-            <span className="ml-auto text-xs text-neutral-500">
-              {d.closed_at ? new Date(d.closed_at).toLocaleDateString('en-AU') : '—'}
+          <li key={d.id} className="flex items-center gap-3 px-4 py-3">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{d.suppliers?.name ?? 'Unknown supplier'}</span>
+              {d.docket_number && (
+                <span className="block truncate font-mono text-xs text-muted">#{d.docket_number}</span>
+              )}
+            </span>
+            <span className="font-mono text-xs text-muted">
+              {d.closed_at ? format(new Date(d.closed_at), 'dd/MM/yyyy') : '—'}
             </span>
           </li>
         ))}
         {closed.length === 0 && (
-          <li className="px-4 py-3 text-sm text-neutral-500">
+          <li className="px-4 py-3 text-sm text-muted">
             No deliveries received yet. The first one from a supplier is typed in by hand;
             after that the app pre-fills the lines from what they sent before.
           </li>

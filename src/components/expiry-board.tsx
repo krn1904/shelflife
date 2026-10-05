@@ -5,11 +5,11 @@ import { ReminderCard, useBatchAnswers, type ReminderCardData } from '@/componen
 
 // A coloured mark beside each written heading; colour is never the only cue.
 const ACCENT: Record<BoardColumn, string> = {
-  pull: 'bg-critical',
-  markdown: 'bg-warning',
-  check: 'bg-brand',
+  pull: 'bg-critical-fill',
+  markdown: 'bg-warning-fill',
+  check: 'bg-ink',
   onHalfPrice: 'bg-warning-soft border border-warning',
-  comingUp: 'bg-good',
+  comingUp: 'bg-line-strong',
 };
 
 // What needs an answer today (the Today list), then what is coming.
@@ -29,9 +29,7 @@ export function ExpiryBoard({ board, timeZone }: { board: Board; timeZone: strin
   return (
     <div className="space-y-8">
       {error && (
-        <p role="alert" className="rounded-lg border border-critical bg-critical-soft px-3 py-2 text-sm text-critical-ink">
-          {error}
-        </p>
+        <p role="alert" className="alert alert-critical">{error}</p>
       )}
 
       {/* Two groups, each its own row of columns: a long column only ever sits beside
@@ -48,9 +46,9 @@ export function ExpiryBoard({ board, timeZone }: { board: Board; timeZone: strin
               return (
                 <section key={column} aria-label={COLUMN_TITLE[column]}>
                   <header className="mb-2 flex items-center gap-2">
-                    <span aria-hidden className={`inline-block size-3 rounded-sm ${ACCENT[column]}`} />
+                    <span aria-hidden className={`inline-block size-2.5 rounded-[3px] ${ACCENT[column]}`} />
                     <h3 className="text-sm font-semibold">{COLUMN_TITLE[column]}</h3>
-                    <span className="ml-auto text-xs tabular-nums text-muted">{visible.length}</span>
+                    <span className="ml-auto rounded-full bg-surface-2 px-2 font-mono text-xs font-bold text-ink">{visible.length}</span>
                   </header>
                   <ul className="space-y-2">
                     {visible.map((card) => (

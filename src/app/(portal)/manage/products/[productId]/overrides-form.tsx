@@ -5,7 +5,7 @@ import { saveSiteProduct, type SiteProductFormState } from '@/lib/products/actio
 import { TRACKING_LABEL, TRACKING_MODES } from '@/lib/products/tracking';
 import type { TrackingMode } from '@/lib/supabase/types';
 
-const FIELD = 'w-full rounded border border-neutral-300 px-3 py-2 text-sm';
+const FIELD = 'w-full field text-sm';
 
 export type SiteOverrideValues = {
   retail_price: number | null;
@@ -52,7 +52,7 @@ export function OverridesForm({
           <label htmlFor="unit_cost" className="block text-sm font-medium">Unit cost (AUD)</label>
           <input id="unit_cost" name="unit_cost" inputMode="decimal"
             defaultValue={values?.unit_cost ?? ''} className={`mt-1 ${FIELD}`} />
-          <p className="mt-1 text-xs text-neutral-500">Used to value waste in dollars.</p>
+          <p className="mt-1 text-xs text-muted">Used to value waste in dollars.</p>
         </div>
         <div>
           <label htmlFor="par_level" className="block text-sm font-medium">Par level</label>
@@ -63,7 +63,7 @@ export function OverridesForm({
           <label htmlFor="fixture" className="block text-sm font-medium">Fixture</label>
           <input id="fixture" name="fixture" maxLength={60} placeholder="Dairy fridge"
             defaultValue={values?.fixture ?? ''} className={`mt-1 ${FIELD}`} />
-          <p className="mt-1 text-xs text-neutral-500">Groups the daily rotation checklist.</p>
+          <p className="mt-1 text-xs text-muted">Groups the daily rotation checklist.</p>
         </div>
       </div>
 
@@ -90,12 +90,12 @@ export function OverridesForm({
       </label>
 
       {state.status === 'error' && (
-        <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="alert alert-critical">
           {state.message}
         </p>
       )}
       {state.status === 'saved' && (
-        <p className="rounded border border-green-300 bg-green-50 px-3 py-2 text-sm text-green-800">
+        <p className="alert alert-good">
           Saved.
         </p>
       )}
@@ -103,7 +103,7 @@ export function OverridesForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="btn btn-primary"
       >
         {pending ? 'Saving…' : values ? 'Save changes' : 'Range at this site'}
       </button>

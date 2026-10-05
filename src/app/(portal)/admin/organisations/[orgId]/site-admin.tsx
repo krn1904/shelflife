@@ -70,12 +70,12 @@ function AddSiteForm({ orgId }: { orgId: string }) {
       </div>
 
       {state.status === 'error' && (
-        <p className="mt-3 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+        <p className="mt-3 alert alert-critical">
           {state.message}
         </p>
       )}
       {state.status === 'created' && (
-        <p className="mt-3 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+        <p className="mt-3 alert alert-good">
           Site created.
         </p>
       )}

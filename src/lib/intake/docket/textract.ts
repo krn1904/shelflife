@@ -1,6 +1,6 @@
 import 'server-only';
-import { AnalyzeDocumentCommand, AnalyzeExpenseCommand, TextractClient } from '@aws-sdk/client-textract';
-import { expenseFromDocuments, tablesFromBlocks, textLinesFromBlocks, type Table, type TextractReading } from './textract-shape';
+import { AnalyzeDocumentCommand, TextractClient } from '@aws-sdk/client-textract';
+import { tablesFromBlocks, textLinesFromBlocks, type Table } from './textract-shape';
 
 /** Raised when the server does not have the AWS credentials needed to call Textract. */
 export class TextractNotConfigured extends Error {}
@@ -23,25 +23,6 @@ function client(): TextractClient {
     );
   }
   return new TextractClient({ region, credentials: { accessKeyId, secretAccessKey } });
-}
-
-/**
- * Two readings of one photo: the tables exactly as printed, and Textract's invoice model's
- * line items. Two billed pages per photo; both are shown so the better one can be chosen.
- */
-export async function readWithTextract(bytes: Uint8Array): Promise<TextractReading> {
-  const textract = client();
-  // Run both paid analyses concurrently: one preserves the printed table, while the other
-  // applies Textract's invoice/receipt model to identify fields and line items.
-  const [document, expense] = await Promise.all([
-    textract.send(new AnalyzeDocumentCommand({ Document: { Bytes: bytes }, FeatureTypes: ['TABLES'] })),
-    textract.send(new AnalyzeExpenseCommand({ Document: { Bytes: bytes } })),
-  ]);
-  // Convert AWS's graph-shaped responses into small, predictable objects for the UI.
-  return {
-    tables: tablesFromBlocks(document.Blocks ?? []),
-    expense: expenseFromDocuments(expense.ExpenseDocuments ?? []),
-  };
 }
 
 /**

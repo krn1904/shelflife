@@ -1,9 +1,9 @@
 import Link from 'next/link';
-import { differenceInCalendarDays, parseISO, subMonths } from 'date-fns';
+import { subMonths } from 'date-fns';
 import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/intake/expiry';
-import { bucketFor } from '@/lib/analytics/aggregate';
+import { attentionUntil } from '@/lib/expiry/display';
 import { formatAud } from '@/lib/charts/tokens';
 import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle, QuickAction } from '@/components/ui';
@@ -18,15 +18,16 @@ export default async function ManagePage() {
   const asOf = todayIn(site?.timeZone ?? 'UTC');
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
-  const [{ count: ranged }, { data: batches }, { data: waste }, { count: openDeliveries }, { data: recent }] =
+  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }] =
     await Promise.all([
       supabase.from('site_products').select('*', { count: 'exact', head: true }),
+      // Counted by the database: every dated batch used to be downloaded just to count these.
       supabase
         .from('stock_batches')
-        .select('expiry_date')
+        .select('*', { count: 'exact', head: true })
         .eq('status', 'active')
         .gt('qty_remaining', 0)
-        .not('expiry_date', 'is', null),
+        .lte('expiry_date', attentionUntil(asOf)),
       supabase.from('waste_events').select('value_aud').gte('wasted_at', monthStart),
       supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
       supabase
@@ -37,11 +38,7 @@ export default async function ManagePage() {
         .limit(ACTIVITY_LIMIT),
     ]);
 
-  const urgent = (batches ?? []).filter((b) => {
-    if (!b.expiry_date) return false;
-    const bucket = bucketFor(differenceInCalendarDays(parseISO(b.expiry_date), parseISO(asOf)));
-    return bucket === 'overdue' || bucket === 'today' || bucket === 'soon';
-  }).length;
+  const urgent = urgentCount ?? 0;
 
   const wasteThisMonth = (waste ?? []).reduce((sum, w) => sum + (w.value_aud ?? 0), 0);
 
@@ -57,7 +54,7 @@ export default async function ManagePage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Needs attention" value={urgent} tone={urgent ? 'critical' : 'default'} hint="expiring within 7 days" />
         <Stat label="Waste (30 days)" value={formatAud(wasteThisMonth)} />
         <Stat label="Open deliveries" value={openDeliveries ?? 0} />

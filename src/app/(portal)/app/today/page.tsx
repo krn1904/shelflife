@@ -1,4 +1,4 @@
-import { differenceInCalendarDays, parseISO } from 'date-fns';
+import { differenceInCalendarDays, format, parseISO } from 'date-fns';
 import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { todayIn } from '@/lib/intake/expiry';
@@ -61,11 +61,9 @@ export default async function TodayPage() {
   }));
 
   return (
-    <div>
-      <PageHeader title="Today" subtitle={site.name} />
-      <div className="mt-6">
-        <TodayList items={items} fixtures={fixtures} timeZone={site.timeZone} />
-      </div>
+    <div className="mx-auto max-w-xl space-y-5">
+      <PageHeader title="Today" subtitle={`${site.name} · ${format(parseISO(asOf), 'EEE d MMM')}`} />
+      <TodayList items={items} fixtures={fixtures} timeZone={site.timeZone} />
     </div>
   );
 }

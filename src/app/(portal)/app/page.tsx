@@ -46,7 +46,7 @@ export default async function ShiftPage() {
           <QuickAction href="/app/deliveries" title="Receive a delivery" hint="Work down the docket from a supplier" />
           <QuickAction href="/app/board" title="Expiry board" hint="All dated stock, and what is coming up" />
           <QuickAction href="/app/scan" title="Look up a product" hint="Scan a barcode to find or add it" />
-          <QuickAction href="/app/settings" title="Notifications" hint="Turn push on for this device" />
+          <QuickAction href="/app/settings" title="Settings" hint="Notifications and light or dark theme" />
         </div>
       </div>
     </div>

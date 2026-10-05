@@ -37,18 +37,20 @@ src/
       owner/                     owner      — multi-site rollup + CSV export route
       admin/                     platform admin — organisations, lifecycle, job history
     login/                     one public route (+ demo one-click logins)
-  components/                  shared UI (portal shell, charts, scanner, toggles)
+  components/                  shared UI (portal shell, staff tabs, theme picker, charts, scanner)
   lib/
     supabase/                  client factories, env resolution, generated types
     auth/                      session resolution + role gates, sign-in actions
     intake/                    docket-driven receiving: docket reading, supplier recognition,
                                expected lines, expiry proposal
-    expiry/                    the engine's rules (re-exported from _shared), digest text
+    expiry/                    the engine's rules (re-exported from _shared), digest text,
+                               Today wording, board columns + the board's windowed loader
     offline/                   Dexie outbox + framework-free queue semantics
     products/                  tracking-mode resolution, product mutations
     analytics/                 waste/rollup aggregation for the dashboards
     barcode/                   GTIN check digits, BarcodeDetector + zxing reader
     demo/                      demo-mode config and the "jump N days" action
+    theme/                     light/dark choice: cookie parsing + the server-side read
   proxy.ts                     session refresh on every request (Next 16 "Proxy")
 
 supabase/
@@ -226,6 +228,28 @@ restricted to owners and platform admins.
 
 ---
 
+## UI and theming
+
+The look is the "Night shift" design system, documented in [DESIGN.md](DESIGN.md).
+
+- **Tokens, not colours.** Every colour is a CSS variable in
+  [globals.css](../src/app/globals.css), mapped to Tailwind utilities (`bg-surface`,
+  `text-muted`, `border-line`, `bg-brand`…). Components never use raw palette classes such as
+  `neutral-500` or `red-50`, so both themes come from the same markup.
+- **Light and dark.** With no `theme` cookie, CSS follows `prefers-color-scheme`. The
+  `ThemePicker` writes the cookie and flips `data-theme` on `<html>`; the root layout reads the
+  cookie through [theme/server.ts](../src/lib/theme/server.ts), so the server's first paint
+  already matches. Every route reads the session cookie anyway, so this makes no page
+  dynamic that wasn't already.
+- **Charts** follow the theme through `.chart` CSS rules, which override the colours Recharts
+  writes as SVG attributes. The one series colour is validated for both surfaces in
+  [charts/tokens.ts](../src/lib/charts/tokens.ts).
+- **Staff navigation** is `BottomTabs` on a phone and the same `SHIFT_TABS` in the header from
+  `sm` up. The list lives in a plain module ([shift-tabs.ts](../src/components/shift-tabs.ts))
+  because the server-rendered shell cannot read data exported from a `'use client'` file.
+
+---
+
 ## Docket-driven intake
 
 The receiving flow lives under `app/deliveries/` with its logic in [src/lib/intake/](../src/lib/intake).
@@ -238,8 +262,7 @@ It starts at the docket, not a supplier list:
 2. **Two readers, one shape.** Both produce a `DocketReading`
    ([reading.ts](../src/lib/intake/docket/reading.ts)): every text line, plus the chosen product
    table cell by cell when there is one. AWS Textract runs server-side from the stored photo
-   (`readDocketWithTextract`, one `AnalyzeDocument` TABLES call; the test bench also runs the
-   invoice model). The free reader is Tesseract in the browser
+   (`readDocketWithTextract`, one `AnalyzeDocument` TABLES call). The free reader is Tesseract in the browser
    ([browser.ts](../src/lib/intake/docket/browser.ts)). Which engine a plan gets is meant to be
    decided later; nothing downstream depends on it.
 3. **Supplier from the docket.** `identifySupplier()` ([supplier.ts](../src/lib/intake/docket/supplier.ts))
@@ -281,6 +304,10 @@ It starts at the docket, not a supplier list:
 
 One expiry per SKU line, covering every box of that SKU ⇒ normally one `stock_batch` per
 `delivery_line`.
+
+The screen walks the lines **one at a time** by default, with "Show all lines" for the full
+list. Both views render the same component state; the cursor maths (clamping, "Line n of N",
+the last line) is in [walk.ts](../src/lib/intake/walk.ts) and tested.
 
 ---
 
@@ -354,7 +381,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, digest text, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost) |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, digest text, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

@@ -4,7 +4,7 @@ import { useActionState, useEffect } from 'react';
 import { addCatalogueProduct, type ProductFormState } from '@/lib/products/actions';
 import { TRACKING_HINT, TRACKING_LABEL, TRACKING_MODES } from '@/lib/products/tracking';
 
-const FIELD = 'w-full rounded border border-neutral-300 px-3 py-2 text-sm';
+const FIELD = 'w-full field text-sm';
 
 /**
  * Adds an unknown barcode to the shared catalogue. Shown once per product, ever,
@@ -33,7 +33,7 @@ export function ProductForm({
 
       <div>
         <span className="block text-sm font-medium">Barcode</span>
-        <span className="mt-1 block font-mono text-sm tabular-nums text-neutral-600">{barcode}</span>
+        <span className="mt-1 block font-mono text-sm tabular-nums text-muted">{barcode}</span>
       </div>
 
       <div>
@@ -64,7 +64,7 @@ export function ProductForm({
         <legend className="text-sm font-medium">How should this be tracked?</legend>
         <div className="mt-2 space-y-2">
           {TRACKING_MODES.map((mode) => (
-            <label key={mode} className="flex gap-3 rounded border border-neutral-200 px-3 py-2">
+            <label key={mode} className="flex gap-3 min-h-11 rounded-[var(--radius)] border border-line px-3 py-2">
               <input
                 type="radio"
                 name="tracking_mode"
@@ -74,7 +74,7 @@ export function ProductForm({
               />
               <span>
                 <span className="block text-sm font-medium">{TRACKING_LABEL[mode]}</span>
-                <span className="block text-xs text-neutral-500">{TRACKING_HINT[mode]}</span>
+                <span className="block text-xs text-muted">{TRACKING_HINT[mode]}</span>
               </span>
             </label>
           ))}
@@ -83,7 +83,7 @@ export function ProductForm({
 
       <div>
         <label htmlFor="default_shelf_life_days" className="block text-sm font-medium">
-          Typical shelf life in days <span className="font-normal text-neutral-500">(optional)</span>
+          Typical shelf life in days <span className="font-normal text-muted">(optional)</span>
         </label>
         <input
           id="default_shelf_life_days"
@@ -91,13 +91,13 @@ export function ProductForm({
           inputMode="numeric"
           className={`mt-1 ${FIELD} sm:max-w-40`}
         />
-        <p className="mt-1 text-xs text-neutral-500">
+        <p className="mt-1 text-xs text-muted">
           Used to propose an expiry date at intake, so staff confirm rather than type.
         </p>
       </div>
 
       {state.status === 'error' && (
-        <p className="rounded border border-red-300 bg-red-50 px-3 py-2 text-sm text-red-800">
+        <p className="alert alert-critical">
           {state.message}
         </p>
       )}
@@ -105,7 +105,7 @@ export function ProductForm({
       <button
         type="submit"
         disabled={pending}
-        className="rounded bg-neutral-900 px-4 py-2 text-sm font-medium text-white disabled:opacity-50"
+        className="btn btn-primary"
       >
         {pending ? 'Saving…' : 'Add to catalogue'}
       </button>

@@ -10,6 +10,7 @@ import {
 } from '@/lib/intake/actions';
 import { BASIS_NOTE, type ExpiryBasis } from '@/lib/intake/expiry';
 import { intakePayload, intakeSummary, trackingOf } from '@/lib/intake/plan';
+import { linePosition, stepLine } from '@/lib/intake/walk';
 import { DocketPhoto } from './docket-photo';
 import type { TrackingMode } from '@/lib/supabase/types';
 
@@ -141,6 +142,9 @@ export function IntakeClient({
   const [term, setTerm] = useState('');
   const [results, setResults] = useState<SuggestedLine[]>([]);
   const [searching, startSearch] = useTransition();
+  // One line at a time by default, like reading down the paper; "Show all lines" is the list.
+  const [walking, setWalking] = useState(true);
+  const [at, setAt] = useState(0);
   const [state, formAction, closing] = useActionState<IntakeState, FormData>(closeDelivery, {
     status: 'idle',
   });
@@ -205,6 +209,7 @@ export function IntakeClient({
         ...prev,
         fromProduct(product, { key: `add-${product.productId}-${prev.length}`, docketed: docket ? 0 : null }),
       ]);
+      setAt(rows.length);
     }
     setLinking(null);
     setTerm('');
@@ -218,6 +223,180 @@ export function IntakeClient({
   }
 
   const linkingRow = rows.find((r) => r.key === linking) ?? null;
+  const position = linePosition(at, rows.length);
+  const current = position ? { row: rows[position.line - 1], index: position.line - 1 } : null;
+
+  /** One line's controls; `big` is the one-at-a-time focus card, with thumb-sized steppers. */
+  function lineBody(row: Row, index: number, big: boolean) {
+    const got = row.ticked ? row.qty : 0;
+    const gap = row.docketed === null ? 0 : got - row.docketed;
+    const tracking = trackingOf(row);
+    return (
+      <>
+        <div className={`flex flex-wrap items-start gap-3 ${big ? 'p-5' : 'px-4 py-3'}`}>
+          <input
+            type="checkbox"
+            checked={row.ticked}
+            onChange={(e) => update(row.key, { ticked: e.target.checked })}
+            aria-label={`Received ${row.name}`}
+            className="mt-1.5 size-5"
+          />
+          {/* On a phone, and in the focus card, the name takes its own row and the counts sit underneath. */}
+          <div className={`min-w-0 flex-1 space-y-1 ${big ? 'basis-[calc(100%-2.5rem)]' : 'max-sm:basis-[calc(100%-2.5rem)]'}`}>
+            {row.product ? (
+              <>
+                <span className={`block font-semibold ${big ? 'text-xl leading-tight' : 'truncate text-[0.9375rem]'}`}>{row.product.name}</span>
+                <span className="block text-xs text-muted">
+                  {describe(row.product)}{describe(row.product) ? ' · ' : ''}in your catalogue
+                </span>
+              </>
+            ) : (
+              <>
+                <input
+                  value={row.name}
+                  onChange={(e) => update(row.key, { name: e.target.value })}
+                  aria-label={`Name of docket line ${index + 1}`}
+                  className="field px-2 py-1 text-sm font-medium"
+                  maxLength={120}
+                />
+                <span className="block text-xs text-warning">
+                  New item — not in your catalogue. Check the name; it is added as written.
+                </span>
+              </>
+            )}
+            {row.docketText && (
+              <span className="block truncate font-mono text-xs text-faint" title={row.docketText}>
+                Docket: {row.docketText}
+              </span>
+            )}
+            <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
+              {!row.product && row.suggestion && (
+                <button type="button" onClick={() => link(row.key, row.suggestion!)} className="btn btn-outline btn-sm">
+                  Is it {row.suggestion.name}? Use that
+                </button>
+              )}
+              {!row.product && (
+                <button type="button" onClick={() => findFor(row)} className="text-muted underline">
+                  Find in catalogue
+                </button>
+              )}
+              {row.product && row.fromDocket && (
+                <button type="button" onClick={() => unlink(row)} className="text-muted underline">
+                  Not this product?
+                </button>
+              )}
+              {!row.product && (
+                <label className="flex items-center gap-1 text-muted">
+                  Kind
+                  <select
+                    value={row.newTracking}
+                    onChange={(e) => update(row.key, { newTracking: e.target.value as TrackingMode })}
+                    className="field w-auto px-1.5 py-0.5 text-xs"
+                  >
+                    {(Object.keys(TRACKING_LABEL) as TrackingMode[]).map((mode) => (
+                      <option key={mode} value={mode}>{TRACKING_LABEL[mode]}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+            </span>
+          </div>
+
+          {row.docketed !== null && (
+            <span className={`flex gap-1 text-xs ${big ? 'items-center pl-8' : 'items-center max-sm:pl-8 sm:flex-col sm:items-end sm:pt-1'}`}>
+              <span className="font-mono text-muted">docket {row.docketed}</span>
+              {gap < 0 && <span className="badge badge-warning font-mono">short {-gap}</span>}
+              {gap > 0 && <span className="badge badge-neutral">over {gap}</span>}
+            </span>
+          )}
+
+          <span className={`flex items-center gap-1 rounded ${big ? 'ml-auto' : 'max-sm:ml-auto'} ${row.unsure && row.ticked ? 'bg-warning-soft p-1' : ''}`}>
+            <button
+              type="button"
+              onClick={() => update(row.key, { qty: Math.max(0, row.qty - 1), unsure: false })}
+              className={`btn btn-outline p-0 leading-none ${big ? 'size-14 text-2xl' : 'size-11 text-lg'}`}
+              aria-label={`One fewer ${row.name}`}
+              disabled={!row.ticked}
+            >
+              −
+            </button>
+            <input
+              value={row.qty}
+              onChange={(e) => update(row.key, { qty: Math.max(0, Number(e.target.value) || 0), unsure: false })}
+              inputMode="numeric"
+              aria-label={`Quantity of ${row.name}`}
+              disabled={!row.ticked}
+              className={`field px-2 py-1 text-center font-mono tabular-nums ${big ? 'w-20 text-2xl font-bold' : 'w-16'}`}
+            />
+            <button
+              type="button"
+              onClick={() => update(row.key, { qty: row.qty + 1, unsure: false })}
+              className={`btn btn-outline p-0 leading-none ${big ? 'size-14 text-2xl' : 'size-11 text-lg'}`}
+              aria-label={`One more ${row.name}`}
+              disabled={!row.ticked}
+            >
+              +
+            </button>
+          </span>
+        </div>
+
+        {row.ticked && row.unsure && (
+          <p className="border-t border-line px-4 py-1.5 pl-12 text-xs text-warning">
+            The reader was not sure of this count. Check it against the docket.
+          </p>
+        )}
+        {!row.ticked && row.fromDocket && (
+          <p className="border-t border-line px-4 py-1.5 pl-12 text-xs text-muted">
+            Recorded as not delivered.
+          </p>
+        )}
+
+        {row.ticked && tracking === 'batch' && (
+          <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-2 pl-12">
+            <input
+              type="date"
+              value={row.expiry ?? ''}
+              onChange={(e) => update(row.key, { expiry: e.target.value || null, confirmed: true })}
+              aria-label={`Expiry for ${row.name}`}
+              className="field w-auto px-2 py-1 font-mono"
+            />
+            {row.confirmed ? (
+              <span className="text-xs font-medium text-good">Confirmed</span>
+            ) : row.product ? (
+              <>
+                <span className="text-xs text-muted">{BASIS_NOTE[row.product.proposal.basis]}</span>
+                {row.expiry && (
+                  <button
+                    type="button"
+                    onClick={() => update(row.key, { confirmed: true })}
+                    className="btn btn-outline btn-sm"
+                  >
+                    Looks right
+                  </button>
+                )}
+              </>
+            ) : (
+              <span className="text-xs text-muted">New item: enter the date on the pack.</span>
+            )}
+            {index > 0 && (
+              <button type="button" onClick={() => copyPrevious(index)} className="text-xs text-muted underline">
+                Same as previous line
+              </button>
+            )}
+          </div>
+        )}
+
+        {row.ticked && tracking !== 'batch' && (
+          <p className="border-t border-line px-4 py-2 pl-12 text-xs text-muted">
+            {tracking === 'rotation'
+              ? 'Rotation stock — checked on the daily fixture list, no date needed.'
+              : 'Not expiry-tracked — quantity only.'}
+          </p>
+        )}
+      </>
+    );
+  }
+
 
   return (
     <div className="space-y-8">
@@ -261,184 +440,111 @@ export function IntakeClient({
             : historyNote}
         </p>
 
-        <ul className="card mt-3 divide-y divide-line overflow-hidden">
-          {rows.map((row, index) => {
-            const got = row.ticked ? row.qty : 0;
-            const gap = row.docketed === null ? 0 : got - row.docketed;
-            const tracking = trackingOf(row);
-            return (
-              <li key={row.key} className={row.ticked ? '' : 'bg-surface-2 opacity-70'}>
-                <div className="flex flex-wrap items-start gap-3 px-4 py-3">
-                  <input
-                    type="checkbox"
-                    checked={row.ticked}
-                    onChange={(e) => update(row.key, { ticked: e.target.checked })}
-                    aria-label={`Received ${row.name}`}
-                    className="mt-1.5 size-5"
-                  />
-                  <div className="min-w-0 flex-1 space-y-1">
-                    {row.product ? (
-                      <>
-                        <span className="block truncate text-sm font-medium">{row.product.name}</span>
-                        <span className="block text-xs text-muted">
-                          {describe(row.product)}{describe(row.product) ? ' · ' : ''}in your catalogue
-                        </span>
-                      </>
-                    ) : (
-                      <>
-                        <input
-                          value={row.name}
-                          onChange={(e) => update(row.key, { name: e.target.value })}
-                          aria-label={`Name of docket line ${index + 1}`}
-                          className="field px-2 py-1 text-sm font-medium"
-                          maxLength={120}
-                        />
-                        <span className="block text-xs text-warning">
-                          New item — not in your catalogue. Check the name; it is added as written.
-                        </span>
-                      </>
-                    )}
-                    {row.docketText && (
-                      <span className="block truncate font-mono text-xs text-faint" title={row.docketText}>
-                        Docket: {row.docketText}
+        {rows.length > 0 && (
+          <div className="mt-3 flex flex-wrap items-center gap-3">
+            {walking && position && (
+              <span className="font-mono text-sm text-muted">Line {position.line} of {position.of}</span>
+            )}
+            {walking && position && (
+              <span aria-hidden className="h-1 min-w-24 flex-1 rounded-full bg-line">
+                <span
+                  className="block h-1 rounded-full bg-brand"
+                  style={{ width: `${(position.line / position.of) * 100}%` }}
+                />
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => setWalking((w) => !w)}
+              className="btn btn-ghost btn-sm ml-auto"
+            >
+              {walking ? 'Show all lines' : 'One line at a time'}
+            </button>
+          </div>
+        )}
+
+        {walking && current ? (
+          <div className="mt-3 space-y-3">
+            <div className={`card overflow-hidden rounded-[1.25rem] ${current.row.ticked ? '' : 'opacity-80'}`}>
+              {lineBody(current.row, current.index, true)}
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                type="button"
+                onClick={() => setAt(stepLine(current.index, -1, rows.length))}
+                disabled={current.index === 0}
+                className="btn btn-outline min-h-13 px-5"
+                aria-label="Previous line"
+              >
+                ←
+              </button>
+              {position?.last ? (
+                <a href="#close-delivery" className="btn btn-primary min-h-13 flex-1">
+                  All lines checked · review and close
+                </a>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setAt(stepLine(current.index, 1, rows.length))}
+                  className="btn btn-primary min-h-13 flex-1"
+                >
+                  Next line
+                </button>
+              )}
+            </div>
+
+            <ol className="card divide-y divide-line overflow-hidden" aria-label="All lines">
+              {rows.map((row, index) => {
+                const dated = trackingOf(row) === 'batch';
+                const gap = row.docketed === null ? 0 : (row.ticked ? row.qty : 0) - row.docketed;
+                return (
+                  <li key={row.key}>
+                    <button
+                      type="button"
+                      onClick={() => setAt(index)}
+                      aria-current={index === current.index ? 'step' : undefined}
+                      className={`flex min-h-11 w-full items-center gap-3 px-4 py-2 text-left text-sm hover:bg-surface-2 ${
+                        index === current.index ? 'bg-surface-2 font-semibold' : ''
+                      }`}
+                    >
+                      <span className="w-5 font-mono text-xs text-faint">{index + 1}</span>
+                      <span className={`min-w-0 flex-1 truncate ${row.ticked ? '' : 'text-faint line-through'}`}>
+                        {row.product?.name ?? (row.name || 'Unnamed new item')}
                       </span>
-                    )}
-                    <span className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs">
-                      {!row.product && row.suggestion && (
-                        <button type="button" onClick={() => link(row.key, row.suggestion!)} className="btn btn-outline px-2 py-0.5 text-xs">
-                          Is it {row.suggestion.name}? Use that
-                        </button>
-                      )}
-                      {!row.product && (
-                        <button type="button" onClick={() => findFor(row)} className="text-muted underline">
-                          Find in catalogue
-                        </button>
-                      )}
-                      {row.product && row.fromDocket && (
-                        <button type="button" onClick={() => unlink(row)} className="text-muted underline">
-                          Not this product?
-                        </button>
-                      )}
-                      {!row.product && (
-                        <label className="flex items-center gap-1 text-muted">
-                          Kind
-                          <select
-                            value={row.newTracking}
-                            onChange={(e) => update(row.key, { newTracking: e.target.value as TrackingMode })}
-                            className="field w-auto px-1.5 py-0.5 text-xs"
-                          >
-                            {(Object.keys(TRACKING_LABEL) as TrackingMode[]).map((mode) => (
-                              <option key={mode} value={mode}>{TRACKING_LABEL[mode]}</option>
-                            ))}
-                          </select>
-                        </label>
-                      )}
-                    </span>
-                  </div>
-
-                  {row.docketed !== null && (
-                    <span className="flex flex-col items-end gap-1 pt-1 text-xs">
-                      <span className="text-muted">docket {row.docketed}</span>
-                      {gap < 0 && <span className="badge bg-warning-soft text-warning">short {-gap}</span>}
-                      {gap > 0 && <span className="badge badge-neutral">over {gap}</span>}
-                    </span>
-                  )}
-
-                  <span className={`flex items-center gap-1 rounded ${row.unsure && row.ticked ? 'bg-warning-soft p-1' : ''}`}>
-                    <button
-                      type="button"
-                      onClick={() => update(row.key, { qty: Math.max(0, row.qty - 1), unsure: false })}
-                      className="btn btn-outline size-8 p-0 text-lg leading-none"
-                      aria-label={`One fewer ${row.name}`}
-                      disabled={!row.ticked}
-                    >
-                      −
+                      <span className={`font-mono text-xs ${gap < 0 ? 'text-warning' : 'text-muted'}`}>
+                        {!row.ticked
+                          ? 'not delivered'
+                          : row.docketed !== null && gap !== 0
+                            ? `${row.qty} of ${row.docketed}`
+                            : row.qty}
+                        {row.ticked && dated && (row.confirmed ? ' · ✓ date' : row.expiry ? ' · date?' : ' · no date')}
+                      </span>
                     </button>
-                    <input
-                      value={row.qty}
-                      onChange={(e) => update(row.key, { qty: Math.max(0, Number(e.target.value) || 0), unsure: false })}
-                      inputMode="numeric"
-                      aria-label={`Quantity of ${row.name}`}
-                      disabled={!row.ticked}
-                      className="field w-14 px-2 py-1 text-center tabular-nums"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => update(row.key, { qty: row.qty + 1, unsure: false })}
-                      className="btn btn-outline size-8 p-0 text-lg leading-none"
-                      aria-label={`One more ${row.name}`}
-                      disabled={!row.ticked}
-                    >
-                      +
-                    </button>
-                  </span>
-                </div>
+                  </li>
+                );
+              })}
+            </ol>
+          </div>
+        ) : (
+          <ul className="card mt-3 divide-y divide-line overflow-hidden">
+            {rows.map((row, index) => {
+              return (
+                <li key={row.key} className={row.ticked ? '' : 'bg-surface-2 opacity-70'}>
+                  {lineBody(row, index, false)}
+                </li>
+              );
+            })}
 
-                {row.ticked && row.unsure && (
-                  <p className="border-t border-line px-4 py-1.5 pl-12 text-xs text-warning">
-                    The reader was not sure of this count. Check it against the docket.
-                  </p>
-                )}
-                {!row.ticked && row.fromDocket && (
-                  <p className="border-t border-line px-4 py-1.5 pl-12 text-xs text-muted">
-                    Recorded as not delivered.
-                  </p>
-                )}
-
-                {row.ticked && tracking === 'batch' && (
-                  <div className="flex flex-wrap items-center gap-2 border-t border-line px-4 py-2 pl-12">
-                    <input
-                      type="date"
-                      value={row.expiry ?? ''}
-                      onChange={(e) => update(row.key, { expiry: e.target.value || null, confirmed: true })}
-                      aria-label={`Expiry for ${row.name}`}
-                      className="field w-auto px-2 py-1"
-                    />
-                    {row.confirmed ? (
-                      <span className="text-xs font-medium text-good">Confirmed</span>
-                    ) : row.product ? (
-                      <>
-                        <span className="text-xs text-muted">{BASIS_NOTE[row.product.proposal.basis]}</span>
-                        {row.expiry && (
-                          <button
-                            type="button"
-                            onClick={() => update(row.key, { confirmed: true })}
-                            className="btn btn-outline px-2 py-1 text-xs"
-                          >
-                            Looks right
-                          </button>
-                        )}
-                      </>
-                    ) : (
-                      <span className="text-xs text-muted">New item: enter the date on the pack.</span>
-                    )}
-                    {index > 0 && (
-                      <button type="button" onClick={() => copyPrevious(index)} className="text-xs text-muted underline">
-                        Same as previous line
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {row.ticked && tracking !== 'batch' && (
-                  <p className="border-t border-line px-4 py-2 pl-12 text-xs text-muted">
-                    {tracking === 'rotation'
-                      ? 'Rotation stock — checked on the daily fixture list, no date needed.'
-                      : 'Not expiry-tracked — quantity only.'}
-                  </p>
-                )}
+            {rows.length === 0 && (
+              <li className="px-4 py-3 text-sm text-muted">
+                {docket
+                  ? 'No product lines were found on the docket. Add the lines by hand below.'
+                  : 'Nothing pre-filled. Add the lines from the docket below.'}
               </li>
-            );
-          })}
-
-          {rows.length === 0 && (
-            <li className="px-4 py-3 text-sm text-muted">
-              {docket
-                ? 'No product lines were found on the docket. Add the lines by hand below.'
-                : 'Nothing pre-filled. Add the lines from the docket below.'}
-            </li>
-          )}
-        </ul>
+            )}
+          </ul>
+        )}
       </section>
 
       <section>
@@ -499,25 +605,25 @@ export function IntakeClient({
         </details>
       )}
 
-      <form action={formAction} className="space-y-3 border-t border-line pt-6">
+      <form id="close-delivery" action={formAction} className="scroll-mt-20 space-y-3 border-t border-line pt-6">
         <input type="hidden" name="delivery_id" value={deliveryId} />
         <input type="hidden" name="docket_number" value={docketNumber} />
         <input type="hidden" name="lines" value={payload} />
 
         {newItems.length > 0 && (
-          <p className="rounded border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
+          <p className="alert alert-warning">
             {newItems.length} new {newItems.length === 1 ? 'item is' : 'items are'} added to your organisation’s
             products as written when you close. Check {newItems.length === 1 ? 'its name' : 'their names'} first.
           </p>
         )}
         {short.length > 0 && (
-          <p className="rounded border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
+          <p className="alert alert-warning">
             {short.length} {short.length === 1 ? 'line is' : 'lines are'} short of the docket. They are recorded
             as delivered short.
           </p>
         )}
         {undated.length > 0 && (
-          <p className="rounded border border-warning/30 bg-warning-soft px-3 py-2 text-sm text-warning">
+          <p className="alert alert-warning">
             {undated.length} dated{' '}
             {undated.length === 1 ? 'line has' : 'lines have'} no date yet. Closing now records
             the stock but nothing will surface before it expires.
@@ -525,16 +631,16 @@ export function IntakeClient({
         )}
 
         {state.status === 'error' && (
-          <p className="rounded border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+          <p className="alert alert-critical">
             {state.message}
           </p>
         )}
 
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <button
             type="submit"
             disabled={closing || received.length === 0 || unnamed.length > 0}
-            className="btn btn-primary"
+            className="btn btn-primary min-h-13 w-full sm:w-auto"
           >
             {closing ? 'Closing…' : `Close delivery from ${supplierName}`}
           </button>

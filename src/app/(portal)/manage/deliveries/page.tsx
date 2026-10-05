@@ -137,7 +137,7 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
         <SectionTitle>Closed</SectionTitle>
         <div className="card overflow-x-auto">
           <table className="w-full min-w-[40rem] text-sm">
-            <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+            <thead className="border-b border-line text-left text-xs font-semibold text-muted">
               <tr>
                 <th className="px-4 py-2.5 font-medium">Closed</th>
                 <th className="px-4 py-2.5 font-medium">Supplier</th>

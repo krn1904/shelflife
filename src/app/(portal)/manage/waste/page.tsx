@@ -46,8 +46,8 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
   return (
     <div>
       <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-xl font-semibold">Waste</h1>
-        <p className="text-sm text-neutral-500">
+        <h1 className="text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Waste</h1>
+        <p className="text-sm text-muted">
           {site?.name ?? 'No site'} · last {WINDOW_MONTHS} months
         </p>
       </div>
@@ -59,10 +59,10 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
       </div>
 
       <section className="mt-8">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
+        <h2 className="section-title">
           Waste by month
         </h2>
-        <div className="mt-2 rounded border border-neutral-200 p-3">
+        <div className="mt-2 card p-3">
           <TrendChart
             data={byMonth.map((m) => ({ label: m.label, value: m.valueAud }))}
             emptyNote="No waste recorded in this window. That is either very good news or nobody is recording it."
@@ -72,12 +72,12 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
 
 
       <section className="mt-8">
-        <h2 className="text-sm font-medium uppercase tracking-wide text-neutral-500">
+        <h2 className="section-title">
           Recent write-offs
         </h2>
-        <div className="mt-2 overflow-x-auto rounded border border-neutral-200">
+        <div className="mt-2 overflow-x-auto card">
           <table className="w-full min-w-[36rem] text-sm">
-            <thead className="border-b border-neutral-200 text-left text-xs uppercase tracking-wide text-neutral-500">
+            <thead className="border-b border-line text-left text-xs font-semibold text-muted">
               <tr>
                 <th className="px-3 py-2 font-medium">When</th>
                 <th className="px-3 py-2 font-medium">Product</th>
@@ -86,19 +86,19 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
                 <th className="px-3 py-2 text-right font-medium">Value</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-neutral-100">
+            <tbody className="divide-y divide-line">
               {(events ?? []).slice(0, LOG_LIMIT).map((e) => (
                 <tr key={e.id}>
-                  <td className="px-3 py-2 whitespace-nowrap text-neutral-600">
+                  <td className="px-3 py-2 whitespace-nowrap text-muted">
                     {new Date(e.wasted_at).toLocaleDateString('en-AU')}
                   </td>
                   <td className="px-3 py-2">
                     {e.products?.name ?? 'Unknown'}
-                    <span className="ml-2 text-xs text-neutral-500">
+                    <span className="ml-2 text-xs text-muted">
                       {[e.products?.brand, e.products?.size].filter(Boolean).join(' · ')}
                     </span>
                   </td>
-                  <td className="px-3 py-2 text-neutral-600">{WASTE_REASON_LABEL[e.reason]}</td>
+                  <td className="px-3 py-2 text-muted">{WASTE_REASON_LABEL[e.reason]}</td>
                   <td className="px-3 py-2 text-right tabular-nums">{e.qty}</td>
                   <td className="px-3 py-2 text-right tabular-nums">
                     {e.value_aud === null ? '—' : formatAud(e.value_aud)}
@@ -107,7 +107,7 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
               ))}
               {(events ?? []).length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-3 py-3 text-neutral-500">
+                  <td colSpan={5} className="px-3 py-3 text-muted">
                     Nothing written off in this window.
                   </td>
                 </tr>
@@ -116,7 +116,7 @@ export default async function WastePage(props: PageProps<'/manage/waste'>) {
           </table>
         </div>
         {(events ?? []).length > LOG_LIMIT && (
-          <p className="mt-2 text-xs text-neutral-500">
+          <p className="mt-2 text-xs text-muted">
             Showing the most recent {LOG_LIMIT} of {(events ?? []).length}.
           </p>
         )}

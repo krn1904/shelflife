@@ -19,12 +19,14 @@ export type ReminderCardData = {
   predicted?: boolean;    // date never confirmed at intake
 };
 
-const TONE: Record<BoardColumn, string> = {
-  pull: 'border-critical bg-critical-soft',
-  markdown: 'border-warning bg-warning-soft',
-  check: '',
-  onHalfPrice: '',
-  comingUp: '',
+// The status pill: dark text on a bright fill for what needs doing today, quieter for
+// what is only being watched. The written title always sits inside it.
+const PILL: Record<BoardColumn, string> = {
+  pull: 'pill-critical',
+  markdown: 'pill-warning',
+  check: 'pill-neutral',
+  onHalfPrice: 'pill-neutral',
+  comingUp: 'pill-quiet',
 };
 
 /**
@@ -56,45 +58,44 @@ export function useBatchAnswers() {
   return { isHidden: (key: string) => hidden.has(key), error, setError, answer };
 }
 
-/** One card and its answers. Last-day cards also ask how many are being binned. */
+/**
+ * One card and its answers. Last-day cards also ask how many are being binned.
+ * `featured` is Today's "Next up"; `compact` fits a narrow board column.
+ */
 export function ReminderCard({
   card,
   onAnswer,
   timeZone,
   compact = false,
+  featured = false,
 }: {
   card: ReminderCardData;
   onAnswer: (card: ReminderCardData, step: BatchStep, qty?: number | null) => void;
   timeZone: string; // the site's, for "on half price since <date>"
   compact?: boolean; // tighter layout for board columns
+  featured?: boolean; // the larger "Next up" card on Today
 }) {
   const [left, setLeft] = useState(String(card.qtyRemaining));
   const leftCount = Number(left);
   const leftValid = left !== '' && Number.isInteger(leftCount) && leftCount >= 0 && leftCount <= card.qtyRemaining;
-  const button = compact ? 'btn px-2.5 py-1.5 text-xs' : 'btn';
+  const button = compact ? 'btn btn-sm' : featured ? 'btn min-h-12' : 'btn';
 
   return (
-    <li className={`card ${compact ? 'px-3 py-2.5' : 'px-4 py-3'} ${TONE[card.kind]}`}>
-      {compact ? (
-        // Narrow board column: name, then brand · size · stock on one line beneath.
-        <>
-          <p className="text-sm font-medium">{card.name}</p>
-          <p className="text-xs text-muted">
-            {[card.detail, `${card.qtyRemaining} in stock`].filter(Boolean).join(' · ')}
-          </p>
-        </>
-      ) : (
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
-          <span className="text-sm font-semibold">{COLUMN_TITLE[card.kind]}</span>
-          <span className="text-sm font-medium">{card.name}</span>
-          {card.detail && <span className="text-xs text-muted">{card.detail}</span>}
-          <span className="ml-auto text-xs text-muted">{card.qtyRemaining} in stock</span>
-        </div>
-      )}
+    <li className={`card ${compact ? 'px-3 py-2.5' : featured ? 'rounded-[1.125rem] p-5' : 'px-4 py-3'}`}>
+      <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+        <span className={`pill ${PILL[card.kind]}`}>{COLUMN_TITLE[card.kind].toUpperCase()}</span>
+        <span className={`font-mono text-muted ${compact ? 'text-[0.6875rem]' : 'text-xs'} ml-auto`}>
+          {card.qtyRemaining} in stock
+        </span>
+      </div>
+      <p className={`mt-2 font-semibold leading-tight ${compact ? 'text-sm' : featured ? 'text-[1.375rem] tracking-tight' : 'text-[0.9375rem]'}`}>
+        {card.name}
+      </p>
+      {card.detail && <p className="text-xs text-muted">{card.detail}</p>}
       <p className={`mt-1 text-muted ${compact ? 'text-xs' : 'text-sm'}`}>{cardInstruction({ action: card.kind, ...card }, timeZone)}</p>
-      {card.predicted && <p className="mt-1 text-xs text-warning">Date never confirmed</p>}
+      {card.predicted && <p className="mt-1 text-xs font-semibold text-warning">Date never confirmed</p>}
 
-      <div className={`${compact ? 'mt-2' : 'mt-3'} flex flex-wrap items-center gap-2`}>
+      <div className={`${compact ? 'mt-2' : 'mt-4'} flex flex-wrap items-center gap-2`}>
         {card.kind === 'check' && (
           <button type="button" className={`${button} btn-primary`} onClick={() => onAnswer(card, 'checked')}>
             Checked
@@ -123,7 +124,7 @@ export function ReminderCard({
                 max={card.qtyRemaining}
                 value={left}
                 onChange={(e) => setLeft(e.target.value)}
-                className={`field ${compact ? 'w-16 py-1' : 'w-20'}`}
+                className={`field font-mono ${compact ? 'min-h-9 w-16 py-1' : 'w-20'}`}
                 aria-label={`How many ${card.name} are left on the shelf`}
               />
             </label>

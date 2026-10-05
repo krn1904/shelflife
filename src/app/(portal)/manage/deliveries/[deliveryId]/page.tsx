@@ -85,7 +85,7 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
           <Link href={`/app/deliveries/${delivery.id}`} className="underline">Open the intake screen</Link>
         </p>
       ) : (
-        <div className="grid gap-3 sm:grid-cols-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
           <Stat label="Lines" value={totals.lines} />
           <Stat label="Units received" value={totals.received} hint={`${totals.docketed} on the docket`} />
           <Stat label="Short lines" value={totals.short} tone={totals.short ? 'critical' : 'default'}
@@ -98,13 +98,14 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
         <section>
           <SectionTitle>What was received</SectionTitle>
           <div className="card overflow-x-auto">
-            <table className="w-full min-w-[40rem] text-sm">
-              <thead className="border-b border-line text-left text-xs uppercase tracking-wide text-faint">
+            {/* Phones keep the verdict and expiry in view; the raw counts join from `sm` up. */}
+            <table className="w-full text-sm sm:min-w-[40rem]">
+              <thead className="border-b border-line text-left text-xs font-semibold text-muted">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Product</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Docket</th>
-                  <th className="px-4 py-2.5 text-right font-medium">Received</th>
                   <th className="px-4 py-2.5 font-medium">Against the docket</th>
+                  <th className="px-4 py-2.5 text-right font-medium max-sm:hidden">Docket</th>
+                  <th className="px-4 py-2.5 text-right font-medium max-sm:hidden">Received</th>
                   <th className="px-4 py-2.5 font-medium">Expiry</th>
                 </tr>
               </thead>
@@ -121,13 +122,16 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
                           {[l.products?.brand, l.products?.size].filter(Boolean).join(' · ')}
                         </span>
                       </td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{l.qty_docketed}</td>
-                      <td className="px-4 py-2.5 text-right tabular-nums">{l.qty_received}</td>
                       <td className="px-4 py-2.5">
                         <span className={status.className}>
                           {status.label}{gap !== 0 && l.qty_received > 0 ? ` ${Math.abs(gap)}` : ''}
                         </span>
+                        <span className="block font-mono text-xs text-muted sm:hidden">
+                          {l.qty_received} of {l.qty_docketed}
+                        </span>
                       </td>
+                      <td className="px-4 py-2.5 text-right font-mono tabular-nums max-sm:hidden">{l.qty_docketed}</td>
+                      <td className="px-4 py-2.5 text-right font-mono tabular-nums max-sm:hidden">{l.qty_received}</td>
                       <td className="px-4 py-2.5 text-xs">
                         {l.products?.tracking_mode !== 'batch' ? (
                           <span className="text-faint">{l.products?.tracking_mode === 'rotation' ? 'rotation stock' : 'not tracked'}</span>
@@ -175,7 +179,7 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
             <summary className="cursor-pointer font-medium">What the reader found</summary>
             <p className="mt-2 text-xs text-muted">As read when the delivery was received.</p>
             {reading.table ? (
-              <div className="mt-2 overflow-x-auto rounded border border-line">
+              <div className="mt-2 overflow-x-auto card">
                 <table className="w-max min-w-full text-xs">
                   <tbody className="divide-y divide-line">
                     {reading.table.map((row, r) => (

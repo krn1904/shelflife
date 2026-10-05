@@ -47,61 +47,76 @@ export function TodayList({ items, fixtures, timeZone }: { items: TodayItem[]; f
   }
 
   const cards: ReminderCardData[] = items.map((i) => ({ ...i, key: i.id, kind: i.action }));
-  const visible = cards.filter((c) => !isHidden(c.key));
+  // Items arrive most urgent first, so the head of the list is what to do next.
+  const [next, ...rest] = cards.filter((c) => !isHidden(c.key));
 
   return (
-    <div className="space-y-8">
-      {error && (
-        <p role="alert" className="rounded-lg border border-critical bg-critical-soft px-3 py-2 text-sm text-critical-ink">
-          {error}
-        </p>
-      )}
+    <div className="space-y-7">
+      {error && <p role="alert" className="alert alert-critical">{error}</p>}
 
-      <section>
-        <SectionTitle actions={<Link href="/app/board" className="text-sm text-muted hover:text-ink">Expiry board →</Link>}>
-          Dated stock ({visible.length})
+      <section aria-labelledby="next-up">
+        <SectionTitle actions={<Link href="/app/board" className="text-sm font-semibold text-muted hover:text-ink">Expiry board →</Link>}>
+          <span id="next-up">Next up</span>
         </SectionTitle>
-        <ul className="space-y-2">
-          {visible.map((card) => (
-            <ReminderCard key={card.key} card={card} onAnswer={answer} timeZone={timeZone} />
-          ))}
-          {visible.length === 0 && (
-            <li className="card px-4 py-3 text-sm text-muted">
-              Nothing dated needs attention. The list is rebuilt overnight.
-            </li>
-          )}
-        </ul>
+        {next ? (
+          <ul>
+            <ReminderCard key={next.key} card={next} onAnswer={answer} timeZone={timeZone} featured />
+          </ul>
+        ) : (
+          <p className="card px-5 py-6 text-sm text-muted">
+            Nothing dated needs attention. The list is rebuilt overnight.
+          </p>
+        )}
       </section>
 
-      <section>
-        <SectionTitle>Fixtures to check</SectionTitle>
-        <p className="-mt-1 mb-2 text-xs text-muted">
+      {rest.length > 0 && (
+        <section aria-labelledby="then">
+          <SectionTitle>
+            <span id="then">Then · <span className="font-mono">{rest.length}</span></span>
+          </SectionTitle>
+          <ul className="space-y-2">
+            {rest.map((card) => (
+              <ReminderCard key={card.key} card={card} onAnswer={answer} timeZone={timeZone} />
+            ))}
+          </ul>
+        </section>
+      )}
+
+      <section aria-labelledby="walk-past">
+        <SectionTitle><span id="walk-past">Walk past</span></SectionTitle>
+        <p className="-mt-1 mb-3 text-xs text-muted">
           Short-life stock is rotated by eye, so these are a walk-past rather than a scan.
         </p>
-        <ul className="card divide-y divide-line">
-          {fixtures.map((f) => {
-            const done = f.done || ticked.has(f.id);
-            return (
-              <li key={f.id} className="flex items-center gap-3 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={done}
-                  disabled={done}
-                  onChange={() => tickFixture(f.id)}
-                  aria-label={`Checked ${f.fixture}`}
-                  className="size-5 accent-brand"
-                />
-                <span className={`text-sm ${done ? 'text-faint line-through' : ''}`}>{f.fixture}</span>
-              </li>
-            );
-          })}
-          {fixtures.length === 0 && (
-            <li className="px-4 py-3 text-sm text-muted">
-              No fixtures set up. A manager assigns one to each rotation product from the Site
-              portal, and the list builds itself overnight.
-            </li>
-          )}
-        </ul>
+        {fixtures.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {fixtures.map((f) => {
+              const done = f.done || ticked.has(f.id);
+              return (
+                <label
+                  key={f.id}
+                  className={`flex min-h-11 items-center gap-2 rounded-full px-4 text-sm font-semibold ${
+                    done ? 'bg-brand-soft text-brand-soft-ink' : 'border border-line-strong'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={done}
+                    disabled={done}
+                    onChange={() => tickFixture(f.id)}
+                    aria-label={`Checked ${f.fixture}`}
+                    className="size-[18px]"
+                  />
+                  {f.fixture}
+                </label>
+              );
+            })}
+          </div>
+        ) : (
+          <p className="card px-4 py-3 text-sm text-muted">
+            No fixtures set up. A manager assigns one to each rotation product from the Site
+            portal, and the list builds itself overnight.
+          </p>
+        )}
       </section>
     </div>
   );
