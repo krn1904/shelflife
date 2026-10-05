@@ -1086,6 +1086,27 @@ async function main() {
     await admin.from('orgs').update({ is_demo: false }).eq('id', united.id);
   }
 
+  console.log('\nnightly expiry-engine schedule (03:00 Melbourne):');
+  {
+    // The cron fires at 16:00 and 17:00 UTC; exactly one must be 03:00 in Melbourne,
+    // including the nights the clocks change.
+    const pairs: [string, string, string][] = [
+      ['winter (AEST)', '2026-07-15T16:00:05Z', '2026-07-15T17:00:05Z'],
+      ['summer (AEDT)', '2026-01-15T17:00:05Z', '2026-01-15T16:00:05Z'],
+      ['clocks go back', '2026-04-04T16:00:05Z', '2026-04-04T17:00:05Z'],
+      ['clocks go forward', '2026-10-03T17:00:05Z', '2026-10-03T16:00:05Z'],
+    ];
+    for (const [name, notDue, due] of pairs) {
+      const { data: a } = await admin.rpc('expiry_engine_due', { p_at: notDue });
+      const { data: b } = await admin.rpc('expiry_engine_due', { p_at: due });
+      check(`runs exactly once a night: ${name}`, a === false && b === true, `got ${a} / ${b}`);
+    }
+
+    const anon = createClient<Database>(URL, ANON);
+    const { error } = await anon.rpc('expiry_engine_due', {});
+    check('anon cannot call the schedule helper', error !== null, error ? '' : 'call unexpectedly succeeded');
+  }
+
   console.log('\nanonymous (no session):');
   {
     const anon = createClient<Database>(URL, ANON);

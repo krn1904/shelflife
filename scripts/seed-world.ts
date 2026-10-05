@@ -922,7 +922,7 @@ export function buildWorld(now: Date): World {
       .reduce((n, o) => n + o.rotationChecks.filter((c) => c.check_date === asOf).length, 0);
     for (let back = 20; back >= 0; back--) {
       const day = dayAgo(back);
-      const engineAt = at(day, 2, 0);
+      const engineAt = at(day, 3, 0);
       if (Date.parse(engineAt) >= latest && back === 0) continue;
       const failed = back === 9;
       const processed = failed ? 0 : Math.max(0, openNow + between(-25, 25));

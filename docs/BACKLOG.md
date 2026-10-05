@@ -105,13 +105,14 @@ through intake for a rare case; deliveries are normally closed the same day.
 
 **Context (2026-10-03):** every date is now worked out on each site's own calendar (required
 `sites.timezone`), including in the nightly expiry engine. The job still *runs* on
-Melbourne's clock, at 02:00 Australia/Melbourne.
+Melbourne's clock, at 03:00 Australia/Melbourne (pg_cron job, 2026-10-06).
 
-**Why it matters later:** at 02:00 in Melbourne it is still the previous evening in Perth, so a
+**Why it matters later:** at 03:00 in Melbourne it is still the previous evening in Perth, so a
 Perth site's reminders would be planned for the day that is ending. All current sites are in Melbourne, so nothing is wrong today.
 
 **When a site outside Melbourne's zone is added:** run the engine hourly (it is a full,
-idempotent recompute, so extra runs are harmless).
+idempotent recompute, so extra runs are harmless): change the cron to `0 * * * *` and
+`expiry_engine_due()` to run per site at that site's 03:00.
 
 ## If lock-screen notifications come back
 

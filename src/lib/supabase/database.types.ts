@@ -1071,6 +1071,7 @@ export type Database = {
         Args: { p_days: number; p_org_id: string }
         Returns: number
       }
+      expiry_engine_due: { Args: { p_at?: string }; Returns: boolean }
       has_org_role: {
         Args: { org: string; roles: Database["public"]["Enums"]["app_role"][] }
         Returns: boolean

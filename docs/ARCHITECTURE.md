@@ -16,7 +16,7 @@ Browser / PWA ──▶ Next.js (App Router)         Supabase
                        │                          Storage (docket / date photos)
                        └─ Dexie outbox            Realtime
                                                   Edge Function (cron)
-                                                  └─ expiry-engine  02:00
+                                                  └─ expiry-engine  03:00 (pg_cron)
 ```
 
 Everything server-side runs **as the signed-in user**, so Postgres Row-Level Security is the
