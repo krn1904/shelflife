@@ -308,3 +308,10 @@ s3_region = "env(S3_REGION)"
 s3_access_key = "env(S3_ACCESS_KEY)"
 # Configures AWS_SECRET_ACCESS_KEY for S3 bucket
 s3_secret_key = "env(S3_SECRET_KEY)"
+
+# The Edge Function shares supabase/functions/deno.json with the app's engine code, and the CLI
+# only finds a deno.json inside the function's own folder, so name it here. verify_jwt is off
+# because the cron authenticates with x-cron-secret, not a user JWT.
+[functions.expiry-engine]
+verify_jwt = false
+import_map = "./functions/deno.json"
