@@ -26,6 +26,11 @@ function isStale(lastRunAt: string | undefined): boolean {
   return Date.now() - new Date(lastRunAt).getTime() > STALE_AFTER_MS;
 }
 
+/** When this render read its figures, on the platform's clock. Outside the component for the same reason. */
+function loadedAt(): string {
+  return clockAt(new Date(), PLATFORM_TIME_ZONE);
+}
+
 type OrganisationListRow = Pick<
   Tables<'orgs'>,
   'id' | 'name' | 'slug' | 'status' | 'archived_at' | 'created_at'
@@ -74,7 +79,7 @@ export default async function AdminPage() {
       <PageHeader
         title="Platform"
         subtitle="Every organisation, and the jobs that keep them fed."
-        actions={<RefreshButton loadedAt={clockAt(new Date(), PLATFORM_TIME_ZONE)} />}
+        actions={<RefreshButton loadedAt={loadedAt()} />}
       />
 
       <div className="grid gap-3 sm:grid-cols-3">
