@@ -75,6 +75,7 @@ export default async function ManagePage() {
           <QuickAction href="/manage/expiry" title="Expiry board" hint="Everything dated, by days left" />
           <QuickAction href="/manage/reminders" title="Reminder settings" hint="When staff are told to check, discount or pull" />
           <QuickAction href="/manage/messages" title="Message staff" hint="Send a note; see who has read it" />
+          <QuickAction href="/manage/people" title="People" hint="Add or remove the people who work here" />
         </div>
       </div>
 

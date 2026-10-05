@@ -53,9 +53,14 @@ export default async function OwnerPage() {
           sites?.length === 1 ? 'site' : 'sites'
         }`}
         actions={
-          <Link href="/owner/export" prefetch={false} className="btn btn-outline">
-            Download CSV
-          </Link>
+          <>
+            <Link href="/manage/people" className="btn btn-outline">
+              People
+            </Link>
+            <Link href="/owner/export" prefetch={false} className="btn btn-outline">
+              Download CSV
+            </Link>
+          </>
         }
       />
 

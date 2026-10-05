@@ -32,7 +32,7 @@ src/
   app/                         Next.js App Router
     (portal)/                  authenticated shell; layout gates the session
       app/                       staff PWA  — deliveries, today, expiry board, scan, waste, messages, settings
-      manage/                    manager    — delivery review, expiry board, waste, products, reminder settings, messages
+      manage/                    manager    — delivery review, expiry board, waste, products, reminder settings, messages, people
       owner/                     owner      — multi-site rollup + CSV export route
       admin/                     platform admin — organisations, lifecycle, job history
     login/                     one public route (+ demo one-click logins)
@@ -45,6 +45,7 @@ src/
     expiry/                    the engine's rules (re-exported from _shared), reminder text,
                                Today wording, board columns + the board's windowed loader
     messages/                  manager → staff site messages: validation, read summaries, loaders, actions
+    people/                    owner/manager staff management: who may manage whom (rules.ts), actions, loader
     offline/                   Dexie outbox + framework-free queue semantics
     products/                  tracking-mode resolution, product mutations
     analytics/                 waste/rollup aggregation for the dashboards
@@ -215,6 +216,19 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
 - **Every run writes a `job_runs` row, success or failure.** A silently-stopped cron is the
   worst failure mode (nothing looks broken until stock is gone); the admin portal flags an engine
   that has not reported in 36 hours.
+
+**Owners and managers manage their own people** ([src/lib/people/](../src/lib/people)). Adding a
+person needs the service key (only it can create a login), so `addSiteMember()` authorises first,
+in app code (the site is in the caller's RLS-scoped `session.sites`, the role passes
+`canManageRole()`), and only then calls `auth.admin.createUser`. `add_site_member()`, security
+definer, is the authority: it re-checks the role with `can_manage_site_role()` (owner or platform
+admin: staff or manager at any site of the organisation; manager: staff at the site they manage),
+locks the organisation and requires it active, refuses a login with a membership in another
+organisation, and writes the `member.added` audit row itself (`write_audit` only accepts
+`platform_admin.*`). If it refuses, the just-created login is deleted. `remove_site_member()`
+applies the same rule, never to the caller's own membership or an organisation-wide one, and
+leaves the login. The People list reads memberships as the user (RLS) and looks up emails with
+the service key only for those ids.
 
 **Reminders are in-app, per account.** There is no morning job and no Web Push. The staff and
 manager home screens read what is due today through `loadReminders()`
@@ -406,7 +420,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, reminder text and who sees it, site message validation and read summaries, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, reminder text and who sees it, site message validation and read summaries, who may add or remove whom, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

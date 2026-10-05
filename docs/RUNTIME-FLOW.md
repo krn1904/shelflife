@@ -16,6 +16,7 @@ How the app works end-to-end, one line per step. For the code-level map see
 9. **Record waste** — *Pulled out* writes expired waste automatically (site cost, else the docket's unit price). There is no separate write-off screen.
 10. **Offline** — Today answers that cannot be sent are kept in the Dexie outbox under the same UUID idempotency key and replayed oldest-first on reconnect (intake is *not* queued).
 11. **Managers/owners view** — delivery review (`/manage/deliveries`: open deliveries, docketed vs received, the docket photo and reading), expiry board, waste analytics, multi-site rollup, CSV export — all reading RLS-scoped data.
+11a. **Owner or manager runs their people** — `/manage/people` adds a person (the server creates the login with the service key only after checking the caller may add that role at that site, then `add_site_member()` re-checks and links it) or removes one (`remove_site_member()`; the login stays). Both write `member.*` audit rows.
 12. **Admin operates the platform** — creates organisations with their first site and owner, manages members and temporary password resets, archives/restores organisations, and monitors catalogue and `job_runs` health. Archived organisations retain their records but lose member access, jobs and notifications.
 
 ## The four portals
@@ -23,6 +24,6 @@ How the app works end-to-end, one line per step. For the code-level map see
 | Route | Role | Purpose |
 |---|---|---|
 | `/app` | staff | The phone PWA — receive deliveries, today's list, expiry board, rotation checks |
-| `/manage` | manager | One site — delivery review, expiry board, waste log, product/par settings, reminder settings, messages to staff |
+| `/manage` | manager | One site — delivery review, expiry board, waste log, product/par settings, reminder settings, messages to staff, people (owners: staff and managers; managers: staff) |
 | `/owner` | owner | Multi-site rollup, waste league table, trend charts, CSV export |
 | `/admin` | platform_admin | All organisations — lifecycle, catalogue moderation, `job_runs` history |

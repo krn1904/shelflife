@@ -37,6 +37,13 @@ The owner signs in through `/login` and is routed to `/owner`.
 
 ## Managing people
 
+Day-to-day staff changes don't need the platform admin. On `/manage/people` an owner adds or
+removes staff and managers at any site in their organisation, and a manager adds or removes
+staff at their own site, through `add_site_member()` / `remove_site_member()` (migration
+`20261005000003`, audited as `member.added` / `member.removed`). Those functions never add an
+owner or platform admin, never remove an organisation-wide membership or the caller's own, and
+refuse a login that already belongs to another organisation. Everything else below stays here.
+
 From `/admin/organisations/[orgId]`, a platform admin can:
 
 - Add or link a person
