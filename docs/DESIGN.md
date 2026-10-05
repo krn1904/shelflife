@@ -147,7 +147,15 @@ writes them as SVG attributes that CSS overrides. Tooltips use `TOOLTIP_STYLE` f
 ### Manager, owner and admin (desktop first, work at phone width)
 
 4. **Expiry board** (`/manage/expiry`): one table grouped by bucket, with link-based filter
-   buttons that show counts and keep the chosen site. Days left sits beside the product name
+   buttons that show counts and keep the chosen site. It fetches only what it shows:
+   - every overdue, due-today and within-7-days batch;
+   - the first 20 batches 8–30 days out, with "Show all" (capped at 500), counted by the
+     database;
+   - batches more than 30 days out as a count line only.
+
+   The date lines come from `boardWindow()` in `display.ts`, tested against the bucket edges.
+   Loading every dated batch used to build about 6,400 elements with the seed data; the board
+   is now about 560. Days left sits beside the product name
    so it never scrolls off a phone. The expiry date and the "Date never confirmed" note move
    under the name on small screens.
 5. **Delivery review** (`/manage/deliveries/[id]`): on a phone the table keeps Product,

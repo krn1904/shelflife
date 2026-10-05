@@ -1,6 +1,15 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { actionTone, daysLeftShort, daysLeftText, daysLeftTone, orderForShift } from './display';
+import { bucketFor } from '@/lib/analytics/aggregate';
+import {
+  actionTone,
+  boardWindow,
+  daysLeftShort,
+  daysLeftText,
+  daysLeftTone,
+  orderForShift,
+  SOON_DAYS,
+} from './display';
 
 test('board pills follow the expiry buckets', () => {
   assert.equal(daysLeftTone(-3), 'critical');
@@ -41,4 +50,12 @@ test('the shift list puts pulls first, then markdowns, then checks, soonest firs
   );
   // The input is not reordered in place.
   assert.equal(items[0].id, 'check-late');
+});
+
+test('the board window matches the bucket edges, across a month end', () => {
+  assert.deepEqual(boardWindow('2026-10-05'), { soonEnd: '2026-10-12', watchEnd: '2026-11-04' });
+  assert.deepEqual(boardWindow('2026-12-28'), { soonEnd: '2027-01-04', watchEnd: '2027-01-27' });
+  // The last day fetched as urgent is still "soon"; the next one is the first "watch".
+  assert.equal(bucketFor(SOON_DAYS), 'soon');
+  assert.equal(bucketFor(SOON_DAYS + 1), 'watch');
 });

@@ -1,3 +1,4 @@
+import { addDays, format, parseISO } from 'date-fns';
 import { bucketFor } from '@/lib/analytics/aggregate';
 import type { ExpiryActionKind } from '@/lib/supabase/types';
 
@@ -49,4 +50,26 @@ export function orderForShift<T extends { action: ExpiryActionKind; dueDate: str
   return [...items].sort(
     (a, b) => ACTION_RANK[a.action] - ACTION_RANK[b.action] || a.dueDate.localeCompare(b.dueDate),
   );
+}
+
+/** "Within 7 days" ends here — the same line `bucketFor` draws between `soon` and `watch`. */
+export const SOON_DAYS = 7;
+
+/** The expiry board's horizon: past this, a batch is counted but not listed. */
+export const WATCH_DAYS = 30;
+
+/** How many "Within 30 days" rows the board loads before "Show all". */
+export const WATCH_PREVIEW = 20;
+
+/**
+ * The date lines the expiry board queries by, so the database returns only what is shown.
+ * Inclusive ends: a batch on `soonEnd` is "Within 7 days", one on `watchEnd` is still
+ * "Within 30 days", and anything after `watchEnd` is only counted.
+ */
+export function boardWindow(asOf: string): { soonEnd: string; watchEnd: string } {
+  const day = parseISO(asOf);
+  return {
+    soonEnd: format(addDays(day, SOON_DAYS), 'yyyy-MM-dd'),
+    watchEnd: format(addDays(day, WATCH_DAYS), 'yyyy-MM-dd'),
+  };
 }
