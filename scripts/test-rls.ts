@@ -269,6 +269,39 @@ async function main() {
       `got ${lines?.length} lines`);
   }
 
+  console.log('\ndocket photos in storage (private bucket, scoped by path):');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    const own = `${metro.id}/${brunswick.id}/${crypto.randomUUID()}/docket.jpg`;
+    const atCoburg = `${metro.id}/${coburg.id}/${crypto.randomUUID()}/docket.jpg`;
+    const jpeg = new Uint8Array([0xff, 0xd8, 0xff, 0xd9]);
+    const put = (db: Db, path: string) =>
+      db.storage.from('dockets').upload(path, jpeg, { contentType: 'image/jpeg', upsert: true });
+
+    const { error: ownUpload } = await put(staff, own);
+    check('staff upload a docket photo to their own site\'s folder', ownUpload === null, ownUpload?.message ?? '');
+    const { error: otherSiteUpload } = await put(staff, atCoburg);
+    check('but not into another site\'s folder', otherSiteUpload !== null, 'upload unexpectedly succeeded');
+    const { error: otherOrgUpload } = await put(other, `${metro.id}/${brunswick.id}/${crypto.randomUUID()}/docket.jpg`);
+    check('another organisation cannot upload under this one', otherOrgUpload !== null, 'upload unexpectedly succeeded');
+
+    const { data: byOwner } = await owner.storage.from('dockets').download(own);
+    check('the owner (every site) can open it', byOwner !== null);
+    const coburgManager = await signIn('coburg.manager@metro-petroleum.test');
+    const { data: byCoburg } = await coburgManager.storage.from('dockets').download(own);
+    check('a manager of another site cannot', byCoburg === null);
+    const { data: byOther } = await other.storage.from('dockets').download(own);
+    check('nor can another organisation', byOther === null);
+
+    await staff.storage.from('dockets').remove([own]);
+    const { data: stillThere } = await admin.storage.from('dockets').download(own);
+    check('staff cannot delete a docket photo: it is evidence', stillThere !== null);
+
+    await admin.storage.from('dockets').remove([own, atCoburg]);
+  }
+
   console.log('\nrole resolution (regression: staff must not inherit a colleague\'s role):');
   {
     // RLS scopes memberships to the ORG, so a staff member legitimately sees the

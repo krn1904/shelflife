@@ -3,15 +3,17 @@
 import { useState } from 'react';
 import { createClient } from '@/lib/supabase/client';
 import { attachDocketPhoto } from '@/lib/intake/actions';
+import { forUpload } from '@/lib/intake/docket/browser';
 
-const MAX_BYTES = 8 * 1024 * 1024;
+// Before shrinking. A phone photo is 2–12 MB; anything far past that is not a photo of a docket.
+const MAX_ORIGINAL_BYTES = 40 * 1024 * 1024;
 const BUCKET = 'dockets';
 
 /**
- * Uploads straight from the browser to Storage rather than through a Server Action:
- * a docket photo is a few megabytes, and routing it through the action would double the
- * transfer and time out on a bad connection. The action is told the path afterwards, and
- * checks it points inside this delivery's own folder.
+ * Uploads straight from the browser to Storage rather than through a Server Action, shrunk
+ * on the phone first (forUpload), the same as a photo taken when starting the delivery: a
+ * store room's signal is poor, and Textract takes 5 MB at most. The action is told the path
+ * afterwards, and checks it points inside this delivery's own folder.
  */
 export function DocketPhoto({
   deliveryId,
@@ -35,33 +37,42 @@ export function DocketPhoto({
       setError('That is not an image.');
       return;
     }
-    if (file.size > MAX_BYTES) {
-      setError('That photo is over 8MB. Try again with a smaller one.');
+    if (file.size > MAX_ORIGINAL_BYTES) {
+      setError('That file is too large to be a photo. Take the photo again.');
       return;
     }
 
     setBusy(true);
-    const extension = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-    const target = `${orgId}/${siteId}/${deliveryId}/docket-${Date.now()}.${extension}`;
+    try {
+      let photo: Blob;
+      try {
+        photo = await forUpload(file);
+      } catch {
+        // Some formats (a HEIC on a desktop browser, say) cannot be decoded here.
+        setError('Could not open that photo. Take it again with the camera.');
+        return;
+      }
 
-    const supabase = createClient();
-    const { error: uploadError } = await supabase.storage
-      .from(BUCKET)
-      .upload(target, file, { upsert: true, contentType: file.type });
+      const target = `${orgId}/${siteId}/${deliveryId}/docket-${Date.now()}.jpg`;
+      const { error: uploadError } = await createClient().storage
+        .from(BUCKET)
+        .upload(target, photo, { upsert: true, contentType: 'image/jpeg' });
+      if (uploadError) {
+        setError(`Upload failed: ${uploadError.message}`);
+        return;
+      }
 
-    if (uploadError) {
+      const result = await attachDocketPhoto(deliveryId, target);
+      if (result.status === 'error') {
+        setError(result.message);
+        return;
+      }
+      setPath(target);
+    } catch (e) {
+      setError(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
       setBusy(false);
-      setError(`Upload failed: ${uploadError.message}`);
-      return;
     }
-
-    const result = await attachDocketPhoto(deliveryId, target);
-    setBusy(false);
-    if (result.status === 'error') {
-      setError(result.message);
-      return;
-    }
-    setPath(target);
   }
 
   return (

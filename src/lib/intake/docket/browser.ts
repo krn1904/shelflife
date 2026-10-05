@@ -3,7 +3,17 @@
  * reads the photo on the device so the image never leaves it. Browser-only (canvas, workers).
  */
 
-const TARGET_WIDTH = 2400;
+const TARGET_WIDTH = 2400;     // OCR width: wide enough for Tesseract to separate digits from table rules
+const MAX_UPLOAD_HEIGHT = 4800; // a long receipt photographed whole; Textract takes up to 10000 px
+const UPLOAD_QUALITY = 0.88;
+const FALLBACK_QUALITY = 0.7;   // only when a very detailed photo is still over the limit
+export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // Textract's limit for a synchronous call
+
+/** The size a photo is stored at: never enlarged, at most TARGET_WIDTH wide and MAX_UPLOAD_HEIGHT tall. */
+export function uploadSize(width: number, height: number): { width: number; height: number } {
+  const scale = Math.min(1, TARGET_WIDTH / width, MAX_UPLOAD_HEIGHT / height);
+  return { width: Math.max(1, Math.round(width * scale)), height: Math.max(1, Math.round(height * scale)) };
+}
 
 /**
  * The 1st and 99th percentile grey levels. Counted in a 256-slot histogram rather than by
@@ -55,17 +65,31 @@ async function cleanUp(file: Blob): Promise<Blob> {
     canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('could not prepare the photo'))), 'image/png'));
 }
 
-/** A JPEG small enough for Textract (5 MB) and the upload, big enough to read. */
+/**
+ * A JPEG small enough for Textract (5 MB) and a store room's signal, big enough to read.
+ * Every docket photo goes through this before upload, whichever screen took it.
+ */
 export async function forUpload(file: Blob): Promise<Blob> {
   const bitmap = await createImageBitmap(file);
-  const scale = Math.min(1, TARGET_WIDTH / bitmap.width);
   const canvas = document.createElement('canvas');
-  canvas.width = Math.round(bitmap.width * scale);
-  canvas.height = Math.round(bitmap.height * scale);
-  canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
-  bitmap.close();
-  return new Promise((resolve, reject) =>
-    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('could not prepare the photo'))), 'image/jpeg', 0.88));
+  try {
+    const size = uploadSize(bitmap.width, bitmap.height);
+    canvas.width = size.width;
+    canvas.height = size.height;
+    canvas.getContext('2d')!.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+  } finally {
+    bitmap.close();
+  }
+  const encode = (quality: number) => new Promise<Blob>((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error('could not prepare the photo'))), 'image/jpeg', quality));
+  try {
+    const blob = await encode(UPLOAD_QUALITY);
+    return blob.size <= MAX_UPLOAD_BYTES ? blob : await encode(FALLBACK_QUALITY);
+  } finally {
+    // Releases the pixel buffer now rather than whenever the canvas is collected.
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }
 
 /** Tesseract reads the photo in the browser: free, and the image never leaves the device. */
