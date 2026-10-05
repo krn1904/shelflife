@@ -15,7 +15,7 @@ Browser / PWA ──▶ Next.js (App Router)         Supabase
                   └─ Client Components            Auth   (cookie session)
                        │                          Storage (docket / date photos)
                        └─ Dexie outbox            Edge Function (cron)
-                                                  └─ expiry-engine  02:00
+                                                  └─ expiry-engine  03:00 (pg_cron)
 ```
 
 Everything server-side runs **as the signed-in user**, so Postgres Row-Level Security is the

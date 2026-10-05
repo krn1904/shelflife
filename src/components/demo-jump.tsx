@@ -10,7 +10,7 @@ const JUMP_DAYS = 7;
  * The demo's single best trick: skip a week and watch the board fill up.
  *
  * It shifts the data, not the clock, so the expiry engine is never told it is a demo and
- * does in front of the visitor exactly what it does in production at 2am.
+ * does in front of the visitor exactly what it does in production at 3am.
  */
 export function DemoJump() {
   const [error, setError] = useState<string | null>(null);

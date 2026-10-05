@@ -74,8 +74,9 @@ npm run dev
 The project uses the 544xx port range rather than Supabase's 543xx defaults, so it can run
 alongside another local Supabase project. `supabase db reset` applies migrations only; the
 SQL seed hook is off so there is exactly one seed, and it behaves the same everywhere.
-Scheduled Edge Functions exist only on the hosted project; locally their history in
-`job_runs` comes from the seed.
+The expiry engine only runs on its schedule on the hosted project; locally its history in
+`job_runs` comes from the seed (the local cron job has no Vault secrets, so if the stack is
+up at 03:00 it adds a failed "not called" run).
 
 ### Verification
 
@@ -91,7 +92,7 @@ database, and is the gate that matters — it is the security claim the product 
 
 ### The expiry engine
 
-`supabase/functions/expiry-engine` runs nightly at 02:00 Australia/Melbourne. It deletes
+`supabase/functions/expiry-engine` runs nightly at 03:00 Australia/Melbourne. It deletes
 every open `expiry_actions` row and regenerates them from the current batches — a full
 recompute over a few thousand rows takes milliseconds and is always correct, so there is
 no incremental diffing to get wrong. It also creates the day's rotation checks. Both writes
@@ -124,6 +125,21 @@ function itself only runs under Deno.
 supabase functions deploy expiry-engine
 supabase secrets set CRON_SECRET=...      # required; the function 403s without it
 ```
+
+The schedule lives in the database, as a `pg_cron` job added by a migration
+(`20261006120000_expiry_engine_schedule.sql`). pg_cron only knows UTC and Melbourne moves
+between UTC+10 and UTC+11, so the job fires at 16:00 and 17:00 UTC and calls the engine
+only when it is 03:00 in Melbourne — exactly once a night, including when the clocks change.
+It reads the project URL and the cron secret from Supabase Vault, so set them once per
+project in the SQL editor (the same value as `CRON_SECRET` above):
+
+```sql
+select vault.create_secret('https://<ref>.supabase.co', 'project_url');
+select vault.create_secret('<CRON_SECRET>', 'cron_secret');
+```
+
+Until both exist the job records a failed run in `job_runs` each night instead of calling
+the engine. Locally the job exists too but has no secrets, so it only ever logs that.
 
 Trigger it by hand to watch it work:
 
@@ -259,8 +275,9 @@ key, and the `TEXTRACT_*` keys if docket reading should offer
 AWS Textract. Supabase renamed its keys in 2025 and both
 naming schemes are accepted — `NEXT_PUBLIC_SUPABASE_ANON_KEY` or
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` or
-`SUPABASE_SECRET_KEY` — so use whichever pair your project's API settings show. Schedule the expiry-engine
-Edge Function at 02:00 Australia/Melbourne, passing `x-cron-secret`.
+`SUPABASE_SECRET_KEY` — so use whichever pair your project's API settings show. The nightly
+schedule comes with the migrations; it only needs the two Vault secrets described under
+[The expiry engine](#the-expiry-engine).
 
 After deploying, regenerate the database types against the live schema:
 

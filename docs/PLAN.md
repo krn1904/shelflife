@@ -140,7 +140,7 @@ Platform admin moderates.
 
 ## The expiry engine
 
-A single Supabase Edge Function on a nightly cron (02:00 Australia/Melbourne):
+A single Supabase Edge Function on a nightly cron (03:00 Australia/Melbourne; planned as 02:00):
 
 1. Mark `stock_batches` past `expiry_date` as needing a `pull` action.
 2. **Delete and fully regenerate** all `open` `expiry_actions` from current batches.

@@ -1,4 +1,4 @@
-// Nightly expiry engine. Scheduled at 02:00 Australia/Melbourne. Every date it works out
+// Nightly expiry engine. Scheduled at 03:00 Australia/Melbourne. Every date it works out
 // (today, a batch's arrival day) is in each site's own timezone.
 //
 // This file is deliberately thin. Every decision it makes lives in
@@ -6,7 +6,7 @@
 // are testable even though this wrapper is not runnable outside Deno.
 //
 // Deploy:  supabase functions deploy expiry-engine
-// Schedule: supabase/config.toml, or a pg_cron job calling it over HTTP.
+// Schedule: the pg_cron job in migration 20261006120000_expiry_engine_schedule.sql.
 
 import { createClient } from '@supabase/supabase-js';
 import {
@@ -36,7 +36,7 @@ function chunks<T>(rows: T[], size = WRITE_CHUNK_SIZE): T[][] {
 }
 
 /**
- * "Today" has to be the store's today, not UTC's. A run at 02:00 Melbourne is still the
+ * "Today" has to be the store's today, not UTC's. A run at 03:00 Melbourne is still the
  * previous day in UTC for most of the year, and using the UTC date would shift every
  * reminder by one — pulling stock a day late, every day, invisibly.
  */
