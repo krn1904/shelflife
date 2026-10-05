@@ -141,7 +141,8 @@ writes them as SVG attributes that CSS overrides. Tooltips use `TOOLTIP_STYLE` f
      row there, with the counts underneath.
    - The server actions, docket handling, catalogue search and payload are unchanged; both
      views render the same state.
-3. **Receive start, deliveries list, Waste, Scan, Settings, docket test bench**: rethemed.
+3. **Receive start, deliveries list, Waste, Scan, Settings**: rethemed. The docket OCR test
+   bench was removed once docket reading was settled.
    The deliveries list rows are restacked for phones.
 
 ### Manager, owner and admin (desktop first, work at phone width)

@@ -36,12 +36,9 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
         </p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-3">
+      <div className="mt-6">
         <Link href="/app/deliveries/new" className="btn btn-primary">
           Receive a delivery
-        </Link>
-        <Link href="/app/deliveries/docket-test" className="btn btn-ghost">
-          Test docket OCR
         </Link>
       </div>
 

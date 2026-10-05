@@ -241,8 +241,7 @@ It starts at the docket, not a supplier list:
 2. **Two readers, one shape.** Both produce a `DocketReading`
    ([reading.ts](../src/lib/intake/docket/reading.ts)): every text line, plus the chosen product
    table cell by cell when there is one. AWS Textract runs server-side from the stored photo
-   (`readDocketWithTextract`, one `AnalyzeDocument` TABLES call; the test bench also runs the
-   invoice model). The free reader is Tesseract in the browser
+   (`readDocketWithTextract`, one `AnalyzeDocument` TABLES call). The free reader is Tesseract in the browser
    ([browser.ts](../src/lib/intake/docket/browser.ts)). Which engine a plan gets is meant to be
    decided later; nothing downstream depends on it.
 3. **Supplier from the docket.** `identifySupplier()` ([supplier.ts](../src/lib/intake/docket/supplier.ts))
