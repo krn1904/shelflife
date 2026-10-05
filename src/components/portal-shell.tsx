@@ -9,6 +9,9 @@ import { currentTheme } from '@/lib/theme/server';
 import { loadReminders } from '@/lib/expiry/reminders-data';
 import { remindersShownTo } from '@/lib/expiry/reminders';
 import { RefreshOnReturn } from '@/components/refresh-on-return';
+import { loadStaffMessages } from '@/lib/messages/data';
+import { MessageNotices } from '@/components/message-notices';
+import { HideOnPath } from '@/components/hide-on-path';
 import type { AppRole } from '@/lib/supabase/types';
 import { SubmitButton } from '@/components/submit-button';
 
@@ -36,7 +39,9 @@ export async function PortalShell({ session, children }: { session: Session; chi
   const staffTabs = session.primaryRole === 'staff';
   const theme = await currentTheme();
   // The count on the Today tab. Same read as the page's banner (cached per request).
-  const reminders = staffTabs ? await loadReminders(session) : null;
+  const [reminders, messages] = staffTabs
+    ? await Promise.all([loadReminders(session), loadStaffMessages(session)])
+    : [null, null];
   const badges: Record<string, number> = reminders ? { '/app/today': reminders.summary.total } : {};
 
   return (
@@ -81,6 +86,12 @@ export async function PortalShell({ session, children }: { session: Session; chi
         </div>
       </header>
       <main className={`mx-auto max-w-6xl px-4 py-6 sm:py-8 ${staffTabs ? 'pb-28 sm:pb-8' : ''}`}>
+        {messages && (
+          // The Messages page lists them itself.
+          <HideOnPath path="/app/messages">
+            <MessageNotices unread={messages.unread} timeZone={messages.site.timeZone} />
+          </HideOnPath>
+        )}
         {children}
       </main>
       {staffTabs && <BottomTabs badges={badges} />}

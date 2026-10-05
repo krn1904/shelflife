@@ -111,11 +111,13 @@ async function wipe() {
   // is not guaranteed to succeed.
   for (const table of [
     'waste_events', 'expiry_actions', 'rotation_checks', 'stock_batches', 'delivery_lines',
-    'deliveries', 'site_products', 'reminder_settings', 'supplier_aliases', 'suppliers', 'memberships', 'sites',
+    'deliveries', 'site_products', 'reminder_settings', 'site_message_reads', 'site_messages',
+    'supplier_aliases', 'suppliers', 'memberships', 'sites',
     'audit_log', 'job_runs', 'orgs', 'products',
   ] as const) {
-    // reminder_settings is keyed by its site, so it has no id column.
-    await deleteAll(table, table === 'reminder_settings' ? 'site_id' : 'id');
+    // Tables keyed by their parent have no id column.
+    const key = table === 'reminder_settings' ? 'site_id' : table === 'site_message_reads' ? 'message_id' : 'id';
+    await deleteAll(table, key);
   }
 
   // Everyone, not just the seed accounts: people added through the admin portal or by the

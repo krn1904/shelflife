@@ -117,6 +117,10 @@ a pop-up the first time that day, and (for staff) a count on the Today tab. Remi
 the account, not the phone, so there is nothing to switch on per device. Owners and platform
 admins don't get shift reminders. (An owner email digest is planned but not built.)
 
+Managers can also send their staff a short note (**Site → Message staff**): it stays at the top
+of every staff page until each person taps **Got it**, and the manager sees who has read it.
+Staff don't reply in the app.
+
 How early an item is mentioned depends on its **shelf life when it arrived**, because a 14-day
 smoothie and an 8-month bag of chips need very different warnings. Each batch is put in a group
 once, from its expiry date minus the day it arrived, and stays there:
@@ -177,8 +181,8 @@ Four roles, enforced at the database level so organisation isolation does not de
 
 - **`platform_admin`** — across organisations; provision, archive and restore organisations; support access is audit-logged
 - **`owner`** — every site in their organisation; analytics, and adding or removing staff and managers
-- **`manager`** — one site; deliveries, expiry board, waste, product settings, reminder settings, adding or removing staff
-- **`staff`** — one site, phone only; receive, action list, expiry board, waste, rotation checks
+- **`manager`** — one site; deliveries, expiry board, waste, product settings, reminder settings, messages to staff, adding or removing staff
+- **`staff`** — one site, phone only; receive, action list, expiry board, waste, rotation checks, the manager's messages
 
 ---
 
