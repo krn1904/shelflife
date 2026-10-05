@@ -20,6 +20,9 @@ export type TodayItem = {
 
 export type FixtureCheck = { id: string; fixture: string; done: boolean };
 
+/** Past this many tasks, one segment each turns into slivers; a plain bar reads better. */
+const MAX_SEGMENTS = 12;
+
 /**
  * The shift's whole list in one screen: dated stock that needs a decision, then the
  * fixtures to walk past. Rotation stock has no dates at all, so without the second list
@@ -86,18 +89,24 @@ export function TodayList({
           <p className="font-mono text-sm text-muted">
             {done} of {total} done
           </p>
-          <div className="flex gap-1" aria-hidden>
-            {Array.from({ length: total }, (_, i) => (
-              <span key={i} className={`h-1 flex-1 rounded-full ${i < done ? 'bg-brand' : 'bg-line'}`} />
-            ))}
-          </div>
+          {total <= MAX_SEGMENTS ? (
+            <div className="flex gap-1" aria-hidden>
+              {Array.from({ length: total }, (_, i) => (
+                <span key={i} className={`h-1 flex-1 rounded-full ${i < done ? 'bg-brand' : 'bg-line'}`} />
+              ))}
+            </div>
+          ) : (
+            <div className="h-1 rounded-full bg-line" aria-hidden>
+              <div className="h-1 rounded-full bg-brand" style={{ width: `${(done / total) * 100}%` }} />
+            </div>
+          )}
         </div>
       )}
 
       {error && <p role="alert" className="alert alert-critical">{error}</p>}
 
       <section aria-labelledby="next-up">
-        <h2 id="next-up" className="section-title mb-2 px-1">Next up</h2>
+        <h2 id="next-up" className="section-title mb-2 scroll-mt-20 px-1">Next up</h2>
         {next ? (
           <article className="card flex flex-col gap-4 rounded-[1.125rem] p-5">
             <div className="flex flex-wrap items-center gap-2">
@@ -146,7 +155,11 @@ export function TodayList({
               <li key={item.id}>
                 <button
                   type="button"
-                  onClick={() => setFocusId(item.id)}
+                  onClick={() => {
+                    setFocusId(item.id);
+                    // On a phone the card is above the fold; bring it to where the thumb is.
+                    document.getElementById('next-up')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                  }}
                   className="flex min-h-15 w-full items-center gap-3 px-4 py-2.5 text-left hover:bg-surface-2"
                 >
                   <span className={`pill pill-${actionTone(item.action)}`}>{daysLeftShort(item.daysLeft)}d</span>
@@ -189,7 +202,7 @@ export function TodayList({
                     disabled={isDone}
                     onChange={() => tickFixture(f.id)}
                     aria-label={`Checked ${f.fixture}`}
-                    className="size-[18px] accent-[var(--brand)]"
+                    className="size-[18px]"
                   />
                   {f.fixture}
                 </label>

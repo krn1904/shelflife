@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { format } from 'date-fns';
+import { PageHeader } from '@/components/ui';
 import { activeSite, requireSession } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { firstParam } from '@/lib/search-params';
@@ -26,10 +28,7 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
 
   return (
     <div>
-      <div className="flex flex-wrap items-baseline justify-between gap-2">
-        <h1 className="text-[1.875rem] font-bold leading-tight tracking-tight sm:text-[2rem]">Deliveries</h1>
-        <p className="text-sm text-muted">{site?.name ?? 'No site assigned'}</p>
-      </div>
+      <PageHeader title="Deliveries" subtitle={site?.name ?? 'No site assigned'} />
 
       {justClosed && (
         <p className="mt-4 alert alert-good">
@@ -51,15 +50,17 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
           <h2 className="mt-8 section-title">
             Still open
           </h2>
-          <ul className="mt-2 divide-y divide-line card border-warning/40">
+          <ul className="mt-2 divide-y divide-line card overflow-hidden border-warning/40">
             {open.map((d) => (
               <li key={d.id}>
-                <Link href={`/app/deliveries/${d.id}`} className="flex items-baseline gap-3 px-4 py-3 hover:bg-warning-soft">
-                  <span className="text-sm font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
-                  <span className="text-xs text-muted">
-                    started {d.received_at ? new Date(d.received_at).toLocaleString('en-AU') : '—'}
+                <Link href={`/app/deliveries/${d.id}`} className="flex min-h-14 items-center gap-3 px-4 py-3 hover:bg-surface-2">
+                  <span className="min-w-0 flex-1">
+                    <span className="block font-semibold">{d.suppliers?.name ?? 'Unknown supplier'}</span>
+                    <span className="block font-mono text-xs text-muted">
+                      started {d.received_at ? format(new Date(d.received_at), 'dd/MM HH:mm') : '—'}
+                    </span>
                   </span>
-                  <span className="ml-auto text-xs font-medium text-warning">Finish</span>
+                  <span className="badge badge-warning">Finish →</span>
                 </Link>
               </li>
             ))}
@@ -68,15 +69,17 @@ export default async function DeliveriesPage(props: PageProps<'/app/deliveries'>
       )}
 
       <h2 className="mt-8 section-title">Recent</h2>
-      <ul className="mt-2 divide-y divide-line card">
+      <ul className="mt-2 divide-y divide-line card overflow-hidden">
         {closed.map((d) => (
-          <li key={d.id} className="flex flex-wrap items-baseline gap-3 px-4 py-3">
-            <span className="text-sm font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
-            {d.docket_number && (
-              <span className="font-mono text-xs text-muted">#{d.docket_number}</span>
-            )}
-            <span className="ml-auto text-xs text-muted">
-              {d.closed_at ? new Date(d.closed_at).toLocaleDateString('en-AU') : '—'}
+          <li key={d.id} className="flex items-center gap-3 px-4 py-3">
+            <span className="min-w-0 flex-1">
+              <span className="block truncate font-semibold">{d.suppliers?.name ?? 'Unknown supplier'}</span>
+              {d.docket_number && (
+                <span className="block truncate font-mono text-xs text-muted">#{d.docket_number}</span>
+              )}
+            </span>
+            <span className="font-mono text-xs text-muted">
+              {d.closed_at ? format(new Date(d.closed_at), 'dd/MM/yyyy') : '—'}
             </span>
           </li>
         ))}

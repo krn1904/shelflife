@@ -1,7 +1,7 @@
-# ShelfLife — design plan: "Night shift"
+# ShelfLife — design system: "Night shift"
 
-Status: **in progress on `feat/night-shift-theme`** — tokens (light + dark with a System / Light / Dark picker), fonts, shell, Today, Receive and the Expiry board are built; browser verification pending. This replaces the warm paper + clay theme in
-`src/app/globals.css`. The agreed mockups live on the design canvas (Option C, lime accent):
+Status: **built on `feat/night-shift-theme`, not yet merged.** This replaced the warm paper +
+clay theme. The agreed mockups live on the design canvas (Option C, lime accent):
 <https://claude.ai/artifact/4XnsJRRhnk3Wtkgcr7N44k>. Options A (Ledger) and B (Shelf tag)
 were considered and set aside.
 
@@ -9,7 +9,7 @@ were considered and set aside.
 
 - **Built for where the app is used.** Staff use it on a phone in a store room, at the
   counter, and on late shifts. A dark, high-contrast interface is easy to read in dim light
-  and doesn't glare.
+  and doesn't glare. A light theme is there for daytime and bright counters.
 - **One thing at a time.** Each staff screen leads with the single next action (the next
   item to pull, the next docket line to check). The rest of the list stays visible but
   quieter. This follows the product rule that staff only do work that pays for itself.
@@ -17,151 +17,164 @@ were considered and set aside.
   gradients, no soft-shadow cards. The look is graphite surfaces, one lime accent, and
   monospaced numbers.
 
+## Light and dark
+
+- The app follows the device's light/dark setting by default ("System").
+- Anyone can override it with the **System / Light / Dark** switch: in the header from large
+  screens up, and on **Settings** (`/app/settings`) for every role.
+- The choice is a `theme` cookie (`light` or `dark`; no cookie means System), kept for a
+  year on that device. The root layout reads it and writes `data-theme` on `<html>`, so the
+  first paint is already in the right theme, with no flash and no script. Parsing is in
+  [src/lib/theme/theme.ts](../src/lib/theme/theme.ts) and only accepts the two exact values.
+- CSS does the rest: light tokens on `:root`, dark tokens under
+  `@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) }` and again under
+  `:root[data-theme="dark"]`. Each block sets `color-scheme`, so date pickers, selects and
+  scrollbars follow the theme too.
+
 ## Foundations
 
 ### Colour tokens
 
-These keep the existing token names, so every `bg-*`, `text-*` and `border-*` utility keeps
-working and the theme change is mostly a swap of values in `globals.css`.
+These keep the existing token names, so every `bg-*`, `text-*` and `border-*` utility works
+in both themes. Values live in [src/app/globals.css](../src/app/globals.css).
 
-| Token | Dark (primary) | Light (proposed, see open decisions) | Use |
+| Token | Dark | Light | Use |
 |---|---|---|---|
 | `paper` | `#0F1113` | `#F6F7F8` | page background |
 | `surface` | `#181B1F` | `#FFFFFF` | cards, tables, inputs |
 | `surface-2` | `#22262B` | `#EEF0F2` | buttons, steppers, hover |
 | `ink` | `#ECEEF0` | `#0F1113` | primary text |
 | `ink-muted` | `#9AA1A9` | `#565D66` | secondary text |
-| `ink-faint` | `#7D848C` | `#6E7680` | hints, timestamps (≥4.5:1 on `paper`) |
+| `ink-faint` | `#8A9199` | `#646B74` | hints, timestamps |
 | `line` | `#2C3137` | `#E2E5E9` | dividers |
-| `line-strong` | `#3A4048` | `#CDD2D8` | input and button borders |
+| `line-strong` | `#3A4048` | `#CDD2D8` | button and panel borders |
+| `field-border` | `#6B727B` | `#848B94` | input edges |
 | `brand` | `#C8F25A` | `#C8F25A` | primary button fill, progress, active tab |
 | `brand-hover` | `#D6F77E` | `#B9E443` | |
 | `brand-ink` | `#0F1113` | `#0F1113` | text on lime: **always dark** |
-| `brand-soft` | `#1E2A12` | `#EEF9D0` | ticked fixture chips, selected rows |
-| `brand-soft-ink` | `#C8F25A` | `#3F6B00` | text on `brand-soft`; links in light mode |
+| `brand-soft` | `#1E2A12` | `#EEF9D0` | ticked fixture chips |
+| `brand-soft-ink` | `#C8F25A` | `#3F6B00` | text on `brand-soft` |
+| `brand-text` | `#C8F25A` | `#3F6B00` | accent-coloured text, checkbox and radio accent |
+| `focus` | `#C8F25A` | `#0F1113` | focus rings |
 | `good` / `good-soft` | `#C8F25A` / `#1E2A12` | `#3F6B00` / `#EEF9D0` | confirmed lines |
 | `warning` / `warning-soft` | `#F5B544` / `#33280F` | `#8A5A00` / `#FDF0D5` | mark down, short delivery |
+| `warning-fill` | `#F5B544` | `#F5B544` | Mark down and due-today pill fill |
 | `serious` / `serious-soft` | `#FF9466` / `#35201A` | `#B24A1A` / `#FCE5DA` | |
 | `critical` / `critical-soft` / `critical-ink` | `#FF6B5E` / `#3A1A18` / `#FF8A80` | `#C8372D` / `#FBE3E1` / `#A3261E` | pull, overdue, errors |
+| `critical-fill` | `#FF6B5E` | `#E5483C` | Pull and overdue pill fill |
 
 Rules:
-- Lime is **never text on a light surface**: it fails contrast. On light surfaces, lime is
-  only used as a fill behind dark text.
-- Status pills (Pull, Mark down, days left) use **dark text on a bright fill**: red, amber,
-  or graphite for Check. The fills differ in lightness as well as hue, and every pill
-  also carries a written label.
-- `--shadow` becomes `none` in dark mode. Depth comes from the surface steps
+- Lime is **never text on a light surface**: it is about 1.3:1 on white. Use
+  `text-brand-text` for accent-coloured text and `--focus` for focus rings.
+- Status pills use **dark text on a bright fill**: red, amber, or graphite for Check. The
+  fills differ in lightness as well as hue, and every pill also carries a written label.
+- `--shadow` is `none` in dark mode. Depth comes from the surface steps
   (`paper` → `surface` → `surface-2`) and 1px lines.
+
+### Contrast
+
+Every text/background pair was computed against WCAG 2.2 in both themes:
+
+- **Text, 4.5:1 or better:** ink, muted and faint on every surface; accent text; text on every
+  soft fill; dark text on lime, amber and red pill fills.
+- **Controls and focus, 3:1 or better:** focus rings, input borders (`field-border`) and the
+  chart line on both surfaces.
+
+The two pairs that failed during checking were fixed: faint text on `surface-2`, and input
+borders that used `line-strong` (about 1.5:1).
 
 ### Typography
 
-- **Instrument Sans** (400/500/600/700) for all text, replacing Geist Sans.
+- **Instrument Sans** (400–700) for all text, replacing Geist Sans.
 - **JetBrains Mono** (500/700) for anything counted or dated: quantities, days left, docket
   numbers, dates, prices. Always `tabular-nums`.
-- Both load through `next/font/google` in `src/app/layout.tsx`, exposed as `--font-sans` and
-  `--font-mono` in `@theme`. Check the bundled Next 16 docs (`node_modules/next/dist/docs/`)
-  for the current `next/font` API before writing it.
-- Scale: page title 30px/700 (phone) and 32px (desktop); card title 22px/700; body 15px;
-  meta 12–13px. Section labels are sentence case at 12px/600 in `ink-muted`; this drops the
-  uppercase tracked style.
+- Both load through `next/font/google` in [src/app/layout.tsx](../src/app/layout.tsx) as
+  `--font-instrument-sans` and `--font-jetbrains-mono`, mapped to `font-sans` / `font-mono`.
+- Page titles are 30px/700 on a phone and 32px from `sm`. Section labels are sentence case at
+  12px/600 in `ink-muted`; the old uppercase tracked style is gone.
 
 ### Shape, spacing, touch
 
-- Radius: 10px for buttons and inputs, 14px for lists, 18–20px for focus cards, 999px for
-  chips. `--radius` becomes `0.625rem`.
-- Touch targets: **at least 44px** everywhere, 48–52px for primary staff actions, and 64px
-  for the delivery quantity stepper.
-- Focus: 2px `brand` outline with a 2px offset (unchanged mechanism, new colour).
+- Radius: 10px for buttons and inputs, 14px for cards and lists, 18–20px for focus cards,
+  999px for chips.
+- Touch targets: **at least 44px** everywhere, 48–52px for primary staff actions, 56px for
+  the delivery quantity stepper.
 
 ## Components
 
-| Component | Change |
-|---|---|
-| `.btn-primary` | Lime fill, dark text, 48px tall on staff screens. |
-| `.btn-outline` | `surface-2` fill, `line-strong` border. |
-| `.btn-ghost` | Transparent, `ink-muted`. |
-| `.field` | `paper` fill inside cards, `line-strong` border, lime border on focus. |
-| `.card` | `surface`, 1px `line`, no shadow, 14–20px radius. |
-| `.badge` | Becomes the **pill**: mono, 12px/700, 6px radius. |
-| `Stat` | Mono value; the `tone` prop maps to `critical`/`warning`/`brand`. |
-| **New `DaysLeft`** | Mono pill taking `daysLeft` and an action kind; the colour comes from one shared function, so Today, Expiry and Receive always agree. |
-| **New `ProgressBar`** | Segmented (Today: one segment per task) or continuous (Receive: line n of N). |
-| **New `FixtureChip`** | A checkbox styled as a pill; ticked uses `brand-soft`. |
-| **New `BottomTabs`** | Staff phone navigation: Shift `/app`, Today `/app/today`, Receive `/app/deliveries`, Waste `/app/waste`, Scan `/app/scan`. Shown below `sm` for the staff role only; managers and owners keep the top bar. |
-| `PortalShell` / `PortalNav` | Graphite top bar; the active tab is a `surface-2` pill. The lime square stays as the logo mark. |
+| Piece | Where | Notes |
+|---|---|---|
+| `.btn` + `-primary` / `-outline` / `-ghost` / `-danger` / `-sm` | globals.css | 44px default height; `-sm` (36px) for dense desktop rows |
+| `.field` | globals.css | `field-border` edge, focus colour on focus |
+| `.card`, `.badge-*`, `.alert-*`, `.table` | globals.css | alerts replace hand-rolled bordered error/notice boxes |
+| `.pill` + `-critical` / `-warning` / `-neutral` / `-quiet` | globals.css | mono status pill for days left and actions |
+| `daysLeftTone`, `actionTone`, `daysLeftShort`, `daysLeftText`, `orderForShift` | [src/lib/expiry/display.ts](../src/lib/expiry/display.ts) | one source for how dated stock is shown, so Today and the Expiry board agree |
+| `stepLine`, `linePosition` | [src/lib/intake/walk.ts](../src/lib/intake/walk.ts) | moving through a delivery one line at a time |
+| `ThemePicker` | [src/components/theme-picker.tsx](../src/components/theme-picker.tsx) | System / Light / Dark |
+| `BottomTabs` + `SHIFT_TABS` | [bottom-tabs.tsx](../src/components/bottom-tabs.tsx), [shift-tabs.ts](../src/components/shift-tabs.ts) | staff only. Bottom tabs below `sm`; the same links sit in the header from `sm` up |
+| `PortalShell` / `PortalNav` | src/components | active tab is a `surface-2` pill; on a phone the portal tabs take their own row |
+| `Stat` | src/components/stat.tsx | mono value; `tone` is `brand` / `warning` / `critical`. Four-tile rows are two columns on a phone |
 
-Charts: `src/lib/charts/tokens.ts` was validated against a **white** surface. `SERIES`,
-`CHART_INK` and `STATUS` must be re-run through the dataviz validator against `#181B1F` (and
-against the light surface if light mode ships). Don't reuse the current values on dark.
+Charts: the series colour `#2A78D6` passes the dataviz validator against both the light
+`#FFFFFF` and dark `#181B1F` surfaces, so one value serves both. Grid, axis, tick and label
+colours come from the theme through the `.chart` rules in globals.css, because Recharts
+writes them as SVG attributes that CSS overrides. Tooltips use `TOOLTIP_STYLE` from
+[src/lib/charts/tokens.ts](../src/lib/charts/tokens.ts).
 
 ## Screens
 
 ### Staff (phone first)
 
-1. **Today** (`/app/today`, `today-list.tsx`)
-   - Header shows the site, date and a segmented progress bar ("2 of 7 done").
-   - **Next up**: the most urgent open item (pull first, then mark down, then check, by due
-     date) as a large card. For a pull it shows *Pull & record waste* (primary), *Done* and
-     *Not here*.
-   - **Then**: the remaining items as compact rows with a `DaysLeft` pill. Tapping a row
-     promotes it to Next up.
-   - **Walk past**: fixtures as `FixtureChip`s.
-   - Keep the optimistic hide and rollback behaviour exactly as it is. Only the layout
-     changes.
-2. **Receive delivery** (`/app/deliveries/[deliveryId]`, `intake-client.tsx`)
-   - Header: supplier, docket number, chips for "Docket · n rows read" and how the supplier
-     was recognised.
-   - **One line at a time** in a focus card: product name (mono when taken as printed),
-     *New item* pill, 64px stepper with "docket N" under the received quantity, and the
-     expiry input. Rotation lines hide the date field.
-   - Checked lines collapse into a list below that shows qty and date, or "16 of 18 · short
-     2" in `warning`.
-   - Footer: ← previous line, then *Confirm & next line*. The last line turns the button into
-     *Close delivery*.
-   - Keep a "Show all lines" toggle that falls back to the full list, so staff who work
-     down the paper docket aren't forced into the stepper flow. The server actions and
-     docketed/received data are unchanged.
-3. **Receive start, deliveries list, Waste, Scan, Settings, docket test bench**: retheme
-   onto the new classes and primitives. No flow changes.
+1. **Today** (`/app/today`)
+   - An "x of y done" progress bar: one segment per task up to 12, a plain bar beyond that.
+   - **Next up** is the most urgent open item (pulls, then mark-downs, then checks, soonest
+     first) as a large card. Tapping any row below promotes it and scrolls the card into
+     view.
+   - **Walk past**: fixtures as tick chips.
+   - The optimistic hide and rollback behaviour is unchanged.
+2. **Receive delivery** (`/app/deliveries/[deliveryId]`)
+   - **One line at a time** by default: "Line n of N" with a progress bar, a focus card with
+     56px steppers, ← previous and **Next line**, and a numbered list of every line below
+     (tap to jump). On the last line the button becomes "All lines checked · review and
+     close", which jumps to the close form.
+   - **Show all lines** switches to the full list. On a phone the product name takes its own
+     row there, with the counts underneath.
+   - The server actions, docket handling, catalogue search and payload are unchanged; both
+     views render the same state.
+3. **Receive start, deliveries list, Waste, Scan, Settings, docket test bench**: rethemed.
+   The deliveries list rows are restacked for phones.
 
-### Manager and owner (desktop first, must work at phone width)
+### Manager, owner and admin (desktop first, work at phone width)
 
-4. **Expiry board** (`/manage/expiry`)
-   - Replace the four columns with **one table** grouped by bucket (Overdue, Due today,
-     Within 7 days, Within 30 days), with filter buttons that show counts.
-   - Columns: product, left, expires, days left (pill when ≤ 0, otherwise mono number plus a
-     30-day bar), and a note column for *Date never confirmed*.
-   - The table scrolls horizontally inside its box on narrow screens.
-5. **Site dashboard, products and ranging, waste, delivery review, Group dashboard**: retheme.
-   Stats use mono values, and charts use the revalidated dark palette.
-6. **Platform admin, login, landing**: retheme only.
+4. **Expiry board** (`/manage/expiry`): one table grouped by bucket, with link-based filter
+   buttons that show counts and keep the chosen site. Days left sits beside the product name
+   so it never scrolls off a phone. The expiry date and the "Date never confirmed" note move
+   under the name on small screens.
+5. **Delivery review** (`/manage/deliveries/[id]`): on a phone the table keeps Product,
+   Against the docket (with "received of docketed") and Expiry. Docket and Received columns
+   join from `sm` up.
+6. **Site, Products, Waste, Deliveries, Group, Platform, organisation detail, login**:
+   rethemed.
 
-## Rollout
+## Differences from the mockups
 
-Each step is one PR, with tests and the README/docs updates it affects. Nothing merges to
-`main` without both.
+- The Receive button says **"Next line"**, not "Confirm & next line". Moving on does not
+  confirm the proposed expiry date: that still needs the existing "Looks right" button, so
+  staff can't confirm dates just by tapping through.
+- The Receive header has no "Docket · n rows read" chips. The existing docket section already
+  says how the docket was read.
+- The Expiry board's bars only appear from `sm` up.
 
-1. **Foundations.** Tokens, fonts, component classes, `PortalShell`/`PortalNav`, new
-   primitives (`DaysLeft`, `ProgressBar`, `FixtureChip`, `BottomTabs`), and chart tokens
-   revalidated. Unit tests for the shared tone/label logic behind `DaysLeft` (bucket,
-   colour, "expired 1 day ago" / "in 2 days" copy) and the "next up" ordering.
-2. **Staff screens.** Today, then Receive (the largest change), then the rest of the staff
-   portal. Tests cover the next-up selection and the line-by-line intake navigation
-   (previous/next, last line closes, show-all toggle).
-3. **Manager and owner screens.** Expiry board table and filters, then the remaining
-   `/manage` and `/owner` pages.
-4. **Admin, login, landing**, and removal of every remaining raw `neutral-*`, `red-*` and
-   `amber-*` class. A `grep` for them should come back empty.
+## Decisions settled
 
-Each PR is checked in the browser at 390px and 1280px wide. The check covers contrast on
-every text/fill pair, 44px targets, keyboard focus, and an idle page that settles (no
-running timers or effects).
+1. **Light and dark both ship.** The app follows the device by default, with a manual
+   override.
+2. **Bottom tabs are for staff only.** Managers, owners and admins keep the top tabs; on a
+   phone those take their own row.
+3. **Receive defaults to one line at a time**, with "Show all lines" one tap away.
 
-## Open decisions
+## Verification done
 
-1. **Dark only, or follow the device setting?** The recommendation is to follow the device
-   setting, with dark as the default. The light column above is a proposal and needs its own
-   mockup pass before it ships.
-2. **Bottom tabs for managers on a phone?** The plan assumes no: they keep the top bar.
-3. **Receive default mode:** one line at a time (planned), or the full list with the focus
-   card as an option.
+- `npm test`, `npx eslint src`, `npx tsc --noEmit` and `npm run build` pass.
+- In the browser: staff, manager and platform-admin accounts at 375px (phone), 768px (tablet)
+  and desktop, in light and dark.

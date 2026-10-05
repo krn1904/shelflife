@@ -131,14 +131,15 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
         </p>
       ) : (
         <div className="card overflow-x-auto">
-          <table className="table min-w-[40rem]">
+          {/* Days left sits beside the name so it never scrolls off a phone; extras drop on small screens. */}
+          <table className="table">
             <thead>
               <tr>
                 <th scope="col">Product</th>
-                <th scope="col">Left</th>
-                <th scope="col">Expires</th>
                 <th scope="col">Days left</th>
-                <th scope="col"><span className="sr-only">Note</span></th>
+                <th scope="col">Left</th>
+                <th scope="col" className="max-sm:hidden">Expires</th>
+                <th scope="col" className="max-md:hidden"><span className="sr-only">Note</span></th>
               </tr>
             </thead>
             {visible.map(({ bucket, cards: rows }) => (
@@ -153,16 +154,20 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
                     <td>
                       <div className="font-semibold">{card.name}</div>
                       {card.detail && <div className="text-xs text-muted">{card.detail}</div>}
+                      <div className="font-mono text-xs text-muted sm:hidden">
+                        expires {format(parseISO(card.expiryDate), 'dd/MM')}
+                      </div>
+                      {card.predicted && (
+                        <div className="text-xs font-semibold text-warning md:hidden">Date never confirmed</div>
+                      )}
                     </td>
-                    <td className="font-mono">{card.qty}</td>
-                    <td className="font-mono">{format(parseISO(card.expiryDate), 'dd/MM')}</td>
                     <td>
                       {card.daysLeft <= 0 ? (
                         <span className={`pill pill-${daysLeftTone(card.daysLeft)}`}>{daysLeftShort(card.daysLeft)}</span>
                       ) : (
                         <div className="flex items-center gap-2.5">
                           <span className={`w-6 font-mono ${bucket === 'watch' ? 'text-muted' : ''}`}>{card.daysLeft}</span>
-                          <span aria-hidden className="h-1.5 w-32 rounded-full bg-surface-2">
+                          <span aria-hidden className="h-1.5 w-32 rounded-full bg-surface-2 max-sm:hidden">
                             <span
                               className={`block h-1.5 rounded-full ${bucket === 'watch' ? 'bg-faint' : 'bg-ink'}`}
                               style={{ width: `${Math.min(100, (card.daysLeft / HORIZON_DAYS) * 100)}%` }}
@@ -171,7 +176,9 @@ export default async function ExpiryBoardPage(props: PageProps<'/manage/expiry'>
                         </div>
                       )}
                     </td>
-                    <td className="text-xs font-semibold text-warning">
+                    <td className="font-mono">{card.qty}</td>
+                    <td className="font-mono max-sm:hidden">{format(parseISO(card.expiryDate), 'dd/MM')}</td>
+                    <td className="text-xs font-semibold text-warning max-md:hidden">
                       {card.predicted && 'Date never confirmed'}
                     </td>
                   </tr>

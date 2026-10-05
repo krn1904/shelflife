@@ -21,7 +21,7 @@ export function Stat({
   return (
     <div className="card p-4">
       <div className="section-title">{label}</div>
-      <div className={`mt-1.5 font-mono text-3xl font-bold tabular-nums ${accent}`}>{value}</div>
+      <div className={`mt-1.5 font-mono text-2xl font-bold tabular-nums sm:text-3xl ${accent}`}>{value}</div>
       {hint && <div className="mt-1 text-xs text-muted">{hint}</div>}
     </div>
   );

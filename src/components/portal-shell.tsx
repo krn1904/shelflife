@@ -2,6 +2,7 @@ import { signOut } from '@/lib/auth/actions';
 import { PendingChanges } from '@/components/pending-changes';
 import { PortalNav, type NavLink } from '@/components/portal-nav';
 import { BottomTabs } from '@/components/bottom-tabs';
+import { SHIFT_TABS } from '@/components/shift-tabs';
 import { ThemePicker } from '@/components/theme-picker';
 import { roleAtLeast, type Session } from '@/lib/auth/session';
 import { currentTheme } from '@/lib/theme/server';
@@ -42,14 +43,26 @@ export async function PortalShell({ session, children }: { session: Session; chi
             ShelfLife
           </span>
 
-          {links.length > 1 && <PortalNav links={links} />}
+          {staffTabs ? (
+            // Phones use the bottom tabs; from tablet width up the same links sit here.
+            <div className="hidden sm:block">
+              <PortalNav links={SHIFT_TABS.map(({ href, label, exact }) => ({ href, label, exact }))} />
+            </div>
+          ) : (
+            links.length > 1 && (
+              // On a phone the portal tabs take their own row under the logo and Sign out.
+              <div className="max-sm:order-last max-sm:-mx-1 max-sm:w-full max-sm:overflow-x-auto">
+                <PortalNav links={links} />
+              </div>
+            )
+          )}
 
           <div className="ml-auto flex items-center gap-3 text-sm">
-            <div className="hidden text-right leading-tight sm:block">
+            <div className="hidden text-right leading-tight lg:block">
               <div className="font-medium text-ink">{contextName}</div>
               <div className="text-xs text-faint">{ROLE_LABEL[session.primaryRole]}</div>
             </div>
-            <div className="hidden md:block">
+            <div className="hidden lg:block">
               <ThemePicker initial={theme} compact />
             </div>
             <form action={signOut}>

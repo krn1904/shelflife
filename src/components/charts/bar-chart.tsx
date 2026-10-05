@@ -71,8 +71,9 @@ export function HorizontalBars({
             contentStyle={TOOLTIP_STYLE}
           />
           <Bar dataKey="value" radius={[0, 4, 4, 0]} barSize={18} isAnimationActive={false}>
-            {data.map((d) => (
-              <Cell key={d.label} fill={d.tone ?? SERIES} />
+            {/* Keyed by position too: an admin's league holds same-named sites from different organisations. */}
+            {data.map((d, i) => (
+              <Cell key={`${i}-${d.label}`} fill={d.tone ?? SERIES} />
             ))}
             <LabelList
               dataKey="value"

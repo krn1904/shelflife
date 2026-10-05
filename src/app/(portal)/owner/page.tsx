@@ -60,7 +60,7 @@ export default async function OwnerPage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Waste this month" value={formatAud(thisMonth)} tone={thisMonth ? 'brand' : 'default'} />
         <Stat label={`Last ${WINDOW_MONTHS} months`} value={formatAud(total)} />
         <Stat label="Active batches" value={activeBatches ?? 0} hint="dated stock on shelf" />

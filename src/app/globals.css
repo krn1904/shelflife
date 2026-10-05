@@ -20,9 +20,10 @@
   --surface-2: #eef0f2;    /* buttons, steppers, hovers */
   --ink: #0f1113;          /* primary text */
   --ink-muted: #565d66;    /* secondary text */
-  --ink-faint: #6e7680;    /* hints, timestamps */
+  --ink-faint: #646b74;    /* hints, timestamps (≥4.5:1 on every surface) */
   --line: #e2e5e9;         /* dividers */
-  --line-strong: #cdd2d8;  /* input and button borders */
+  --line-strong: #cdd2d8;  /* button and panel borders */
+  --field-border: #848b94; /* input edges: ≥3:1 so a field is findable */
 
   --brand: #c8f25a;        /* lime: fills only */
   --brand-hover: #b9e443;
@@ -56,9 +57,10 @@
     --surface-2: #22262b;
     --ink: #eceef0;
     --ink-muted: #9aa1a9;
-    --ink-faint: #7d848c;
+    --ink-faint: #8a9199;
     --line: #2c3137;
     --line-strong: #3a4048;
+    --field-border: #6b727b;
 
     --brand: #c8f25a;
     --brand-hover: #d6f77e;
@@ -93,9 +95,10 @@
   --surface-2: #22262b;
   --ink: #eceef0;
   --ink-muted: #9aa1a9;
-  --ink-faint: #7d848c;
+  --ink-faint: #8a9199;
   --line: #2c3137;
   --line-strong: #3a4048;
+  --field-border: #6b727b;
 
   --brand: #c8f25a;
   --brand-hover: #d6f77e;
@@ -164,6 +167,12 @@ body {
   color: var(--brand-ink);
 }
 
+/* Native checkboxes and radios in the accent: deep green on light, lime on dark. */
+input[type="checkbox"],
+input[type="radio"] {
+  accent-color: var(--brand-text);
+}
+
 /* Consistent, visible keyboard focus everywhere — ink on light, lime on dark. */
 :focus-visible {
   outline: 2px solid var(--focus);
@@ -215,7 +224,7 @@ body {
     width: 100%;
     min-height: 2.75rem;
     border-radius: var(--radius);
-    border: 1px solid var(--line-strong);
+    border: 1px solid var(--field-border);
     background: var(--surface);
     color: var(--ink);
     padding: 0.5rem 0.75rem;

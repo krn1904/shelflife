@@ -56,7 +56,7 @@ export default async function ManagePage() {
         }
       />
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Needs attention" value={urgent} tone={urgent ? 'critical' : 'default'} hint="expiring within 7 days" />
         <Stat label="Waste (30 days)" value={formatAud(wasteThisMonth)} />
         <Stat label="Open deliveries" value={openDeliveries ?? 0} />

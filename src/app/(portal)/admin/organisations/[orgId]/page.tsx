@@ -182,7 +182,7 @@ export default async function OrganisationPage(
         )}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Sites" value={managedSites.length} />
         <Stat label="People" value={people.length} />
         <Stat label="Active batches" value={batches ?? 0} />

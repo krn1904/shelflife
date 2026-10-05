@@ -231,7 +231,7 @@ export function IntakeClient({
     const tracking = trackingOf(row);
     return (
       <>
-        <div className="flex flex-wrap items-start gap-3 px-4 py-3">
+        <div className={`flex flex-wrap items-start gap-3 ${big ? 'p-5' : 'px-4 py-3'}`}>
           <input
             type="checkbox"
             checked={row.ticked}
@@ -239,7 +239,8 @@ export function IntakeClient({
             aria-label={`Received ${row.name}`}
             className="mt-1.5 size-5"
           />
-          <div className="min-w-0 flex-1 space-y-1">
+          {/* On a phone, and in the focus card, the name takes its own row and the counts sit underneath. */}
+          <div className={`min-w-0 flex-1 space-y-1 ${big ? 'basis-[calc(100%-2.5rem)]' : 'max-sm:basis-[calc(100%-2.5rem)]'}`}>
             {row.product ? (
               <>
                 <span className={`block font-semibold ${big ? 'text-xl leading-tight' : 'truncate text-[0.9375rem]'}`}>{row.product.name}</span>
@@ -300,14 +301,14 @@ export function IntakeClient({
           </div>
 
           {row.docketed !== null && (
-            <span className="flex flex-col items-end gap-1 pt-1 text-xs">
+            <span className={`flex gap-1 text-xs ${big ? 'items-center pl-8' : 'items-center max-sm:pl-8 sm:flex-col sm:items-end sm:pt-1'}`}>
               <span className="font-mono text-muted">docket {row.docketed}</span>
               {gap < 0 && <span className="badge badge-warning font-mono">short {-gap}</span>}
               {gap > 0 && <span className="badge badge-neutral">over {gap}</span>}
             </span>
           )}
 
-          <span className={`flex items-center gap-1 rounded ${row.unsure && row.ticked ? 'bg-warning-soft p-1' : ''}`}>
+          <span className={`flex items-center gap-1 rounded ${big ? 'ml-auto' : 'max-sm:ml-auto'} ${row.unsure && row.ticked ? 'bg-warning-soft p-1' : ''}`}>
             <button
               type="button"
               onClick={() => update(row.key, { qty: Math.max(0, row.qty - 1), unsure: false })}
