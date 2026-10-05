@@ -1,0 +1,68 @@
+name: CI
+
+# Every push, on every branch, is checked the same way as before a merge:
+# lint, unit tests, a fresh database with the seed world, the RLS isolation suite,
+# a production build and the typecheck.
+on:
+  push:
+  workflow_dispatch:
+
+# A newer push to the same branch makes the older run pointless.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - run: npm ci
+
+      # The cheap checks first, so a lint slip fails in a minute, not after Supabase starts.
+      - name: Lint
+        run: npm run lint
+
+      - name: Unit tests
+        run: npm test
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: 2.117.0
+
+      # CI runs its own throwaway Supabase rather than the hosted project: the seed wipes
+      # the database, and nothing here may touch real data. Services the checks never call
+      # are skipped to start faster. `supabase start` applies every migration.
+      - name: Start Supabase
+        run: supabase start -x studio,imgproxy,edge-runtime,logflare,vector,supavisor,mailpit
+
+      - name: Export local Supabase credentials
+        run: |
+          supabase status -o env > supabase.env
+          get() { grep "^$1=" supabase.env | cut -d= -f2- | tr -d '"'; }
+          echo "NEXT_PUBLIC_SUPABASE_URL=$(get API_URL)" >> "$GITHUB_ENV"
+          echo "NEXT_PUBLIC_SUPABASE_ANON_KEY=$(get ANON_KEY)" >> "$GITHUB_ENV"
+          echo "SUPABASE_SERVICE_ROLE_KEY=$(get SERVICE_ROLE_KEY)" >> "$GITHUB_ENV"
+          rm supabase.env
+
+      - name: Seed world
+        run: npm run db:reset
+
+      # The security claim the product rests on. Never skipped.
+      - name: Tenant isolation (RLS)
+        run: npm run test:rls
+
+      - name: Build
+        run: npm run build
+
+      # After the build, which generates the route types (PageProps, LayoutProps) tsc needs.
+      - name: Typecheck
+        run: npx tsc --noEmit

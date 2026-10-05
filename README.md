@@ -90,6 +90,12 @@ npm run build
 `npm test` needs no database. `npm run test:rls` needs a running Supabase and a seeded
 database, and is the gate that matters — it is the security claim the product rests on.
 
+GitHub Actions runs all of this on every push, to any branch
+([.github/workflows/ci.yml](.github/workflows/ci.yml)): lint, `npm test`, then a throwaway
+local Supabase with every migration and the seed world, `npm run test:rls`, the build and
+the typecheck. It never touches the hosted project. A PR's checks are the run for its latest
+commit.
+
 ### The expiry engine
 
 `supabase/functions/expiry-engine` runs nightly at 03:00 Australia/Melbourne. It deletes
