@@ -74,7 +74,7 @@ genuinely the fastest way to identify it.
 ## Stack
 
 - **Next.js 15** (App Router) + TypeScript strict, Tailwind + shadcn/ui
-- **Supabase** — Postgres, Auth, Realtime, Storage (docket photos), Edge Functions (cron jobs)
+- **Supabase** — Postgres, Auth, Realtime *(not used)*, Storage (docket photos), Edge Functions (cron jobs)
 - **Organisation isolation via RLS** on every table, keyed by `org_id`
 - **Barcode scanning:** native `BarcodeDetector` API where available, `@zxing/browser` WASM fallback
 - **Offline:** Dexie (IndexedDB) outbox (no service worker), client-generated UUIDs, idempotent upserts

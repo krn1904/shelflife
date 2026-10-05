@@ -72,8 +72,8 @@ make here:
 | Factory | File | Runs as | Use for |
 |---|---|---|---|
 | `createClient()` | [server.ts](../src/lib/supabase/server.ts) | the signed-in user (RLS) | Server Components, Server Actions, Route Handlers — almost everything |
-| browser client | [client.ts](../src/lib/supabase/client.ts) | the signed-in user (RLS) | Client Components (Realtime, interactive reads) |
-| admin client | [admin.ts](../src/lib/supabase/admin.ts) | service key (**bypasses RLS**) | Edge Functions and platform-admin paths only |
+| browser client | [client.ts](../src/lib/supabase/client.ts) | the signed-in user (RLS) | Client Components (interactive reads) |
+| admin client | [admin.ts](../src/lib/supabase/admin.ts) | service key (**bypasses RLS**) | Server-only: platform-admin actions, and adding or listing people (`src/lib/people`), which need logins created or read |
 
 Credentials are resolved once in [env.ts](../src/lib/supabase/env.ts), which accepts both the
 pre-2025 (`ANON` / `SERVICE_ROLE`) and post-2025 (`PUBLISHABLE` / `SECRET`) Supabase key names
