@@ -77,8 +77,8 @@ genuinely the fastest way to identify it.
 - **Supabase** — Postgres, Auth, Realtime, Storage (docket photos), Edge Functions (cron jobs)
 - **Organisation isolation via RLS** on every table, keyed by `org_id`
 - **Barcode scanning:** native `BarcodeDetector` API where available, `@zxing/browser` WASM fallback
-- **Offline:** service worker + Dexie (IndexedDB) outbox, client-generated UUIDs, idempotent upserts
-- **Notifications:** Web Push (VAPID) via Edge Function + Resend for email digests
+- **Offline:** Dexie (IndexedDB) outbox (no service worker), client-generated UUIDs, idempotent upserts
+- **Reminders:** in-app, per account (home-screen banner, once-a-day pop-up, Today-tab count) for staff and managers; no Web Push. Owner email digest via Resend is not built.
 - **Charts:** Recharts — load the `dataviz` skill before writing any chart code
 - **Deploy:** Vercel + Supabase free tiers, so the demo stays alive indefinitely at zero cost
 
@@ -121,7 +121,7 @@ Core tables (all with `org_id`, `created_at`, RLS enabled):
   `due_date`, `state` (`open` | `done` | `dismissed`)
 - `rotation_checks` — `site_id`, `fixture`, `check_date`, `checked_by`, `state`
 - `waste_events` — `batch_id` (nullable), `product_id`, `qty`, `reason_code`, `value_aud`, `by`
-- `push_subscriptions`, `audit_log`
+- `audit_log` (`push_subscriptions` existed until reminders moved in-app, 2026-10-05)
 
 **Roles:** `platform_admin` (all organisations), `owner` (multi-site), `manager` (one site),
 `staff` (phone only).
@@ -146,13 +146,15 @@ A single Supabase Edge Function on a nightly cron (02:00 Australia/Melbourne):
    milliseconds and is always correct.
 3. Create today's `rotation_checks` rows for each site's fixtures.
 
-A second function at 06:00 sends the digest: Web Push to on-shift manager, email to owner.
+Reminders are not sent: staff and managers see what is due when they open the app
+(banner, pop-up, Today-tab count). A 06:00 Web Push digest was built and later removed
+(2026-10-05) in favour of in-app reminders per account.
 
-Both functions return a typed result (`{ processed, skipped, reason }`) written to a
+The function returns a typed result (`{ processed, skipped, reason }`) written to a
 `job_runs` table so failures are legible rather than silent, and the platform-admin portal
-can show run history. Archiving an organisation pauses both jobs: engine writes lock and
+can show run history. Archiving an organisation pauses the job: engine writes lock and
 recheck each organisation so they cannot insert into an organisation that archived after
-the snapshot, and the digest rechecks status immediately before dispatch.
+the snapshot.
 
 ---
 
@@ -244,5 +246,5 @@ Right-sized, not event-sourced:
 - Intake timed against a real docket at Karan's site: target is a repeat supplier delivery
   closed in under 60 seconds. If it isn't, the prediction/bulk-apply flow needs work — this is
   the number the whole product's adoption rests on.
-- Push notifications verified end to end on a real device; note explicitly that iOS requires
-  the PWA to be installed to the home screen
+- ~~Push notifications verified end to end on a real device~~ (push removed 2026-10-05;
+  reminders are in-app)

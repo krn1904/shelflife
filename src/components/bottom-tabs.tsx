@@ -3,9 +3,10 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { SHIFT_TABS } from '@/components/shift-tabs';
+import { CountBadge } from '@/components/portal-nav';
 
 /** Thumb-reach navigation for staff on a phone; hidden from `sm` up, where the header has room. */
-export function BottomTabs() {
+export function BottomTabs({ badges = {} }: { badges?: Record<string, number> }) {
   const pathname = usePathname();
 
   return (
@@ -24,9 +25,12 @@ export function BottomTabs() {
               active ? 'text-brand-text' : 'text-muted'
             }`}
           >
-            <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d={t.icon} />
-            </svg>
+            <span className="relative">
+              <svg aria-hidden width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d={t.icon} />
+              </svg>
+              <CountBadge count={badges[t.href]} className="absolute -top-1.5 left-3.5" />
+            </span>
             {t.label}
           </Link>
         );

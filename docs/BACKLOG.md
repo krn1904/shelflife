@@ -85,13 +85,26 @@ through intake for a rare case; deliveries are normally closed the same day.
 ## Scheduled jobs for sites outside Melbourne's timezone
 
 **Context (2026-10-03):** every date is now worked out on each site's own calendar (required
-`sites.timezone`), including in the nightly expiry engine and the morning digest. The jobs
-still *run* on Melbourne's clock: the engine at 02:00 and the digest at 06:00 Australia/Melbourne.
+`sites.timezone`), including in the nightly expiry engine. The job still *runs* on
+Melbourne's clock, at 02:00 Australia/Melbourne.
 
 **Why it matters later:** at 02:00 in Melbourne it is still the previous evening in Perth, so a
-Perth site's reminders would be planned for the day that is ending, and its digest would arrive
-at 3–4am. All current sites are in Melbourne, so nothing is wrong today.
+Perth site's reminders would be planned for the day that is ending. All current sites are in Melbourne, so nothing is wrong today.
 
 **When a site outside Melbourne's zone is added:** run the engine hourly (it is a full,
-idempotent recompute, so extra runs are harmless) and have the digest send to each site in the
-run where that site's local hour is 6.
+idempotent recompute, so extra runs are harmless).
+
+## If lock-screen notifications come back
+
+**Context (2026-10-05):** reminders moved in-app, per account (banner, pop-up, Today-tab count),
+and device Web Push was removed: the `daily-digest` Edge Function, the service worker's push
+handlers, the Settings switch and the `push_subscriptions` table. The trade-off is that nothing
+reaches anyone while ShelfLife is closed.
+
+**What was learned, in case push returns:** `web-push` (npm) does work from the Supabase Edge
+runtime. Three bugs existed in the removed code: an owner's device was saved against one site
+instead of organisation-wide; a shared store tablet that changed hands hit an RLS error (the
+browser's endpoint is unique and was stored under the previous user) and on *Turn on* also
+unsubscribed the browser; and failed sends other than 404/410 were counted as quiet skips, so
+wrong VAPID keys would never have shown in `job_runs`. Browsers keep a subscription per device,
+so a push design has to decide who owns a shared device.

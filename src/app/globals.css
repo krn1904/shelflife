@@ -292,6 +292,7 @@ input[type="radio"] {
   .alert-critical { background: var(--critical-soft); color: var(--critical-ink); border-color: color-mix(in srgb, var(--critical) 35%, transparent); }
   .alert-warning { background: var(--warning-soft); color: var(--warning); border-color: color-mix(in srgb, var(--warning) 35%, transparent); }
   .alert-good { background: var(--good-soft); color: var(--good); border-color: color-mix(in srgb, var(--good) 35%, transparent); }
+  .alert-neutral { background: var(--surface-2); color: var(--ink); border-color: var(--line); }
 
   /* Tables */
   .table { width: 100%; border-collapse: collapse; font-size: 0.875rem; }

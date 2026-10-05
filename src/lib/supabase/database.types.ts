@@ -471,66 +471,6 @@ export type Database = {
         }
         Relationships: []
       }
-      push_subscriptions: {
-        Row: {
-          auth: string
-          created_at: string
-          endpoint: string
-          failed_at: string | null
-          failure_reason: string | null
-          id: string
-          org_id: string
-          p256dh: string
-          site_id: string | null
-          updated_at: string
-          user_agent: string | null
-          user_id: string
-        }
-        Insert: {
-          auth: string
-          created_at?: string
-          endpoint: string
-          failed_at?: string | null
-          failure_reason?: string | null
-          id?: string
-          org_id: string
-          p256dh: string
-          site_id?: string | null
-          updated_at?: string
-          user_agent?: string | null
-          user_id: string
-        }
-        Update: {
-          auth?: string
-          created_at?: string
-          endpoint?: string
-          failed_at?: string | null
-          failure_reason?: string | null
-          id?: string
-          org_id?: string
-          p256dh?: string
-          site_id?: string | null
-          updated_at?: string
-          user_agent?: string | null
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "push_subscriptions_org_id_fkey"
-            columns: ["org_id"]
-            isOneToOne: false
-            referencedRelation: "orgs"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "push_subscriptions_site_id_fkey"
-            columns: ["site_id"]
-            isOneToOne: false
-            referencedRelation: "sites"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       reminder_settings: {
         Row: {
           created_at: string

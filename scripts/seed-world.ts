@@ -933,13 +933,6 @@ export function buildWorld(now: Date): World {
           ? 'canceling statement due to statement timeout'
           : `${processed} actions, ${checksNow} rotation checks, horizon ${HORIZON_DAYS}d`,
       });
-      const digestAt = at(day, 6, 0);
-      if (back === 0 && Date.parse(digestAt) >= latest) continue;
-      const pushes = failed ? 0 : between(3, 9);
-      runs.push({
-        job: 'daily-digest', ran_at: digestAt, ok: true, processed: pushes, skipped: between(0, 2),
-        duration_ms: between(300, 1500), reason: `${pushes} pushes sent, 0 skipped`,
-      });
     }
     return runs;
   }

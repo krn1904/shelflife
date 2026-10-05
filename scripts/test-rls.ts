@@ -639,12 +639,6 @@ async function main() {
       .eq('org_id', united.id)
       .limit(1)
       .single();
-    const { data: metroSite } = await admin
-      .from('sites')
-      .select('id')
-      .eq('org_id', metro.id)
-      .limit(1)
-      .single();
 
     const { error: directSiteWrite } = await platform
       .from('sites')
@@ -755,97 +749,6 @@ async function main() {
     check('platform admin can remove an unassigned empty site through the audited RPC',
       rpcSiteRemoval === null, rpcSiteRemoval?.message ?? '');
 
-    const endpoint = `https://push.test/${Date.now()}`;
-    const { error: crossOrgSubscription } = await other
-      .from('push_subscriptions')
-      .insert({
-        user_id: otherUser!.id,
-        org_id: united.id,
-        site_id: metroSite!.id,
-        endpoint: `${endpoint}/cross-org`,
-        p256dh: 'test-p256dh',
-        auth: 'test-auth',
-      });
-    check('subscription cannot reference another organisation site',
-      crossOrgSubscription !== null, crossOrgSubscription ? '' : 'insert unexpectedly succeeded');
-
-    const { data: subscription, error: subscriptionError } = await other
-      .from('push_subscriptions')
-      .insert({
-        user_id: otherUser!.id,
-        org_id: united.id,
-        site_id: unitedSite!.id,
-        endpoint,
-        p256dh: 'test-p256dh',
-        auth: 'test-auth',
-      })
-      .select('id')
-      .single();
-    check('owner can create a subscription in an active organisation',
-      subscriptionError === null, subscriptionError?.message ?? '');
-
-    const { data: orgWideSubscription, error: orgWideSubscriptionError } = await other
-      .from('push_subscriptions')
-      .insert({
-        user_id: otherUser!.id,
-        org_id: united.id,
-        site_id: null,
-        endpoint: `${endpoint}/org-wide`,
-        p256dh: 'test-p256dh',
-        auth: 'test-auth',
-      })
-      .select('id')
-      .single();
-    check('owner can create an organisation-wide subscription',
-      orgWideSubscriptionError === null, orgWideSubscriptionError?.message ?? '');
-    await other.from('push_subscriptions').delete().eq('id', orgWideSubscription!.id);
-
-    const { data: { user: staffUserForPush } } = await staff.auth.getUser();
-    const { data: staffSite } = await staff.from('sites').select('id').single();
-    const { error: staffOrgWide } = await staff.from('push_subscriptions').insert({
-      user_id: staffUserForPush!.id,
-      org_id: metro.id,
-      site_id: null,
-      endpoint: `${endpoint}/staff-org-wide`,
-      p256dh: 'test-p256dh',
-      auth: 'test-auth',
-    });
-    check('staff cannot create an organisation-wide subscription',
-      staffOrgWide !== null, staffOrgWide ? '' : 'insert unexpectedly succeeded');
-
-    const { data: staffSubscription, error: staffSubscriptionError } = await staff
-      .from('push_subscriptions')
-      .insert({
-        user_id: staffUserForPush!.id,
-        org_id: metro.id,
-        site_id: staffSite!.id,
-        endpoint: `${endpoint}/staff-site`,
-        p256dh: 'test-p256dh',
-        auth: 'test-auth',
-      })
-      .select('id')
-      .single();
-    check('staff can create a site-scoped subscription',
-      staffSubscriptionError === null, staffSubscriptionError?.message ?? '');
-
-    const { data: staffOrgWideUpdate } = await staff
-      .from('push_subscriptions')
-      .update({ site_id: null })
-      .eq('id', staffSubscription!.id)
-      .select('id');
-    check('staff cannot retarget a subscription to the whole organisation',
-      (staffOrgWideUpdate?.length ?? 0) === 0,
-      `updated ${staffOrgWideUpdate?.length} subscriptions`);
-    await staff.from('push_subscriptions').delete().eq('id', staffSubscription!.id);
-
-    const { data: crossOrgUpdate } = await other
-      .from('push_subscriptions')
-      .update({ site_id: metroSite!.id })
-      .eq('id', subscription!.id)
-      .select('id');
-    check('subscription cannot be reassigned to another organisation site',
-      (crossOrgUpdate?.length ?? 0) === 0, `updated ${crossOrgUpdate?.length} subscriptions`);
-
     const { data: ownerMutation } = await other
       .from('orgs')
       .update({
@@ -925,29 +828,6 @@ async function main() {
     check('archived owner cannot update its profile through the app API',
       (profileUpdate?.length ?? 0) === 0, `updated ${profileUpdate?.length} profiles`);
 
-    const { data: archivedSubscriptions } = await other
-      .from('push_subscriptions')
-      .select('id')
-      .eq('id', subscription!.id);
-    check('archived organisation subscription is hidden',
-      archivedSubscriptions?.length === 0, `got ${archivedSubscriptions?.length} subscriptions`);
-
-    const { data: subscriptionUpdate } = await other
-      .from('push_subscriptions')
-      .update({ user_agent: 'archived mutation' })
-      .eq('id', subscription!.id)
-      .select('id');
-    check('archived organisation subscription cannot be updated',
-      (subscriptionUpdate?.length ?? 0) === 0, `updated ${subscriptionUpdate?.length} subscriptions`);
-
-    const { data: subscriptionDelete } = await other
-      .from('push_subscriptions')
-      .delete()
-      .eq('id', subscription!.id)
-      .select('id');
-    check('archived organisation subscription cannot be deleted',
-      (subscriptionDelete?.length ?? 0) === 0, `deleted ${subscriptionDelete?.length} subscriptions`);
-
     const { error: archivedServiceWrite } = await admin
       .from('sites')
       .insert({ org_id: united.id, name: 'Post-archive service write', timezone: 'Australia/Melbourne' });
@@ -981,8 +861,6 @@ async function main() {
     check('owner access returns after restore',
       restored?.length === 1 && restored[0].id === united.id,
       `got ${restored?.length} orgs`);
-
-    await other.from('push_subscriptions').delete().eq('id', subscription!.id);
 
     await admin.from('orgs').update({ is_demo: true }).eq('id', united.id);
     const { error: demoAuditError } = await other.rpc('write_audit', {

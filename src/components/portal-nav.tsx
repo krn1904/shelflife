@@ -5,7 +5,20 @@ import Link, { useLinkStatus } from 'next/link';
 import { usePathname } from 'next/navigation';
 
 /** `exact`: active only on this path itself, not below it (the Shift home sits above every shift page). */
-export type NavLink = { href: string; label: string; exact?: boolean };
+export type NavLink = { href: string; label: string; exact?: boolean; badge?: number };
+
+/** How many things wait behind a tab; nothing at zero. Shared with the bottom tabs. */
+export function CountBadge({ count, className = '' }: { count: number | undefined; className?: string }) {
+  if (!count) return null;
+  return (
+    <span
+      aria-label={`${count} due`}
+      className={`badge-brand inline-flex min-w-4.5 items-center justify-center rounded-full px-1 font-mono text-[10px] leading-4 font-bold tabular-nums ${className}`}
+    >
+      {count > 99 ? '99+' : count}
+    </span>
+  );
+}
 
 /** A dot that pulses beside a tab while its page is on the way. */
 function PendingDot() {
@@ -52,6 +65,7 @@ export function PortalNav({ links }: { links: NavLink[] }) {
             }
           >
             {n.label}
+            <CountBadge count={n.badge} className="ml-1.5" />
             <PendingDot />
           </Link>
         );

@@ -15,9 +15,8 @@ Browser / PWA ──▶ Next.js (App Router)         Supabase
                   └─ Client Components            Auth   (cookie session)
                        │                          Storage (docket / date photos)
                        └─ Dexie outbox            Realtime
-                                                  Edge Functions (cron)
-                                                  ├─ expiry-engine  02:00
-                                                  └─ daily-digest   06:00
+                                                  Edge Function (cron)
+                                                  └─ expiry-engine  02:00
 ```
 
 Everything server-side runs **as the signed-in user**, so Postgres Row-Level Security is the
@@ -43,7 +42,7 @@ src/
     auth/                      session resolution + role gates, sign-in actions
     intake/                    docket-driven receiving: docket reading, supplier recognition,
                                expected lines, expiry proposal
-    expiry/                    the engine's rules (re-exported from _shared), digest text,
+    expiry/                    the engine's rules (re-exported from _shared), reminder text,
                                Today wording, board columns + the board's windowed loader
     offline/                   Dexie outbox + framework-free queue semantics
     products/                  tracking-mode resolution, product mutations
@@ -56,9 +55,8 @@ src/
 supabase/
   migrations/                  schema, RLS helpers, policies, lifecycle and intake changes (in order)
   functions/
-    _shared/                   engine + digest + tracking logic (single source of truth)
+    _shared/                   engine + tracking logic (single source of truth)
     expiry-engine/             thin Deno wrapper, nightly
-    daily-digest/              thin Deno wrapper, morning
 scripts/                       seed-world (data) + reset-db (npm run db:reset), test-rls
 ```
 
@@ -148,12 +146,10 @@ workflow is documented in [PLATFORM-ADMIN.md](PLATFORM-ADMIN.md).
 Archival is deliberately reversible: operational rows and auth users remain intact, while
 `auth_org_ids()`, `auth_site_ids()` and role checks stop returning access for organisation
 members. `is_platform_admin()` remains independent of organisation status so the platform can
-inspect and restore archived organisations. The service-role Edge Functions bypass RLS, so both
-the expiry engine and daily digest explicitly query active organisation IDs, then recheck that
-status at write/dispatch time: expiry actions and rotation checks go through RPCs that lock each
-organisation and skip archived rows, and the digest cancels delivery if an organisation is no
-longer active. Site-scoped push delivery also requires the subscription's `org_id` to match the
-site. Owners can still insert and update sites and memberships in their own organisation; those
+inspect and restore archived organisations. The service-role expiry engine bypasses RLS, so it
+explicitly queries active organisation IDs, then rechecks that status at write time: expiry
+actions and rotation checks go through RPCs that lock each organisation and skip archived rows.
+Owners can still insert and update sites and memberships in their own organisation; those
 policies are owner-scoped, so platform admins cannot use them to bypass the audited RPCs.
 Normal application users have no `DELETE` policy on `orgs`; permanent deletion is break-glass
 maintenance, not a UI operation.
@@ -164,7 +160,7 @@ maintenance, not a UI operation.
 
 Edge Functions run under Deno and the Supabase bundler will not follow an import out into the
 app source. So the pure rules live in **`supabase/functions/_shared/`** (`engine.ts`,
-`digest.ts`, `tracking.ts`), and the app re-exports them:
+`tracking.ts`), and the app re-exports them:
 
 ```ts
 // src/lib/expiry/engine.ts
@@ -173,7 +169,7 @@ export * from '../../../supabase/functions/_shared/engine';
 
 The result: one implementation, imported as `@/lib/expiry/engine` by app code and tests, and by
 relative path from the Deno function. The `*.test.ts` files exercise it under Node without Deno
-or a database in sight. When you touch engine or digest rules, edit the `_shared` copy.
+or a database in sight. When you touch engine rules, edit the `_shared` copy.
 
 ---
 
@@ -219,12 +215,22 @@ Rules: [_shared/engine.ts](../supabase/functions/_shared/engine.ts). Wrapper:
   worst failure mode (nothing looks broken until stock is gone); the admin portal flags an engine
   that has not reported in 36 hours.
 
-The 06:00 [daily-digest](../supabase/functions/daily-digest/index.ts) shares the same shape:
-authenticate, scope to active organisations, build per-site summary text via `_shared/digest.ts`,
-Web Push to live subscriptions whose `org_id` matches the site (pruning 404/410 dead ones), and
-cancel delivery if the organisation is no longer active at dispatch time. Email the owner. A site
-with nothing outstanding sends nothing. Organisation-wide (null `site_id`) subscriptions are
-restricted to owners and platform admins.
+**Reminders are in-app, per account.** There is no morning job and no Web Push. The staff and
+manager home screens read what is due today through `loadReminders()`
+([reminders-data.ts](../src/lib/expiry/reminders-data.ts)): the same site (`activeSite`), the
+site's own date and the same filters as the Today page, so the banner, the Today-tab count and
+the list agree. It returns nothing for owners and platform admins (`remindersShownTo()`) before
+querying, and is cached per request so the portal layout's badge and the page's banner share one
+read. Wording and colour come from `summariseReminders()`
+([reminders.ts](../src/lib/expiry/reminders.ts)). The badge lives in the portal layout; answers go
+through Server Actions that call `revalidatePath`, which re-renders the current route including
+the layout, so the count drops without a reload. The pop-up
+([reminder-toast.tsx](../src/components/reminder-toast.tsx)) is remembered in localStorage per
+account and site and the site's date, written only when the person taps Open or Later. Because an open tab never re-renders on its
+own, [refresh-on-return.tsx](../src/components/refresh-on-return.tsx) calls `router.refresh()`
+when the tab becomes visible after at least a minute hidden (`refreshOnReturn()`), or is
+restored from the back/forward cache. It notes a timestamp on hide rather than running a
+timer, so an idle, visible tab does no work.
 
 ---
 
@@ -364,7 +370,8 @@ barcode, plus each organisation's own products added from dockets, which carry `
 makes v2 reconciliation need no migration; `unit_cost` is the unit price read off the docket when
 the reader is certain of it), `stock_batches` (`checked_at` / `marked_down_at` record staff
 answers), `reminder_settings` (one row per site that changed the defaults), `expiry_actions`, `rotation_checks`,
-`waste_events`, `job_runs`, `push_subscriptions`, `audit_log`.
+`waste_events`, `job_runs`, `audit_log`. (`push_subscriptions` was dropped in
+`20261005000001` when reminders moved in-app.)
 
 `memberships` is `unique nulls not distinct (user_id, org_id, site_id)`. Organisation-wide
 roles (owner, platform admin) store `site_id = null`, and a plain unique constraint lets NULLs
@@ -381,7 +388,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, digest text, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, reminder text and who sees it, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

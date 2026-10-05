@@ -1,6 +1,5 @@
 import { requireSession } from '@/lib/auth/session';
 import { currentTheme } from '@/lib/theme/server';
-import { PushToggle } from '@/components/push-toggle';
 import { ThemePicker } from '@/components/theme-picker';
 import { PageHeader, SectionTitle } from '@/components/ui';
 
@@ -21,11 +20,6 @@ export default async function SettingsPage() {
           </p>
           <ThemePicker initial={theme} />
         </div>
-      </section>
-
-      <section>
-        <SectionTitle>Notifications</SectionTitle>
-        <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? null} />
       </section>
     </div>
   );

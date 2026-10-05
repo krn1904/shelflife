@@ -111,8 +111,11 @@ The review is read-only: the saved lines are the record.
 
 ### The daily action list
 
-A scheduled job runs overnight and rebuilds the action list from current stock. Each morning the
-on-shift manager receives a push notification and the owner an email digest.
+A scheduled job runs overnight and rebuilds the action list from current stock. When staff and
+managers open ShelfLife they see what is due today at their site: a banner on their home screen,
+a pop-up the first time that day, and (for staff) a count on the Today tab. Reminders belong to
+the account, not the phone, so there is nothing to switch on per device. Owners and platform
+admins don't get shift reminders. (An owner email digest is planned but not built.)
 
 How early an item is mentioned depends on its **shelf life when it arrived**, because a 14-day
 smoothie and an 8-month bag of chips need very different warnings. Each batch is put in a group
