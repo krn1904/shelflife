@@ -29,8 +29,8 @@ $$;
  * finds an existing supplier. p_old_alias is the old name, normalised, kept so dockets still
  * printing it are recognised; null when the name did not change in a way that matters.
  *
- * Switching a supplier off hides it from intake; add_supplier() switches it back on when a
- * docket from it arrives again.
+ * Switching a supplier off hides it from intake, docket recognition included; add_supplier()
+ * switches it back on when staff add it again with the same ABN or name.
  */
 create or replace function public.update_supplier(
   p_supplier_id uuid,

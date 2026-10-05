@@ -15,7 +15,8 @@ const ALIASES_SHOWN = 3; // the rest are counted, not listed
  */
 export default async function SuppliersPage(props: PageProps<'/manage/suppliers'>) {
   const session = await requireRole('manager');
-  const site = activeSite(session, firstParam((await props.searchParams).site));
+  const params = await props.searchParams;
+  const site = activeSite(session, firstParam(params.site));
   const supabase = await createClient();
 
   if (!site) return <PageHeader title="Suppliers" subtitle="No site assigned" />;
@@ -29,6 +30,8 @@ export default async function SuppliersPage(props: PageProps<'/manage/suppliers'
   const all = supplierOrder(suppliers ?? []);
   const usage = new Map((activity ?? []).map((a) => [a.supplier_id, a]));
   const canMerge = roleAtLeast(session.primaryRole, 'owner');
+  const mergedInto = all.find((s) => s.id === firstParam(params.merged));
+  const moved = Number(firstParam(params.moved) ?? 0);
   const oneSite = session.memberships.some((m) => m.orgId === site.orgId && m.siteId !== null) && !canMerge;
 
   return (
@@ -45,6 +48,12 @@ export default async function SuppliersPage(props: PageProps<'/manage/suppliers'
           {oneSite && ` Delivery counts are for ${site.name}.`}
         </p>
       </div>
+
+      {mergedInto && (
+        <p role="status" className="alert alert-good">
+          Merged into {mergedInto.name}: {moved} {moved === 1 ? 'delivery' : 'deliveries'} moved.
+        </p>
+      )}
 
       <ul className="space-y-3">
         {all.map((s) => {

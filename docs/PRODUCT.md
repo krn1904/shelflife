@@ -134,8 +134,10 @@ came (for the sites the viewer runs), and points out ones that look like the sam
 - **Rename** a supplier or set its ABN (managers and owners). The old name stays recognised, so
   a docket that still prints it is matched straight away. A name or ABN another supplier already
   has is refused, with a pointer to merging.
-- **Switch off** a supplier that no longer delivers: it leaves the list staff pick from. A docket
-  from it later switches it back on, because it evidently still delivers.
+- **Switch off** a supplier that no longer delivers: it leaves the list staff pick from, and its
+  dockets are no longer recognised. If it delivers again, staff add it from the docket and a
+  match on its ABN or exact name switches the same supplier back on. Without an ABN, one that
+  was renamed comes back as a new supplier, to merge.
 - **Merge** a duplicate into the supplier to keep (owners only, since it rewrites every site's
   history): its deliveries and the docket names it was recognised by move across, its name
   becomes one more, it passes on its ABN if the kept one has none, and it is removed. Two

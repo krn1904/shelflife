@@ -1,6 +1,7 @@
 'use server';
 
 import { revalidatePath } from 'next/cache';
+import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
 import { aliasToKeep, SupplierEdit, SupplierMerge, supplierError } from './upkeep';
@@ -70,6 +71,6 @@ export async function mergeSupplier(_prev: SupplierState, formData: FormData): P
   if (error) return { status: 'error', message: supplierError(error) };
 
   refresh();
-  const count = Number(moved ?? 0);
-  return { status: 'saved', message: `Merged into ${keep.name}: ${count} ${count === 1 ? 'delivery' : 'deliveries'} moved.` };
+  // The merged-away supplier's card, where this form sits, is gone: say so at the top of the list.
+  redirect(`/manage/suppliers?merged=${keepId}&moved=${Number(moved ?? 0)}`);
 }

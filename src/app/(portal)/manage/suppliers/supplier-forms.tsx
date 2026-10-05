@@ -33,7 +33,8 @@ export function SupplierForm({ supplier }: { supplier: Supplier }) {
         <span>
           Offered when receiving a delivery
           <span className="block text-xs text-muted">
-            Switched off, it leaves the supplier list. A docket from it switches it back on.
+            Switched off, it leaves the list staff pick from and its dockets are no longer recognised.
+            Adding it again from a docket (same ABN or name) switches it back on.
           </span>
         </span>
       </label>
