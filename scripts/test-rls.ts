@@ -434,12 +434,22 @@ async function main() {
     check('nor remove a batch staff already acted on', dropUsed?.code === '23514', dropUsed?.message ?? 'no error');
     await fix(brunswickManager, 12, 7, [{ id: milkBatch.id, expiry_date: '2026-09-12', qty: 7 }]);
     const { data: emptied } = await admin.from('stock_batches').select('qty_remaining, status').eq('id', milkBatch.id).single();
-    check('down to exactly what left, the batch is empty and pulled',
-      emptied?.qty_remaining === 0 && emptied.status === 'pulled', JSON.stringify(emptied));
+    check('down to exactly what left, the batch holds nothing',
+      emptied?.qty_remaining === 0 && emptied.status === 'active', JSON.stringify(emptied));
     await fix(brunswickManager, 12, 12, [{ id: milkBatch.id, expiry_date: '2026-09-12', qty: 12 }]);
     const { data: refilled } = await admin.from('stock_batches').select('qty_remaining, status').eq('id', milkBatch.id).single();
     check('raised again, it is back on the shelf', refilled?.qty_remaining === 5 && refilled.status === 'active',
       JSON.stringify(refilled));
+
+    // Staff pulled the rest: raising the count must not put stock back on a cleared shelf.
+    await admin.from('stock_batches').update({ qty_remaining: 0, status: 'pulled' }).eq('id', milkBatch.id);
+    await fix(brunswickManager, 13, 13, [{ id: milkBatch.id, expiry_date: '2026-09-12', qty: 13 }]);
+    const { data: stillPulled } = await admin.from('stock_batches').select('qty_received, qty_remaining, status').eq('id', milkBatch.id).single();
+    check('a batch staff pulled stays empty when its count is raised',
+      stillPulled?.qty_received === 13 && stillPulled.qty_remaining === 0 && stillPulled.status === 'pulled',
+      JSON.stringify(stillPulled));
+    await admin.from('stock_batches').update({ qty_remaining: 5, status: 'active' }).eq('id', milkBatch.id);
+    await fix(brunswickManager, 12, 12, [{ id: milkBatch.id, expiry_date: '2026-09-12', qty: 12 }]);
 
     const { error: tooMany } = await fix(brunswickManager, 12, 12,
       [{ id: milkBatch.id, expiry_date: '2026-09-12', qty: 12 }, { id: null, expiry_date: '2026-09-14', qty: 2 }]);
@@ -502,9 +512,43 @@ async function main() {
         && (milkBatches?.length ?? 0) === 1,
       `offBoard ${milkOff}, ${JSON.stringify(milkBatches)}`);
 
-    await admin.from('stock_batches').delete().in('product_id', [milk.id, chips.id, yoghurt.id]);
-    await admin.from('deliveries').delete().eq('id', delivery!.id);
-    await admin.from('products').delete().in('id', [milk.id, chips.id, yoghurt.id]);
+    const { error: undatedFix } = await fix(brunswickManager, 14, 13, []);
+    check('a line whose product is no longer dated can still be corrected', undatedFix === null, undatedFix?.message ?? '');
+    const { error: keptLine } = await fix(brunswickManager, 0, 0, []);
+    check('but not removed while stock from it has left the shelf', keptLine?.code === '23514', keptLine?.message ?? 'no error');
+
+    // Tracking is the product's, so a site the caller does not run blocks the change.
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    const { data: juice } = await admin.from('products')
+      .insert({ name: 'RLS Correction Juice 1L', org_id: metro.id, tracking_mode: 'batch' }).select('id').single();
+    const { data: coburgDelivery } = await admin.from('deliveries').insert({
+      org_id: metro.id, site_id: coburg.id, supplier_id: supplier!.id, status: 'closed', received_at: closedAt, closed_at: closedAt,
+    }).select('id').single();
+    const { data: coburgLine } = await admin.from('delivery_lines').insert({
+      org_id: metro.id, delivery_id: coburgDelivery!.id, product_id: juice!.id, qty_docketed: 3, qty_received: 3,
+    }).select('id').single();
+    await admin.from('stock_batches').insert({
+      org_id: metro.id, site_id: coburg.id, product_id: juice!.id, delivery_line_id: coburgLine!.id,
+      expiry_date: '2026-09-20', qty_received: 3, qty_remaining: 3, created_at: closedAt,
+    });
+    const { error: elsewhere } = await review(brunswickManager, juice!.id, 'none', null);
+    check('a manager cannot change tracking for a product another site receives', elsewhere?.code === '42501',
+      elsewhere?.message ?? 'no error');
+    const { error: sameMode } = await review(brunswickManager, juice!.id, 'batch', null);
+    check('but can still review its details', sameMode === null, sameMode?.message ?? '');
+
+    const { error: unfixed } = await review(owner, juice!.id, 'rotation', 'Juice fridge');
+    check('rotation waits for a fixture at every site that receives it', unfixed?.code === '23514', unfixed?.message ?? 'no error');
+    await admin.from('site_products').insert({ org_id: metro.id, site_id: coburg.id, product_id: juice!.id, fixture: 'Cold room' });
+    const { data: juiceOff, error: ownerReview } = await review(owner, juice!.id, 'rotation', 'Juice fridge');
+    const { count: coburgLive } = await admin.from('stock_batches')
+      .select('*', { count: 'exact', head: true }).eq('product_id', juice!.id).eq('status', 'active');
+    check('the owner switches it, and every site\'s dated stock leaves the board',
+      ownerReview === null && juiceOff === 1 && coburgLive === 0, ownerReview?.message ?? `offBoard ${juiceOff}, ${coburgLive} live`);
+
+    await admin.from('stock_batches').delete().in('product_id', [milk.id, chips.id, yoghurt.id, juice!.id]);
+    await admin.from('deliveries').delete().in('id', [delivery!.id, coburgDelivery!.id]);
+    await admin.from('products').delete().in('id', [milk.id, chips.id, yoghurt.id, juice!.id]);
   }
 
   console.log('\nsuppliers recognised from dockets:');

@@ -100,7 +100,8 @@ export default async function OrganisationPage(
         .from('stock_batches')
         .select('*', { count: 'exact', head: true })
         .eq('org_id', org.id)
-        .eq('status', 'active'),
+        .eq('status', 'active')
+        .gt('qty_remaining', 0),
       supabase
         .from('audit_log')
         .select('id, action, created_at, subject_type, detail')

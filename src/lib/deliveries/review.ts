@@ -98,3 +98,24 @@ export function atSite(iso: string | null, timeZone: string, withTime = true): s
     ...(withTime ? { hour: 'numeric', minute: '2-digit' } : {}),
   }).format(new Date(iso));
 }
+
+// ---------------------------------------------------------------------------------------
+// Products staff added from dockets, waiting for a manager
+
+export type NewItemArrival = {
+  productId: string;
+  name: string;
+  deliveryId: string;
+  closedAt: string | null;
+  supplier: string | null;
+};
+
+/** One entry per product: the delivery it last arrived on, newest products first. */
+export function latestArrivals(rows: NewItemArrival[]): NewItemArrival[] {
+  const latest = new Map<string, NewItemArrival>();
+  for (const row of rows) {
+    const seen = latest.get(row.productId);
+    if (!seen || (row.closedAt ?? '') > (seen.closedAt ?? '')) latest.set(row.productId, row);
+  }
+  return [...latest.values()].sort((a, b) => (b.closedAt ?? '').localeCompare(a.closedAt ?? ''));
+}

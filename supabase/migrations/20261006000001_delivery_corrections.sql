@@ -47,7 +47,9 @@ $$;
  * quantities may add up to less than received: the rest is stock nobody dated yet.
  *
  * Stock already written off or sold through cannot be un-received, so a batch never drops
- * below what has left it. Setting both quantities to 0 removes the line.
+ * below what has left it, and a batch staff emptied stays empty: raising its count does not
+ * put stock back on a shelf someone already cleared. Setting both quantities to 0 removes
+ * the line.
  */
 create or replace function public.correct_delivery_line(
   p_line_id uuid,
@@ -79,6 +81,10 @@ begin
   end if;
   select * into v_delivery from public.deliveries where id = v_line.delivery_id for update;
 
+  -- Lock the organisation so an archive cannot land in the middle of the correction.
+  if (select status from public.orgs where id = v_delivery.org_id for update) is distinct from 'active'::public.org_status then
+    raise exception 'organisation is archived or missing' using errcode = 'check_violation';
+  end if;
   if not public.can_correct_site(v_delivery.site_id) then
     raise exception 'not permitted to correct this delivery' using errcode = 'insufficient_privilege';
   end if;
@@ -125,9 +131,12 @@ begin
   ) into v_before
   from public.stock_batches b where b.delivery_line_id = v_line.id;
 
-  -- Existing stock: updated when listed, removed when not.
+  -- Existing stock: updated when listed, removed when not. A product no longer dated keeps
+  -- the batches it had, already off the board (review_docket_product closed them out).
   for v_batch in
-    select * from public.stock_batches where delivery_line_id = v_line.id order by id for update
+    select * from public.stock_batches
+    where delivery_line_id = v_line.id and v_mode = 'batch'
+    order by id for update
   loop
     select elem into v_wanted
     from jsonb_array_elements(p_batches) elem
@@ -151,8 +160,8 @@ begin
         using errcode = 'check_violation';
     end if;
 
-    -- Sold through means staff said the shelf is empty: it stays empty whatever the count.
-    v_remaining := case when v_batch.status = 'sold_through' then 0 else v_qty - v_used end;
+    -- Pulled or sold through means staff said the shelf is empty: it stays empty whatever the count.
+    v_remaining := case when v_batch.status = 'active' then v_qty - v_used else 0 end;
 
     if v_qty <> v_batch.qty_received or v_date is distinct from v_batch.expiry_date then
       update public.stock_batches
@@ -161,9 +170,7 @@ begin
           expiry_date = v_date,
           expiry_source = case when v_date is distinct from v_batch.expiry_date
                                then 'manual'::public.expiry_source else expiry_source end,
-          status = case when v_batch.status = 'sold_through' then status
-                        when v_remaining = 0 then 'pulled'::public.batch_status
-                        else 'active'::public.batch_status end
+          status = v_batch.status
       where id = v_batch.id;
       -- The open reminder was planned from the old figures; tonight's run plans it afresh.
       delete from public.expiry_actions where batch_id = v_batch.id and state = 'open';
@@ -182,6 +189,10 @@ begin
   where elem->>'id' is null;
 
   if p_qty_docketed = 0 and p_qty_received = 0 then
+    if exists (select 1 from public.stock_batches where delivery_line_id = v_line.id) then
+      raise exception 'stock from this line has already left the shelf, so the line stays'
+        using errcode = 'check_violation';
+    end if;
     delete from public.delivery_lines where id = v_line.id;
   else
     update public.delivery_lines
@@ -212,10 +223,11 @@ $$;
  * A manager's review of a product staff added from a docket: its name and details, how it
  * is tracked, and, for rotation stock, the fixture it is checked on at this site.
  *
- * Rotation is only checked through a fixture, so it cannot be chosen without one. When the
- * product stops being dated, its dated stock at this site leaves the expiry board: untouched
- * batches were never real and are removed; ones staff already acted on are closed as sold
- * through so their history stays. Returns how many batches left the board.
+ * Rotation is only checked through a fixture, so it cannot be chosen without one, here or at
+ * any other site that receives the product. When the product stops being dated, its dated
+ * stock leaves the expiry board at every site: untouched batches were never real and are
+ * removed; ones staff already acted on are closed as sold through so their history stays.
+ * Returns how many batches left the board.
  */
 create or replace function public.review_docket_product(
   p_product_id uuid,
@@ -239,6 +251,7 @@ declare
   v_fixture text := nullif(btrim(p_fixture), '');
   v_retired integer := 0;
   v_removed integer := 0;
+  v_sites text;
 begin
   select * into v_product from public.products where id = p_product_id for update;
   if not found or v_product.org_id is null then
@@ -249,12 +262,47 @@ begin
   if v_site_org is distinct from v_product.org_id or not public.can_correct_site(p_site_id) then
     raise exception 'not permitted to review this product' using errcode = 'insufficient_privilege';
   end if;
+  if (select status from public.orgs where id = v_product.org_id for update) is distinct from 'active'::public.org_status then
+    raise exception 'organisation is archived or missing' using errcode = 'check_violation';
+  end if;
 
   if char_length(btrim(coalesce(p_name, ''))) not between 2 and 120 then
     raise exception 'give the product a name' using errcode = 'check_violation';
   end if;
   if p_tracking_mode = 'rotation' and v_fixture is null then
     raise exception 'rotation stock needs a fixture to be checked on' using errcode = 'check_violation';
+  end if;
+
+  -- Tracking belongs to the product, so every site that receives it changes with it. Other
+  -- sites must be ones the caller also runs, and for rotation they need a fixture first.
+  if p_tracking_mode is distinct from v_product.tracking_mode then
+    select string_agg(s.name, ', ' order by s.name) into v_sites
+    from public.sites s
+    where s.org_id = v_product.org_id and s.id <> p_site_id
+      and not public.can_correct_site(s.id)
+      and (exists (select 1 from public.delivery_lines l join public.deliveries d on d.id = l.delivery_id
+                   where l.product_id = v_product.id and d.site_id = s.id)
+           or exists (select 1 from public.stock_batches b
+                      where b.product_id = v_product.id and b.site_id = s.id and b.status = 'active'));
+    if v_sites is not null then
+      raise exception 'it is also received at %, so an owner needs to change how it is tracked', v_sites
+        using errcode = 'insufficient_privilege';
+    end if;
+
+    if p_tracking_mode = 'rotation' then
+      select string_agg(s.name, ', ' order by s.name) into v_sites
+      from public.sites s
+      where s.org_id = v_product.org_id and s.id <> p_site_id
+        and exists (select 1 from public.delivery_lines l join public.deliveries d on d.id = l.delivery_id
+                    where l.product_id = v_product.id and d.site_id = s.id)
+        and not exists (select 1 from public.site_products sp
+                        where sp.site_id = s.id and sp.product_id = v_product.id
+                          and nullif(btrim(sp.fixture), '') is not null);
+      if v_sites is not null then
+        raise exception 'it is also received at %, which has no fixture for it yet. Set one there first', v_sites
+          using errcode = 'check_violation';
+      end if;
+    end if;
   end if;
 
   update public.products
@@ -277,7 +325,7 @@ begin
 
   if p_tracking_mode <> 'batch' then
     delete from public.stock_batches b
-    where b.product_id = v_product.id and b.site_id = p_site_id and b.status = 'active'
+    where b.product_id = v_product.id and b.status = 'active'
       and b.qty_remaining = b.qty_received
       and not exists (select 1 from public.waste_events w where w.batch_id = b.id)
       and not exists (select 1 from public.expiry_actions a where a.batch_id = b.id and a.state <> 'open');
@@ -285,13 +333,13 @@ begin
 
     update public.stock_batches
     set status = 'sold_through', qty_remaining = 0
-    where product_id = v_product.id and site_id = p_site_id and status = 'active';
+    where product_id = v_product.id and status = 'active';
     get diagnostics v_retired = row_count;
 
     delete from public.expiry_actions a
     using public.stock_batches b
     where a.batch_id = b.id and a.state = 'open'
-      and b.product_id = v_product.id and b.site_id = p_site_id;
+      and b.product_id = v_product.id;
   end if;
 
   insert into public.audit_log (actor_id, action, org_id, site_id, subject_type, subject_id, detail)

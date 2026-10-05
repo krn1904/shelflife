@@ -13,10 +13,10 @@ import {
   reviewFilters,
   type RangeKey,
 } from '@/lib/deliveries/review';
+import { newItemsToReview } from '@/lib/deliveries/review-queue';
 
 // Enough for a busy site's quarter; the date range, not paging, is what narrows it.
 const LIST_LIMIT = 300;
-const REVIEW_LIMIT = 50; // new items waiting for a manager; more than this is a backlog, not a list
 
 const RANGE_LABEL: Record<RangeKey, string> = { '7d': 'Last 7 days', '30d': 'Last 30 days', '90d': 'Last 90 days' };
 
@@ -51,7 +51,7 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
     .limit(LIST_LIMIT);
   if (filters.supplierId) closedQuery = closedQuery.eq('supplier_id', filters.supplierId);
 
-  const [{ data: open }, { data: closed }, { data: suppliers }, { data: unreviewed }] = await Promise.all([
+  const [{ data: open }, { data: closed }, { data: suppliers }, toReview] = await Promise.all([
     supabase
       .from('deliveries')
       .select('id, received_at, created_at, received_by, suppliers(name)')
@@ -60,29 +60,8 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
       .order('created_at', { ascending: false }),
     closedQuery,
     supabase.from('suppliers').select('id, name').eq('org_id', site.orgId).order('name'),
-    supabase
-      .from('products')
-      .select('id, name, size, tracking_mode, created_at')
-      .eq('org_id', site.orgId)
-      .is('reviewed_at', null)
-      .order('created_at', { ascending: false })
-      .limit(REVIEW_LIMIT),
+    newItemsToReview(supabase, site.id),
   ]);
-
-  // The delivery each new item last came in on at this site, so the review has its context.
-  const { data: arrivals } = (unreviewed ?? []).length > 0
-    ? await supabase
-        .from('delivery_lines')
-        .select('product_id, delivery_id, deliveries!inner(site_id, closed_at, suppliers(name))')
-        .in('product_id', (unreviewed ?? []).map((p) => p.id))
-        .eq('deliveries.site_id', site.id)
-    : { data: [] };
-  const lastArrival = new Map<string, NonNullable<typeof arrivals>[number]>();
-  for (const a of arrivals ?? []) {
-    const seen = lastArrival.get(a.product_id);
-    if (!seen || (a.deliveries.closed_at ?? '') > (seen.deliveries.closed_at ?? '')) lastArrival.set(a.product_id, a);
-  }
-  const toReview = (unreviewed ?? []).filter((p) => lastArrival.has(p.id));
 
   const timeZone = site.timeZone;
   const receiverIds = [...new Set([...(open ?? []), ...(closed ?? [])].flatMap((d) => (d.received_by ? [d.received_by] : [])))];
@@ -150,25 +129,19 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
             until someone says otherwise. Check the name, barcode and tracking, and give rotation stock a fixture.
           </p>
           <ul className="card divide-y divide-line overflow-hidden">
-            {toReview.map((p) => {
-              const arrival = lastArrival.get(p.id)!;
-              return (
-                <li key={p.id}>
-                  <Link href={`/manage/products/${p.id}?site=${site.id}&from=${arrival.delivery_id}`}
-                    className="flex flex-wrap items-baseline gap-3 px-4 py-3 text-sm hover:bg-surface-2">
-                    <span className="font-medium">{p.name}</span>
-                    <span className="text-xs text-muted">
-                      from {arrival.deliveries.suppliers?.name ?? 'a supplier'} · {atSite(arrival.deliveries.closed_at, timeZone, false)}
-                    </span>
-                    <span className="ml-auto text-xs font-semibold text-brand-text">Review →</span>
-                  </Link>
-                </li>
-              );
-            })}
+            {toReview.map((item) => (
+              <li key={item.productId}>
+                <Link href={`/manage/products/${item.productId}?site=${site.id}&from=${item.deliveryId}`}
+                  className="flex flex-wrap items-baseline gap-3 px-4 py-3 text-sm hover:bg-surface-2">
+                  <span className="font-medium">{item.name}</span>
+                  <span className="text-xs text-muted">
+                    from {item.supplier ?? 'a supplier'} · {atSite(item.closedAt, timeZone, false)}
+                  </span>
+                  <span className="ml-auto text-xs font-semibold text-brand-text">Review →</span>
+                </Link>
+              </li>
+            ))}
           </ul>
-          {(unreviewed ?? []).length === REVIEW_LIMIT && (
-            <p className="mt-2 text-xs text-muted">Showing the newest {REVIEW_LIMIT}.</p>
-          )}
         </section>
       )}
 

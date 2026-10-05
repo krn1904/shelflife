@@ -9,6 +9,7 @@ import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle, QuickAction } from '@/components/ui';
 import { loadReminders } from '@/lib/expiry/reminders-data';
 import { ReminderBanner } from '@/components/reminder-banner';
+import { newItemsToReview } from '@/lib/deliveries/review-queue';
 
 const ACTIVITY_LIMIT = 8;
 
@@ -20,7 +21,7 @@ export default async function ManagePage() {
   const asOf = todayIn(site?.timeZone ?? 'UTC');
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
-  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }, reminders, { count: unreviewed }] =
+  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }, reminders, toReview] =
     await Promise.all([
       supabase.from('site_products').select('*', { count: 'exact', head: true }),
       // Counted by the database: every dated batch used to be downloaded just to count these.
@@ -39,13 +40,9 @@ export default async function ManagePage() {
         .order('closed_at', { ascending: false })
         .limit(ACTIVITY_LIMIT),
       loadReminders(session),
-      // Items staff added from this organisation's dockets that no manager has looked at.
-      supabase
-        .from('products')
-        .select('*', { count: 'exact', head: true })
-        .not('org_id', 'is', null)
-        .is('reviewed_at', null),
+      site ? newItemsToReview(supabase, site.id) : Promise.resolve([]),
     ]);
+  const unreviewed = toReview.length;
 
   const urgent = urgentCount ?? 0;
 

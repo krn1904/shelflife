@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { atSite, deliveryTotals, lineStatus, openFor, rangeStart, reviewFilters } from './review';
+import { atSite, deliveryTotals, latestArrivals, lineStatus, openFor, rangeStart, reviewFilters } from './review';
 
 test('a line is ok, short, over, or missing when nothing arrived', () => {
   assert.equal(lineStatus(12, 12), 'ok');
@@ -58,4 +58,17 @@ test('times show in the store\'s timezone, not the server\'s', () => {
   assert.match(atSite('2026-09-29T23:30:00Z', 'Australia/Melbourne'), /^30\/09\/2026, 9:30\s?am$/);
   assert.equal(atSite('2026-09-29T23:30:00Z', 'Australia/Melbourne', false), '30/09/2026');
   assert.equal(atSite(null, 'Australia/Melbourne'), '—');
+});
+
+test('a new item is listed once, with the delivery it last arrived on', () => {
+  const arrival = (productId: string, deliveryId: string, closedAt: string | null) =>
+    ({ productId, name: productId, deliveryId, closedAt, supplier: null });
+  const listed = latestArrivals([
+    arrival('milk', 'd1', '2026-10-01T03:00:00Z'),
+    arrival('milk', 'd3', '2026-10-04T03:00:00Z'),
+    arrival('chips', 'd2', '2026-10-02T03:00:00Z'),
+    arrival('milk', 'd2', '2026-10-02T03:00:00Z'),
+  ]);
+  assert.deepEqual(listed.map((a) => [a.productId, a.deliveryId]), [['milk', 'd3'], ['chips', 'd2']]);
+  assert.deepEqual(latestArrivals([]), []);
 });

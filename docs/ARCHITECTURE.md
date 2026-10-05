@@ -361,16 +361,22 @@ writes, so each is one transaction with its own audit row:
 - `correct_delivery_line(line, qty_docketed, qty_received, batches)` takes the line's dated
   stock as it should be. A listed batch is updated, a new one is inserted with the delivery's
   close time as `created_at` (the engine counts shelf life from it), and one left out is deleted.
-  Dates may cover less than arrived. `qty_remaining` moves by the change in `qty_received`, and
-  the function refuses to drop a batch below what has already left it (written off or sold); a
-  batch at 0 becomes `pulled`, and one given stock back becomes `active`. A changed date becomes
+  Dates may cover less than arrived. On an `active` batch `qty_remaining` moves by the change in
+  `qty_received`, and the function refuses to drop it below what has already left (written off
+  or sold). A `pulled` or `sold_through` batch stays at 0 remaining: staff cleared that shelf, so
+  a higher count must not raise a reminder for stock already gone. A changed date becomes
   `expiry_source = 'manual'` and the batch's open reminder is deleted for the next run to plan.
-  The first correction copies staff's figures into `staff_qty_*`.
+  The first correction copies staff's figures into `staff_qty_*`. A product no longer tracked
+  by date keeps its closed-out batches untouched, and a line with stock that already left the
+  shelf cannot be removed.
 - `review_docket_product(...)` edits a product with `org_id` set (never the shared catalogue) and
-  stamps `reviewed_at`. Rotation requires a fixture, upserted into `site_products`. Leaving
-  `batch` deletes the product's untouched active batches at that site and closes the rest as
-  `sold_through`, because the engine plans reminders for every active dated batch whatever the
-  product's tracking mode.
+  stamps `reviewed_at`. Rotation requires a fixture, upserted into `site_products`. Tracking
+  belongs to the product, so a change of mode covers every site that receives it: it is refused
+  if any of those sites is not one the caller runs (a site-pinned manager asks an owner), and
+  rotation is refused until each of them has a fixture. Leaving `batch` deletes the product's
+  untouched active batches and closes the rest as `sold_through`, because the engine plans
+  reminders for every active dated batch whatever the product's tracking mode.
+- Both lock the organisation row and refuse an archived one, as `add_site_member` does.
 
 The form rules (`LineCorrection`, `checkCorrection`, `ProductReview`) are in
 [corrections.ts](../src/lib/deliveries/corrections.ts); the database repeats the ones it can

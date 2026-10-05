@@ -19,6 +19,8 @@ export type EditableLine = {
   qtyDocketed: number;
   qtyReceived: number;
   trackingMode: TrackingMode;
+  /** Some of its stock already left the shelf, so the line cannot be removed. */
+  keepsStock: boolean;
   batches: EditableBatch[];
 };
 
@@ -106,7 +108,8 @@ export function LineEditor({ line }: { line: EditableLine }) {
         <button type="submit" className="btn btn-primary btn-sm" disabled={pending}>
           {pending ? 'Saving…' : 'Save line'}
         </button>
-        <button type="button" className="btn btn-danger btn-sm" disabled={pending}
+        <button type="button" className="btn btn-danger btn-sm" disabled={pending || line.keepsStock}
+          title={line.keepsStock ? 'Some of its stock already left the shelf, so the line stays.' : undefined}
           onClick={(e) => {
             if (!window.confirm('Remove this line from the delivery? Its stock leaves the expiry board.')) return;
             const form = e.currentTarget.form;

@@ -145,7 +145,11 @@ export default async function ManageDeliveryPage(props: PageProps<'/manage/deliv
                     qtyDocketed: l.qty_docketed,
                     qtyReceived: l.qty_received,
                     trackingMode: l.products?.tracking_mode ?? 'none',
-                    batches: sortedBatches(l).map((b) => ({
+                    // Stock that already left the shelf keeps the line on the delivery.
+                    keepsStock: (l.stock_batches ?? []).some((b) => b.qty_remaining < b.qty_received)
+                      || (l.products?.tracking_mode !== 'batch' && (l.stock_batches ?? []).length > 0),
+                    // A product no longer dated keeps its old batches, closed out and not editable.
+                    batches: l.products?.tracking_mode !== 'batch' ? [] : sortedBatches(l).map((b) => ({
                       id: b.id,
                       expiryDate: b.expiry_date,
                       qty: b.qty_received,
