@@ -31,8 +31,8 @@ key and bypasses RLS; they run on a cron, not in a request.
 src/
   app/                         Next.js App Router
     (portal)/                  authenticated shell; layout gates the session
-      app/                       staff PWA  — deliveries, today, expiry board, scan, waste, settings
-      manage/                    manager    — delivery review, expiry board, waste, products, reminder settings
+      app/                       staff PWA  — deliveries, today, expiry board, scan, waste, messages, settings
+      manage/                    manager    — delivery review, expiry board, waste, products, reminder settings, messages
       owner/                     owner      — multi-site rollup + CSV export route
       admin/                     platform admin — organisations, lifecycle, job history
     login/                     one public route (+ demo one-click logins)
@@ -44,6 +44,7 @@ src/
                                expected lines, expiry proposal
     expiry/                    the engine's rules (re-exported from _shared), reminder text,
                                Today wording, board columns + the board's windowed loader
+    messages/                  manager → staff site messages: validation, read summaries, loaders, actions
     offline/                   Dexie outbox + framework-free queue semantics
     products/                  tracking-mode resolution, product mutations
     analytics/                 waste/rollup aggregation for the dashboards
@@ -232,6 +233,20 @@ when the tab becomes visible after at least a minute hidden (`refreshOnReturn()`
 restored from the back/forward cache. It notes a timestamp on hide rather than running a
 timer, so an idle, visible tab does no work.
 
+**Site messages** ([src/lib/messages/](../src/lib/messages)) use the same delivery: no push, no
+polling, no realtime subscription. A manager inserts a `site_messages` row for their site; staff
+acknowledge with a `site_message_reads` row (primary key `(message_id, user_id)`, written with
+`ignoreDuplicates` so a double tap needs no update permission). `loadStaffMessages()` is cached per
+request on plain ids, so the portal layout (unread notes above every staff page,
+[message-notices.tsx](../src/components/message-notices.tsx)) and the Shift and Messages pages
+share one read. The actions call `refresh()` from `next/cache`, which re-renders the layout too,
+so a note leaves the screen as soon as it is acknowledged. Notes render inline at the top of the
+page, never floating, so they don't cover the reminder pop-up or the bottom tabs. RLS: everyone at
+the site reads messages; only `can_manage_site` at that site inserts (as themselves, `sent_by =
+auth.uid()`) or deletes; there is no update. A reader sees only their own read rows; the site's
+manager or owner sees all of them. `require_active_org_write` stops an archived organisation
+sending.
+
 ---
 
 ## UI and theming
@@ -370,7 +385,8 @@ barcode, plus each organisation's own products added from dockets, which carry `
 makes v2 reconciliation need no migration; `unit_cost` is the unit price read off the docket when
 the reader is certain of it), `stock_batches` (`checked_at` / `marked_down_at` record staff
 answers), `reminder_settings` (one row per site that changed the defaults), `expiry_actions`, `rotation_checks`,
-`waste_events`, `job_runs`, `audit_log`. (`push_subscriptions` was dropped in
+`waste_events`, `job_runs`, `audit_log`, `site_messages` and `site_message_reads` (manager notes to
+staff and who has read them). (`push_subscriptions` was dropped in
 `20261005000001` when reminders moved in-app.)
 
 `memberships` is `unique nulls not distinct (user_id, org_id, site_id)`. Organisation-wide
@@ -388,7 +404,7 @@ and cron agree on what counts as `rotation`.
 
 | Command | Needs a DB? | Covers |
 |---|---|---|
-| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, reminder text and who sees it, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
+| `npm test` | no | pure logic — GTIN check digits, tracking resolution, reminder plans and settings, Today card wording, expiry board columns, reminder text and who sees it, site message validation and read summaries, intake proposal, outbox queue and sync single-flight, barcode camera release on stop, docket parsing (incl. the real Bega table and unit prices), OCR contrast range, supplier recognition, intake rules (`plan.ts`: linking, closing, screen payload, docket unit cost), line-by-line intake navigation (`walk.ts`), theme cookie parsing |
 | `npm run test:rls` | **yes** (seeded) | cross-organisation isolation — the release gate |
 | `npx tsc --noEmit` | no | strict types |
 | `npm run build` | no | production build |

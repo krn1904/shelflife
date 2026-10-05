@@ -468,6 +468,103 @@ async function main() {
     await admin.from('reminder_settings').delete().in('site_id', [brunswick.id, coburg.id]);
   }
 
+  console.log('\nsite messages:');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    const preston = await signIn('preston.staff@metro-petroleum.test');
+    const { data: { user: staffUser } } = await staff.auth.getUser();
+    const { data: { user: prestonUser } } = await preston.auth.getUser();
+    // Cleared first in case an earlier run stopped part-way.
+    await admin.from('site_messages').delete().in('site_id', [brunswick.id, coburg.id]);
+
+    const brunswickManager = await signIn('manager@metro-petroleum.test');
+    const { data: { user: managerUser } } = await brunswickManager.auth.getUser();
+    const { data: sent, error: sendError } = await brunswickManager.from('site_messages')
+      .insert({ org_id: metro.id, site_id: brunswick.id, body: 'RLS check: fridge 3 off at 2pm', sent_by: managerUser!.id })
+      .select('id').single();
+    check('a manager can message their own site\'s staff', sendError === null && !!sent, sendError?.message ?? '');
+
+    const { error: otherSite } = await brunswickManager.from('site_messages')
+      .insert({ org_id: metro.id, site_id: coburg.id, body: 'RLS check', sent_by: managerUser!.id });
+    check('but not another site\'s, even in the same organisation', otherSite !== null,
+      otherSite ? '' : 'insert unexpectedly succeeded');
+
+    const { error: forged } = await brunswickManager.from('site_messages')
+      .insert({ org_id: metro.id, site_id: brunswick.id, body: 'RLS check', sent_by: staffUser!.id });
+    check('nor send one in someone else\'s name', forged !== null, forged ? '' : 'insert unexpectedly succeeded');
+
+    const { error: blank } = await brunswickManager.from('site_messages')
+      .insert({ org_id: metro.id, site_id: brunswick.id, body: '   ', sent_by: managerUser!.id });
+    check('an empty message is refused by the table', blank !== null, blank ? '' : 'insert unexpectedly succeeded');
+
+    const { error: staffSend } = await staff.from('site_messages')
+      .insert({ org_id: metro.id, site_id: brunswick.id, body: 'RLS check', sent_by: staffUser!.id });
+    check('staff cannot send messages', staffSend !== null, staffSend ? '' : 'insert unexpectedly succeeded');
+
+    const { data: staffSees } = await staff.from('site_messages').select('id').eq('id', sent!.id);
+    check('staff at the site can read it', staffSees?.length === 1);
+
+    const { data: prestonSees } = await preston.from('site_messages').select('id').eq('id', sent!.id);
+    check('staff at another site cannot', (prestonSees?.length ?? 0) === 0, `saw ${prestonSees?.length}`);
+
+    const { data: foreignSees } = await other.from('site_messages').select('id').eq('id', sent!.id);
+    check('another organisation cannot see it', (foreignSees?.length ?? 0) === 0);
+
+    const { error: planted } = await other.from('site_messages')
+      .insert({ org_id: united.id, site_id: brunswick.id, body: 'RLS check', sent_by: managerUser!.id });
+    check('nor plant a message at a foreign site under its own org_id', planted !== null,
+      planted ? '' : 'insert unexpectedly succeeded');
+
+    const { error: ack } = await staff.from('site_message_reads')
+      .insert({ message_id: sent!.id, user_id: staffUser!.id });
+    check('staff can mark it read for themselves', ack === null, ack?.message ?? '');
+
+    const { error: ackTwice } = await staff.from('site_message_reads')
+      .upsert({ message_id: sent!.id, user_id: staffUser!.id }, { onConflict: 'message_id,user_id', ignoreDuplicates: true });
+    check('marking it read twice is harmless', ackTwice === null, ackTwice?.message ?? '');
+
+    const { error: ackForOther } = await staff.from('site_message_reads')
+      .insert({ message_id: sent!.id, user_id: prestonUser!.id });
+    check('but not for someone else', ackForOther !== null, ackForOther ? '' : 'insert unexpectedly succeeded');
+
+    const { error: ackUnseen } = await preston.from('site_message_reads')
+      .insert({ message_id: sent!.id, user_id: prestonUser!.id });
+    check('nor read a message they cannot see', ackUnseen !== null, ackUnseen ? '' : 'insert unexpectedly succeeded');
+
+    const { data: managerReads } = await brunswickManager.from('site_message_reads')
+      .select('user_id').eq('message_id', sent!.id);
+    check('the manager sees who has read it', managerReads?.length === 1 && managerReads[0].user_id === staffUser!.id,
+      `got ${JSON.stringify(managerReads)}`);
+
+    // A second staff member at Brunswick reads it too; the first must not see that.
+    await admin.from('site_message_reads').insert({ message_id: sent!.id, user_id: managerUser!.id });
+    const { data: staffReads } = await staff.from('site_message_reads').select('user_id').eq('message_id', sent!.id);
+    check('staff see only their own read, not anyone else\'s',
+      staffReads?.length === 1 && staffReads[0].user_id === staffUser!.id, `got ${staffReads?.length}`);
+
+    const { data: staffDelete } = await staff.from('site_messages').delete().eq('id', sent!.id).select('id');
+    check('staff cannot delete a message', (staffDelete?.length ?? 0) === 0, `deleted ${staffDelete?.length}`);
+
+    const { data: managerDelete } = await brunswickManager.from('site_messages').delete().eq('id', sent!.id).select('id');
+    const { count: readsLeft } = await admin.from('site_message_reads')
+      .select('*', { count: 'exact', head: true }).eq('message_id', sent!.id);
+    check('the manager can delete it, and its reads go with it',
+      managerDelete?.length === 1 && readsLeft === 0, `deleted ${managerDelete?.length}, ${readsLeft} reads left`);
+
+    const archived = await signIn('owner@liberty-oil.test');
+    const { data: { user: archivedUser } } = await archived.auth.getUser();
+    const { data: libertySite } = await admin.from('sites').select('id, org_id')
+      .eq('org_id', orgs!.find((o) => o.slug === 'liberty-oil')!.id).limit(1).single();
+    const { error: archivedSend } = await archived.from('site_messages')
+      .insert({ org_id: libertySite!.org_id, site_id: libertySite!.id, body: 'RLS check', sent_by: archivedUser!.id });
+    check('an archived organisation cannot send messages', archivedSend !== null,
+      archivedSend ? '' : 'insert unexpectedly succeeded');
+
+    await admin.from('site_messages').delete().in('site_id', [brunswick.id, coburg.id]);
+  }
+
   console.log('\norganisation lifecycle:');
   {
     const platform = await signIn('admin@shelflife.test');
@@ -878,7 +975,7 @@ async function main() {
   console.log('\nanonymous (no session):');
   {
     const anon = createClient<Database>(URL, ANON);
-    for (const table of ['orgs', 'sites', 'suppliers', 'memberships', 'products'] as const) {
+    for (const table of ['orgs', 'sites', 'suppliers', 'memberships', 'products', 'site_messages', 'site_message_reads'] as const) {
       const { data } = await anon.from(table).select('*');
       check(`anon reads zero rows from ${table}`, (data?.length ?? 0) === 0, `got ${data?.length}`);
     }

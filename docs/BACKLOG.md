@@ -5,6 +5,22 @@ is already known, so it can be picked up without re-deriving the context.
 
 ---
 
+## Site messages: replies, and staff who join later
+
+**Built (2026-10-05):** a manager's note to everyone on staff at a site, acknowledged with Got it,
+with *Read by N of M* on the manager's side. Chosen deliberately as one-way.
+
+Open questions, not decided:
+
+- **Replies.** A thread per message (staff answer, manager answers back) was considered and left
+  out. It would need a `site_message_replies` table with the same site-scoped RLS, and a way for
+  the manager to notice a reply, since nothing is pushed.
+- **New staff inherit old notes.** A staff member added to a site sees every unread message in
+  the last 50, including ones written before they joined. Filtering to messages sent after their
+  membership was created is a one-line change in `loadStaffMessages()`, if that is wanted.
+
+---
+
 ## Supplier overview for managers
 
 **Asked for:** a detailed manager screen, built with the manager portal work, not a bare

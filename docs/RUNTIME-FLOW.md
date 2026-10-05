@@ -10,6 +10,7 @@ How the app works end-to-end, one line per step. For the code-level map see
 5. **Confirm dates** — `proposeExpiry()` suggests one date per SKU line (from observed supplier shelf life, else catalogue default); staff tap to confirm → one `stock_batch` per line.
 6. **Nightly 02:00 (expiry-engine)** — auth via `x-cron-secret`, read active batches, read each site's `reminder_settings`, `planExpiryActions()` gives each batch at most one reminder from its shelf-life group (fixed on arrival) and what staff already answered, delete-and-regenerate all `open` `expiry_actions`, upsert today's rotation checks through organisation-locked RPCs that skip archives → write a `job_runs` row.
 7. **Staff or manager opens the app** — `loadReminders()` counts what is due today at their site (same filters as Today); the home screen shows a banner (red last day / amber half price / grey checks), a pop-up until Open or Later that day, and staff get a count on the Today tab. Owners and admins see none of it; nothing due → nothing shown.
+7a. **Manager messages staff** — Site → Message staff inserts a `site_messages` row for the site. Each staff member there sees it above every page until they tap Got it (a `site_message_reads` row); the manager's list shows who has read it. Nothing is pushed: it shows on the next page load or return to the app.
 8. **Act on the list** — staff answer "Today" in one tap: Check → *Checked*; Half price → *Reduced price* / *Gone*; Last day → *Pulled out* (how many binned) / *Sold*, via `resolve_batch_step()`. They also tick rotation fixtures.
 8a. **Expiry board** — `/app/board` (staff) and `/manage/expiry` (managers, any of their sites) render the same interactive board: `buildBoard()` puts today's open reminders in Last day / Half price / Check (exactly the Today list), marked-down stock in On half price, and the rest within the site's early-check days in Coming up. Same one-tap answers, plus *Sold out* for stock that went early.
 9. **Record waste** — *Pulled out* writes expired waste automatically (site cost, else the docket's unit price). There is no separate write-off screen.
@@ -22,6 +23,6 @@ How the app works end-to-end, one line per step. For the code-level map see
 | Route | Role | Purpose |
 |---|---|---|
 | `/app` | staff | The phone PWA — receive deliveries, today's list, expiry board, rotation checks |
-| `/manage` | manager | One site — delivery review, expiry board, waste log, product/par settings, reminder settings |
+| `/manage` | manager | One site — delivery review, expiry board, waste log, product/par settings, reminder settings, messages to staff |
 | `/owner` | owner | Multi-site rollup, waste league table, trend charts, CSV export |
 | `/admin` | platform_admin | All organisations — lifecycle, catalogue moderation, `job_runs` history |
