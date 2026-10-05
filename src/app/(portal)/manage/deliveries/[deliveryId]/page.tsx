@@ -23,19 +23,20 @@ const PHOTO_LINK_SECONDS = 15 * 60;
  * changed since.
  */
 export default async function ManageDeliveryPage(props: PageProps<'/manage/deliveries/[deliveryId]'>) {
-  await requireRole('manager');
+  const session = await requireRole('manager');
   const { deliveryId } = await props.params;
   const supabase = await createClient();
 
   // RLS limits this to the manager's own sites: someone else's delivery reads as not found.
   const { data: delivery } = await supabase
     .from('deliveries')
-    .select('id, status, docket_number, docket_photo_path, docket_reading, received_by, received_at, created_at, closed_at, suppliers(name), sites(name, timezone)')
+    .select('id, site_id, status, docket_number, docket_photo_path, docket_reading, received_by, received_at, created_at, closed_at, suppliers(name), sites(name, timezone)')
     .eq('id', deliveryId)
     .maybeSingle();
   if (!delivery) notFound();
 
-  const timeZone = delivery.sites?.timezone ?? 'Australia/Melbourne';
+  // The joined site, or the same site from the session if the join came back empty.
+  const timeZone = delivery.sites?.timezone ?? session.sites.find((s) => s.id === delivery.site_id)?.timeZone ?? 'UTC';
   const [{ data: lines }, { data: receiver }, photo] = await Promise.all([
     supabase
       .from('delivery_lines')

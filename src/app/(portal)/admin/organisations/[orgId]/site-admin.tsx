@@ -3,6 +3,7 @@
 import { useActionState } from 'react';
 import { createSite, removeSite, type SiteFormState } from '@/lib/admin/actions';
 import { SubmitButton } from '@/components/submit-button';
+import { SiteTimezoneSelect } from '@/components/site-timezone-select';
 
 export type ManagedSite = { id: string; name: string; removable: boolean };
 
@@ -59,8 +60,8 @@ function AddSiteForm({ orgId }: { orgId: string }) {
           <input id="site_name" name="name" required placeholder="Brunswick" className="field mt-1" />
         </div>
         <div>
-          <label htmlFor="timezone" className="block text-sm font-medium">Timezone</label>
-          <input id="timezone" name="timezone" defaultValue="Australia/Melbourne" className="field mt-1" />
+          <label htmlFor="timezone" className="block text-sm font-medium">Where it is (sets the site&apos;s calendar)</label>
+          <SiteTimezoneSelect id="timezone" className="mt-1" />
         </div>
         <div className="sm:col-span-2">
           <label htmlFor="address" className="block text-sm font-medium">Address (optional)</label>
@@ -69,12 +70,12 @@ function AddSiteForm({ orgId }: { orgId: string }) {
       </div>
 
       {state.status === 'error' && (
-        <p className="mt-3 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+        <p className="mt-3 alert alert-critical">
           {state.message}
         </p>
       )}
       {state.status === 'created' && (
-        <p className="mt-3 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+        <p className="mt-3 alert alert-good">
           Site created.
         </p>
       )}

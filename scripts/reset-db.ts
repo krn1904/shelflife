@@ -71,7 +71,10 @@ async function preflight() {
   // Update it when a migration the seed depends on is added.
   const { error: columns } = await admin.from('orgs').select('status, archived_at').limit(1);
   const { error: latest } = await admin.rpc('insert_active_expiry_actions', { p_actions: [] });
-  const error = columns ?? latest;
+  // Reminder plans (20261002000001): the seed writes a site's settings and staff answers.
+  const { error: reminders } = await admin.from('stock_batches').select('marked_down_at').limit(1);
+  const { error: settings } = await admin.from('reminder_settings').select('site_id').limit(1);
+  const error = columns ?? latest ?? reminders ?? settings;
   if (error) {
     throw new Error(
       `the database is missing migrations (${error.message}).\n` +
@@ -108,10 +111,11 @@ async function wipe() {
   // is not guaranteed to succeed.
   for (const table of [
     'waste_events', 'expiry_actions', 'rotation_checks', 'stock_batches', 'delivery_lines',
-    'deliveries', 'site_products', 'supplier_aliases', 'suppliers', 'push_subscriptions', 'memberships', 'sites',
+    'deliveries', 'site_products', 'reminder_settings', 'supplier_aliases', 'suppliers', 'push_subscriptions', 'memberships', 'sites',
     'audit_log', 'job_runs', 'orgs', 'products',
   ] as const) {
-    await deleteAll(table);
+    // reminder_settings is keyed by its site, so it has no id column.
+    await deleteAll(table, table === 'reminder_settings' ? 'site_id' : 'id');
   }
 
   // Everyone, not just the seed accounts: people added through the admin portal or by the
@@ -158,6 +162,7 @@ async function writeOrg(plan: OrgPlan, ids: Map<string, string>) {
   await insertAll('memberships', r(plan.memberships));
   await insertAll('suppliers', plan.suppliers);
   await insertAll('site_products', plan.siteProducts);
+  await insertAll('reminder_settings', r(plan.reminderSettings));
   await insertAll('deliveries', r(plan.deliveries));
   await insertAll('delivery_lines', plan.deliveryLines);
   await insertAll('stock_batches', plan.batches);

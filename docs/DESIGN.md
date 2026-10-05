@@ -108,10 +108,10 @@ borders that used `line-strong` (about 1.5:1).
 | `.field` | globals.css | `field-border` edge, focus colour on focus |
 | `.card`, `.badge-*`, `.alert-*`, `.table` | globals.css | alerts replace hand-rolled bordered error/notice boxes |
 | `.pill` + `-critical` / `-warning` / `-neutral` / `-quiet` | globals.css | mono status pill for days left and actions |
-| `daysLeftTone`, `actionTone`, `daysLeftShort`, `daysLeftText`, `orderForShift` | [src/lib/expiry/display.ts](../src/lib/expiry/display.ts) | one source for how dated stock is shown, so Today and the Expiry board agree |
+| `ReminderCard` (+ `featured`, `compact`) | [src/components/reminder-card.tsx](../src/components/reminder-card.tsx) | Today and Expiry board cards: status pill (Last day red, Half price amber, Check graphite), name, instruction, one-tap answers. Wording and order come from [today.ts](../src/lib/expiry/today.ts) and [board.ts](../src/lib/expiry/board.ts) |
 | `stepLine`, `linePosition` | [src/lib/intake/walk.ts](../src/lib/intake/walk.ts) | moving through a delivery one line at a time |
 | `ThemePicker` | [src/components/theme-picker.tsx](../src/components/theme-picker.tsx) | System / Light / Dark |
-| `BottomTabs` + `SHIFT_TABS` | [bottom-tabs.tsx](../src/components/bottom-tabs.tsx), [shift-tabs.ts](../src/components/shift-tabs.ts) | staff only. Bottom tabs below `sm`; the same links sit in the header from `sm` up |
+| `BottomTabs` + `SHIFT_TABS` | [bottom-tabs.tsx](../src/components/bottom-tabs.tsx), [shift-tabs.ts](../src/components/shift-tabs.ts) | staff only: Shift, Today, Receive, Board, Scan. Bottom tabs below `sm`; the same links sit in the header from `sm` up |
 | `PortalShell` / `PortalNav` | src/components | active tab is a `surface-2` pill; on a phone the portal tabs take their own row |
 | `Stat` | src/components/stat.tsx | mono value; `tone` is `brand` / `warning` / `critical`. Four-tile rows are two columns on a phone |
 
@@ -126,12 +126,11 @@ writes them as SVG attributes that CSS overrides. Tooltips use `TOOLTIP_STYLE` f
 ### Staff (phone first)
 
 1. **Today** (`/app/today`)
-   - An "x of y done" progress bar: one segment per task up to 12, a plain bar beyond that.
-   - **Next up** is the most urgent open item (pulls, then mark-downs, then checks, soonest
-     first) as a large card. Tapping any row below promotes it and scrolls the card into
-     view.
+   - Answers, wording and order come from the reminder plans (`today.ts`, `byUrgency`):
+     Last day, then Half price, then Check.
+   - **Next up** is the most urgent card in the larger `featured` size; the rest follow under
+     **Then**. Every answer is one tap and works offline (`sendOrQueue`).
    - **Walk past**: fixtures as tick chips.
-   - The optimistic hide and rollback behaviour is unchanged.
 2. **Receive delivery** (`/app/deliveries/[deliveryId]`)
    - **One line at a time** by default: "Line n of N" with a progress bar, a focus card with
      56px steppers, ← previous and **Next line**, and a numbered list of every line below
@@ -141,24 +140,26 @@ writes them as SVG attributes that CSS overrides. Tooltips use `TOOLTIP_STYLE` f
      row there, with the counts underneath.
    - The server actions, docket handling, catalogue search and payload are unchanged; both
      views render the same state.
-3. **Receive start, deliveries list, Waste, Scan, Settings**: rethemed. The docket OCR test
+3. **Receive start, deliveries list, Scan, Settings**: rethemed. Staff Waste moved into Scan and Today with the reminder-plans work, so its tab became Board. The docket OCR test
    bench was removed once docket reading was settled.
    The deliveries list rows are restacked for phones.
 
 ### Manager, owner and admin (desktop first, work at phone width)
 
-4. **Expiry board** (`/manage/expiry`): one table grouped by bucket, with link-based filter
-   buttons that show counts and keep the chosen site. It fetches only what it shows:
-   - every overdue, due-today and within-7-days batch;
-   - the first 20 batches 8–30 days out, with "Show all" (capped at 500), counted by the
-     database;
-   - batches more than 30 days out as a count line only.
+4. **Expiry board** (`/manage/expiry`, and `/app/board` for staff): the reminder board from
+   the reminder-plans work. "Needs an answer today" (Last day, Half price, Check) takes the
+   same answers as Today; "Looking ahead" shows On half price and Coming up. Column markers
+   match the pill colours.
 
-   The date lines come from `boardWindow()` in `display.ts`, tested against the bucket edges.
-   Loading every dated batch used to build about 6,400 elements with the seed data; the board
-   is now about 560. Days left sits beside the product name
-   so it never scrolls off a phone. The expiry date and the "Date never confirmed" note move
-   under the name on small screens.
+   [board-data.ts](../src/lib/expiry/board-data.ts) fetches only what can appear as a
+   card:
+   - every batch with an open reminder today, however far out;
+   - batches dated up to the end of the look-ahead window;
+   - batches already on half price.
+
+   Everything else is a database count ("N more dated batches expire later"). It used to
+   download every dated batch at the site, about 400–500 per demo site; it now loads about
+   30–50, with the same cards in the same columns (checked on all three demo sites).
 5. **Delivery review** (`/manage/deliveries/[id]`): on a phone the table keeps Product,
    Against the docket (with "received of docketed") and Expiry. Docket and Received columns
    join from `sm` up.

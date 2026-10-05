@@ -19,7 +19,7 @@ export type SessionMembership = {
   role: AppRole;
 };
 
-export type SessionSite = { id: string; name: string; orgId: string };
+export type SessionSite = { id: string; name: string; orgId: string; timeZone: string };
 
 export type Session = {
   userId: string;
@@ -63,7 +63,7 @@ export async function getSession(): Promise<Session | null> {
     supabase.from('memberships')
       .select('org_id, site_id, role, orgs(name, slug)')
       .eq('user_id', user.id),
-    supabase.from('sites').select('id, name, org_id'),
+    supabase.from('sites').select('id, name, org_id, timezone'),
     supabase.from('profiles').select('full_name').eq('id', user.id).maybeSingle(),
   ]);
 
@@ -87,7 +87,7 @@ export async function getSession(): Promise<Session | null> {
     email: user.email ?? '',
     fullName: profile?.full_name ?? null,
     memberships: rows,
-    sites: (sites ?? []).map((s) => ({ id: s.id, name: s.name, orgId: s.org_id })),
+    sites: (sites ?? []).map((s) => ({ id: s.id, name: s.name, orgId: s.org_id, timeZone: s.timezone })),
     primaryRole,
   };
 }

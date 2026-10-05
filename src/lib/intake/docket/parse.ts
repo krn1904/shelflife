@@ -53,6 +53,8 @@ export type DocketLine = {
   code: string | null;
   /** The OCR engine was unsure of this row's description or quantities (Textract only). */
   unsure?: boolean;
+  /** Price of one unit as printed, when a table column makes that certain (Textract only). */
+  unitPrice?: number | null;
 };
 
 export type LineVerdict =
@@ -459,7 +461,11 @@ export type TableCell = { text: string; confidence: number; header?: boolean };
 // Below this Textract confidence, a row is worth a second look.
 const SURE_AT = 80;
 
-type ColumnRole = Column | 'description' | 'code' | null;
+// unitPrice: "Unit Price", "Price Each". price: a bare "Price", which may be per unit or
+// the line total. amount: the line total ("Amount", "Ext", "Total").
+type PriceRole = 'unitPrice' | 'price' | 'amount';
+type ColumnRole = Column | PriceRole | 'description' | 'code' | null;
+const isPriceRole = (role: ColumnRole): role is PriceRole => role === 'unitPrice' || role === 'price' || role === 'amount';
 
 function roleOf(heading: string): ColumnRole {
   const t = heading.toLowerCase();
@@ -471,6 +477,13 @@ function roleOf(heading: string): ColumnRole {
   // "Delivery #", "Invoice No": a reference number, not a quantity column.
   if (/#|\bno\.?$|\bnumber\b/.test(t)) return null;
   if (/\bproduct\b/.test(t)) return 'description';
+  // Money columns, checked before quantities so "Unit Price" is not read as a units count.
+  // A quantity word wins ("Total Delivered", "Total Qty"); "Order Total" is still money.
+  const countWord = t.split(/[\s/|.]+/).some((word) =>
+    COLUMN_WORDS.some(([column, re]) => column !== 'ordered' && re.test(word.replace(/[^a-z]/g, ''))));
+  if (/\b(amount|amt|total|ext\w*|value|nett?)\b/.test(t) && !countWord) return 'amount';
+  if (/\bunit\s*(price|cost)\b|\b(price|cost)\s*(ea|each|per\b.*)\b|\brate\b/.test(t)) return 'unitPrice';
+  if (/\b(price|cost)\b/.test(t)) return 'price';
   for (const word of t.split(/[\s/|.]+/)) {
     const hit = COLUMN_WORDS.find(([, re]) => re.test(word.replace(/[^a-z]/g, '')));
     if (hit) return hit[0];
@@ -488,12 +501,41 @@ function countIn(text: string): number | null {
   return m ? Number(m[1]) : null;
 }
 
+/** Money in a cell: "$3.20", "3.20", "1,250.00". Whole numbers are not prices here. */
+function moneyIn(text: string): number | null {
+  const m = text.replace(/\s/g, '').match(/^\$?(\d{1,3}(?:,\d{3})*|\d+)\.(\d{2})$/);
+  return m ? Number(`${m[1].replace(/,/g, '')}.${m[2]}`) : null;
+}
+
+/**
+ * The price of one unit, only when the table makes it certain. A "Unit Price" column is
+ * taken as is; a bare "Price" only when an amount column proves it is per unit. When an
+ * amount is printed, price × quantity must match it, which also catches carton prices
+ * beside a unit count. Anything doubtful is null: no price beats a wrong one.
+ */
+function unitPriceOf(
+  cells: Partial<Record<PriceRole, number | null>>,
+  qty: number | null,
+  qtyFromCartons: boolean,
+): number | null {
+  const amount = cells.amount ?? null;
+  const price = cells.unitPrice ?? (amount !== null ? cells.price ?? null : null);
+  if (price === null || price <= 0) return null;
+  if (amount !== null) {
+    if (!qty) return null;
+    return Math.abs(price * qty - amount) <= Math.max(0.02, amount * 0.01) ? price : null;
+  }
+  // No amount to check against, and the count was worked out from cartons: the price is
+  // probably per carton, so leave it.
+  return qtyFromCartons ? null : price;
+}
+
 /** True when a table's heading row looks like a product table's. */
 export function isProductTable(rows: TableCell[][]): boolean {
   const heading = rows.findIndex(headingLike);
   if (heading < 0) return false;
   const roles = rows[heading].map((c) => roleOf(c.text));
-  return roles.includes('description') || (roles.some((r) => r && r !== 'code') && rows.length - heading > 1);
+  return roles.includes('description') || (roles.some((r) => r && r !== 'code' && !isPriceRole(r)) && rows.length - heading > 1);
 }
 
 export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[], options: ParseOptions = {}): DocketParse {
@@ -525,8 +567,10 @@ export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[]
 
     const desc = row[description]?.text.trim() ?? '';
     const found: Partial<Record<Column, number | null>> = {};
+    const money: Partial<Record<PriceRole, number | null>> = {};
     roles.forEach((role, c) => {
-      if (role && role !== 'description' && role !== 'code') found[role] ??= countIn(row[c]?.text ?? '');
+      if (isPriceRole(role)) money[role] ??= moneyIn(row[c]?.text ?? '');
+      else if (role && role !== 'description' && role !== 'code') found[role] ??= countIn(row[c]?.text ?? '');
     });
     const counts = Object.values(found).filter((n) => n !== null && n !== undefined);
     const codeCell = roles.indexOf('code');
@@ -553,7 +597,7 @@ export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[]
 
     const quantity = orderedAndSupplied(found, handFilled);
     const { pack, size } = packOf(normalise(desc));
-    const qtyCells = roles.map((r, c) => (r && r !== 'code' ? c : -1)).filter((c) => c >= 0);
+    const qtyCells = roles.map((r, c) => (r && r !== 'code' && !isPriceRole(r) ? c : -1)).filter((c) => c >= 0);
     const unsure = qtyCells.some((c) => row[c]?.text && row[c].confidence < SURE_AT);
     const product = barcode
       ? { id: barcode.id, name: barcode.name, confidence: 1, via: 'barcode' as const }
@@ -566,6 +610,7 @@ export function parseDocketTable(rows: TableCell[][], catalogue: CatalogueItem[]
       confidence: Number(product.confidence.toFixed(2)), via: product.via,
       pack, size, ordered: quantity.ordered, supplied: quantity.supplied, qtyHow: quantity.how,
       cartons: found.cartons ?? null, eaches: found.eaches ?? null, check: null, code, unsure,
+      unitPrice: unitPriceOf(money, quantity.supplied ?? quantity.ordered, quantity.how === 'from cartons'),
     });
     verdicts.push({ index: i, text, kept: true, lineIndex: lines.length - 1 });
   });

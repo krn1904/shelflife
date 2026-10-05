@@ -6,6 +6,24 @@
 const TARGET_WIDTH = 2400;
 
 /**
+ * The 1st and 99th percentile grey levels. Counted in a 256-slot histogram rather than by
+ * sorting a copy: same answer, without a second photo-sized array on a phone.
+ */
+export function contrastRange(grey: Uint8ClampedArray): { lo: number; hi: number } {
+  const counts = new Uint32Array(256);
+  for (const v of grey) counts[v]++;
+  const valueAt = (index: number) => {
+    let seen = 0;
+    for (let v = 0; v < 256; v++) {
+      seen += counts[v];
+      if (seen > index) return v;
+    }
+    return 255;
+  };
+  return { lo: valueAt(Math.floor(grey.length * 0.01)), hi: valueAt(Math.floor(grey.length * 0.99)) };
+}
+
+/**
  * Enlarge, greyscale and stretch the contrast before OCR. On a real docket photo this took
  * the printed quantities from partly read to all read: phone photos are often too small
  * for Tesseract to separate digits from the table rules beside them.
@@ -26,9 +44,7 @@ async function cleanUp(file: Blob): Promise<Blob> {
   const grey = new Uint8ClampedArray(px.length / 4);
   for (let i = 0; i < grey.length; i++) grey[i] = 0.299 * px[i * 4] + 0.587 * px[i * 4 + 1] + 0.114 * px[i * 4 + 2];
   // Stretch between the 1st and 99th percentile, so shadows and grey paper stop muting ink.
-  const sorted = Uint8ClampedArray.from(grey).sort();
-  const lo = sorted[Math.floor(sorted.length * 0.01)];
-  const hi = sorted[Math.floor(sorted.length * 0.99)];
+  const { lo, hi } = contrastRange(grey);
   const range = Math.max(1, hi - lo);
   for (let i = 0; i < grey.length; i++) {
     const v = ((grey[i] - lo) * 255) / range;

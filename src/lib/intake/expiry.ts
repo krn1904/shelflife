@@ -1,5 +1,6 @@
 import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { ExpirySource } from '@/lib/supabase/types';
+import { localDate } from '@/lib/expiry/engine';
 
 // A shelf life outside this range is a data-entry accident, not a product. Observed
 // history that falls outside it is ignored in favour of the catalogue default.
@@ -72,6 +73,12 @@ export function proposeExpiry(input: {
 }
 
 /** Today at the site, as the date-only string the whole intake flow passes around. */
-export function today(): string {
-  return format(new Date(), 'yyyy-MM-dd');
+/**
+ * Today's date at a site, in the site's own timezone ("2026-10-03").
+ *
+ * Never the server's clock: the app runs on UTC servers, where the morning in Melbourne is
+ * still yesterday, so "expires in 1 day" would show on the expiry day until about 10am.
+ */
+export function todayIn(timeZone: string): string {
+  return localDate(new Date().toISOString(), timeZone);
 }

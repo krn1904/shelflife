@@ -23,7 +23,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
     fullName: 'Riley (demo staff)',
     role: 'staff',
     label: 'Staff',
-    blurb: 'The phone view: today’s list, receiving a delivery, scan to waste.',
+    blurb: 'The phone view: today’s list, the expiry board, receiving a delivery.',
   },
   {
     email: 'manager@demo.shelflife.app',

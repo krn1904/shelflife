@@ -14,20 +14,20 @@ import { requireSession } from '@/lib/auth/session';
  */
 export type ReplayReply = { ok: true } | { ok: false; permanent: boolean; message: string };
 
-const WastePayload = z.object({
-  batch_id: z.string().uuid(),
-  qty: z.coerce.number().int().positive().max(9999),
-  reason: z.enum(['expired', 'damaged', 'spoiled', 'recalled', 'staff_error', 'other']),
-  note: z.union([z.null(), z.string().max(280)]),
-});
-
 const StatePayload = z.object({
   id: z.string().uuid(),
   state: z.enum(['done', 'dismissed']),
 });
 
+const BatchStepPayload = z.object({
+  batch_id: z.string().uuid(),
+  step: z.enum(['checked', 'marked_down', 'sold', 'pulled']),
+  qty: z.union([z.null(), z.coerce.number().int().min(0).max(9999)]),
+});
+
 // Postgres classes we know will be rejected identically on every retry.
-const PERMANENT_CODES = new Set(['23514', '23503', '22P02', '42501', 'PGRST116']);
+// P0002 is "batch not found": gone, or another organisation's.
+const PERMANENT_CODES = new Set(['23514', '23503', '22P02', '42501', 'PGRST116', 'P0002']);
 
 function permanent(message: string): ReplayReply {
   return { ok: false, permanent: true, message };
@@ -45,25 +45,25 @@ export async function replayOutboxEntry(
     return permanent('That queued change had no valid id.');
   }
 
-  if (kind === 'waste') {
-    const parsed = WastePayload.safeParse(payload);
-    if (!parsed.success) return permanent('That queued write-off was malformed.');
+  if (kind === 'batch-step') {
+    const parsed = BatchStepPayload.safeParse(payload);
+    if (!parsed.success) return permanent('That queued answer was malformed.');
 
-    // client_id makes this safe to send twice: the function returns the existing row
-    // rather than decrementing the batch again.
-    const { error } = await supabase.rpc('record_waste', {
+    // client_id makes a replayed "pulled" write its waste once; the other steps are
+    // naturally safe to repeat.
+    const { error } = await supabase.rpc('resolve_batch_step', {
       p_batch_id: parsed.data.batch_id,
-      p_qty: parsed.data.qty,
-      p_reason: parsed.data.reason,
-      p_note: parsed.data.note ?? undefined,
+      p_step: parsed.data.step,
+      p_qty: parsed.data.qty ?? undefined,
       p_client_id: clientId,
     });
 
     if (error) {
-      const isPermanent = PERMANENT_CODES.has(error.code ?? '') || error.message.includes('cannot waste');
+      const isPermanent = PERMANENT_CODES.has(error.code ?? '') || error.message.includes('cannot pull');
       return { ok: false, permanent: isPermanent, message: error.message };
     }
 
+    revalidatePath('/app');
     revalidatePath('/app/today');
     return { ok: true };
   }

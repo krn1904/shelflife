@@ -15,21 +15,6 @@ export type WasteRow = {
   siteId: string;
 };
 
-export type ReasonTotal = { reason: WasteReason; qty: number; valueAud: number };
-
-export function wasteByReason(rows: WasteRow[]): ReasonTotal[] {
-  const totals = new Map<WasteReason, ReasonTotal>();
-
-  for (const row of rows) {
-    const current = totals.get(row.reason) ?? { reason: row.reason, qty: 0, valueAud: 0 };
-    current.qty += row.qty;
-    current.valueAud += row.valueAud ?? 0;
-    totals.set(row.reason, current);
-  }
-
-  return [...totals.values()].sort((a, b) => b.valueAud - a.valueAud || b.qty - a.qty);
-}
-
 export type MonthTotal = { month: string; label: string; valueAud: number };
 
 /**

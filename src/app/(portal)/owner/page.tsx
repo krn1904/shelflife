@@ -2,9 +2,8 @@ import Link from 'next/link';
 import { subMonths } from 'date-fns';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { today } from '@/lib/intake/expiry';
-import { siteLeague, wasteByMonth, wasteByReason, type WasteRow } from '@/lib/analytics/aggregate';
-import { WASTE_REASON_LABEL } from '@/lib/expiry/waste-reasons';
+import { todayIn } from '@/lib/intake/expiry';
+import { siteLeague, wasteByMonth, type WasteRow } from '@/lib/analytics/aggregate';
 import { formatAud } from '@/lib/charts/tokens';
 import { HorizontalBars } from '@/components/charts/bar-chart';
 import { TrendChart } from '@/components/charts/trend-chart';
@@ -16,7 +15,8 @@ const WINDOW_MONTHS = 6;
 export default async function OwnerPage() {
   const session = await requireRole('owner');
   const supabase = await createClient();
-  const asOf = today();
+  // An owner's sites normally share one zone; the group's months follow its first site.
+  const asOf = todayIn(session.sites[0]?.timeZone ?? 'UTC');
   const since = subMonths(new Date(asOf), WINDOW_MONTHS - 1).toISOString();
 
   // RLS scopes every one of these to the sites this owner can see, so there is no
@@ -42,7 +42,6 @@ export default async function OwnerPage() {
 
   const league = siteLeague(sites ?? [], rows);
   const byMonth = wasteByMonth(rows, WINDOW_MONTHS, asOf);
-  const byReason = wasteByReason(rows);
   const total = rows.reduce((sum, r) => sum + (r.valueAud ?? 0), 0);
   const thisMonth = byMonth[byMonth.length - 1]?.valueAud ?? 0;
 
@@ -91,18 +90,6 @@ export default async function OwnerPage() {
         </div>
       </section>
 
-      <section>
-        <SectionTitle>By reason</SectionTitle>
-        <div className="card p-4">
-          <HorizontalBars
-            data={byReason.map((r) => ({
-              label: WASTE_REASON_LABEL[r.reason],
-              value: r.valueAud,
-            }))}
-            emptyNote="Nothing written off yet."
-          />
-        </div>
-      </section>
     </div>
   );
 }

@@ -6,6 +6,7 @@ import {
   createOrganisation,
   type OrganisationFormState,
 } from '@/lib/admin/actions';
+import { SiteTimezoneSelect } from '@/components/site-timezone-select';
 
 export function AddOrganisationForm() {
   const [state, formAction, pending] = useActionState<OrganisationFormState, FormData>(
@@ -54,8 +55,8 @@ export function AddOrganisationForm() {
             <input name="site_name" required maxLength={120} placeholder="Brunswick" className="field mt-1" />
           </label>
           <label className="block text-sm font-medium">
-            Timezone
-            <input name="timezone" required defaultValue="Australia/Melbourne" className="field mt-1" />
+            Where it is (sets the site&apos;s calendar)
+            <SiteTimezoneSelect className="mt-1" />
           </label>
           <label className="block text-sm font-medium">
             Address (optional)
@@ -79,12 +80,12 @@ export function AddOrganisationForm() {
       </div>
 
       {state.status === 'error' && (
-        <p className="mt-4 rounded-lg border border-critical/30 bg-critical-soft px-3 py-2 text-sm text-critical">
+        <p className="mt-4 alert alert-critical">
           {state.message}
         </p>
       )}
       {state.status === 'created' && (
-        <div className="mt-4 rounded-lg border border-good/30 bg-good-soft px-3 py-2 text-sm text-good">
+        <div className="mt-4 alert alert-good">
           <p>
             Organisation created with <strong>{state.email}</strong> as owner.
           </p>

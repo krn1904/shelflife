@@ -13,7 +13,10 @@ import { addDays, differenceInCalendarDays, format, parseISO } from 'date-fns';
 import type { TablesInsert } from '../src/lib/supabase/database.types';
 import type { AppRole, TrackingMode, WasteReason } from '../src/lib/supabase/types';
 import { DEMO_LOGINS, DEMO_ORG_SLUG, DEMO_PASSWORD } from '../src/lib/demo/config';
-import { planExpiryActions, planRotationChecks, HORIZON_DAYS } from '../supabase/functions/_shared/engine';
+import {
+  DEFAULT_REMINDER_SETTINGS, HORIZON_DAYS, planExpiryActions, planRotationChecks, remindersFor, shelfLifeGroup,
+  type ReminderSettings,
+} from '../supabase/functions/_shared/engine';
 import { effectiveTrackingMode } from '../supabase/functions/_shared/tracking';
 import { SEED_CATALOGUE } from './seed-catalogue';
 
@@ -196,6 +199,8 @@ type OrgConfig = {
   archivedDaysAgo: number | null;
   admin: string;
   sites: SiteConfig[];
+  /** A site whose manager changed the reminder settings; every other site keeps the defaults. */
+  reminders?: { site: string; by: string; settings: Partial<ReminderSettings> };
   members: MemberConfig[];
   suppliers: SupplierConfig[];
 };
@@ -228,6 +233,8 @@ const ORGS: OrgConfig[] = [
     key: 'demo', name: 'BP Melbourne North (Demo)', slug: DEMO_ORG_SLUG, isDemo: true,
     createdDaysAgo: 250, historyDays: 240, adoptedDaysAgo: 90, rangeShare: 1,
     archivedDaysAgo: null, admin: 'demo-admin',
+    // Coburg treats up to 14 days as short-life and halves the price 3 days out.
+    reminders: { site: 'coburg', by: 'demo-coburg-manager', settings: { shortMaxDays: 14, shortMarkdownDays: 3 } },
     sites: [
       { key: 'brunswick', name: 'Brunswick', address: '212 Sydney Rd, Brunswick VIC 3056' },
       { key: 'coburg', name: 'Coburg', address: '480 Bell St, Coburg VIC 3058' },
@@ -343,6 +350,7 @@ export type OrgPlan = {
   batches: TablesInsert<'stock_batches'>[];
   expiryActions: TablesInsert<'expiry_actions'>[];
   rotationChecks: TablesInsert<'rotation_checks'>[];
+  reminderSettings: TablesInsert<'reminder_settings'>[];
   waste: TablesInsert<'waste_events'>[];
   audit: TablesInsert<'audit_log'>[];
 };
@@ -358,7 +366,7 @@ export type World = {
 /** Columns that hold a user key until the reset script resolves it to an auth id. */
 export const USER_COLUMNS = [
   'created_by', 'user_id', 'received_by', 'actioned_by', 'checked_by', 'wasted_by',
-  'actor_id', 'archived_by',
+  'actor_id', 'archived_by', 'updated_by',
 ] as const;
 
 const NON_EXPIRY_NOTES: Record<Exclude<WasteReason, 'expired' | 'recalled'>, string[]> = {
@@ -450,7 +458,7 @@ export function buildWorld(now: Date): World {
         archived_at: at(endDay, 16, 40), archived_by: config.admin,
       },
       sites: [], memberships: [], suppliers: [], siteProducts: [], deliveries: [],
-      deliveryLines: [], batches: [], expiryActions: [], rotationChecks: [], waste: [], audit: [],
+      deliveryLines: [], batches: [], expiryActions: [], rotationChecks: [], reminderSettings: [], waste: [], audit: [],
     };
 
     const siteIds = new Map(config.sites.map((s) => [s.key, uuid()]));
@@ -458,6 +466,20 @@ export function buildWorld(now: Date): World {
       id: siteIds.get(s.key)!, org_id: orgId, name: s.name, address: s.address,
       timezone: SITE_TIMEZONE, created_at: at(dayAgo(config.createdDaysAgo - i * 3), 10, 5),
     }));
+
+    // Reminder plans per site: the defaults, unless this org's config changed one site's.
+    const reminderSettings = new Map<string, ReminderSettings>();
+    if (config.reminders) {
+      const settings = { ...DEFAULT_REMINDER_SETTINGS, ...config.reminders.settings };
+      const siteId = siteIds.get(config.reminders.site)!;
+      reminderSettings.set(siteId, settings);
+      plan.reminderSettings.push({
+        site_id: siteId, org_id: orgId, updated_by: config.reminders.by,
+        short_max_days: settings.shortMaxDays, medium_max_days: settings.mediumMaxDays,
+        short_markdown_days: settings.shortMarkdownDays, medium_markdown_days: settings.mediumMarkdownDays,
+        long_check_days: settings.longCheckDays, long_markdown_days: settings.longMarkdownDays,
+      });
+    }
 
     const membershipIds = new Map<string, string>();
     for (const m of config.members) {
@@ -500,7 +522,7 @@ export function buildWorld(now: Date): World {
           detail: { email: USERS.find((u) => u.key === m.user)!.email, role: m.role } }));
 
     if (config.historyDays > 0) {
-      simulate(config, plan, orgId, siteIds, supplierIds, handsAt, endDay);
+      simulate(config, plan, orgId, siteIds, supplierIds, handsAt, endDay, reminderSettings);
     }
 
     return plan;
@@ -560,6 +582,7 @@ export function buildWorld(now: Date): World {
     supplierIds: Map<string, string>,
     handsAt: (siteKey: string) => string[],
     endDay: string,
+    reminderSettings: Map<string, ReminderSettings>,
   ) {
     const adoptionDay = dayAgo(config.adoptedDaysAgo);
     const firstDay = dayAgo(config.historyDays);
@@ -793,12 +816,45 @@ export function buildWorld(now: Date): World {
     // Last, so no write-off above can empty a column this fills.
     for (const batchesHere of batchesBySite) ensureBoardCoverage(batchesHere, endDay);
 
+    // Answers staff already gave on earlier days: some stock is on half price (its last-day
+    // card says since when), and some long-life checks are done. Only on days before today.
+    for (const { batch, expiry } of batchesBySite.flat()) {
+      if (batch.status !== 'active' || !batch.qty_remaining) continue;
+      const settings = reminderSettings.get(batch.site_id) ?? DEFAULT_REMINDER_SETTINGS;
+      const arrived = melbourneDate(new Date(batch.created_at!));
+      const group = shelfLifeGroup(arrived, expiry, settings);
+      const steps = remindersFor(group, settings);
+      const markdownDay = shiftDay(expiry, -steps.find((r) => r.action === 'markdown')!.daysBefore);
+      const checkStep = steps.find((r) => r.action === 'check');
+      const siteKey = config.sites.find((x) => siteIds.get(x.key) === batch.site_id)!.key;
+      const answered = (action: 'markdown' | 'check', day: string) => {
+        const when = at(day, between(7, 11), between(0, 59));
+        plan.expiryActions.push({
+          org_id: orgId, site_id: batch.site_id, batch_id: batch.id!, action, due_date: expiry,
+          state: 'done', actioned_by: pick(handsAt(siteKey)), actioned_at: when,
+        });
+        return when;
+      };
+
+      // Answered after it arrived and before today.
+      if (dayGap(endDay, markdownDay) > 0 && dayGap(markdownDay, arrived) >= 0 && chance(0.6)) {
+        batch.marked_down_at = answered('markdown', markdownDay);
+      } else if (checkStep && dayGap(endDay, shiftDay(expiry, -checkStep.daysBefore)) > 0 && chance(0.4)) {
+        batch.checked_at = answered('check', shiftDay(expiry, -checkStep.daysBefore));
+      }
+    }
+
     // What the engine would have put on today's list, via the engine's own rules.
     const open = planExpiryActions(
       plan.batches
         .filter((b) => b.status === 'active' && b.qty_remaining > 0)
-        .map((b) => ({ id: b.id!, orgId, siteId: b.site_id, expiryDate: b.expiry_date ?? null })),
+        .map((b) => ({
+          id: b.id!, orgId, siteId: b.site_id, expiryDate: b.expiry_date ?? null,
+          arrivedOn: melbourneDate(new Date(b.created_at!)),
+          checked: Boolean(b.checked_at), markedDown: Boolean(b.marked_down_at),
+        })),
       endDay,
+      reminderSettings,
     );
     for (const action of open) {
       plan.expiryActions.push({

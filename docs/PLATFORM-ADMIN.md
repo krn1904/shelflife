@@ -20,7 +20,11 @@ organisation.
 “New organisation” provisions the minimum usable account in one flow:
 
 1. Organisation name and unique slug
-2. First site, timezone and optional address
+2. First site, where it is, and optional address. "Where it is" is a required pick of state or
+   territory (e.g. Victoria, Western Australia). It sets the site's timezone, and with it the
+   site's calendar: "today", "expires in N days" and the nightly reminders. There is no default,
+   because a wrong zone puts every date the site sees a day out. The same pick is required when
+   adding a site later.
 3. Initial owner name and email
 
 If the email is new, ShelfLife creates a confirmed Auth account and displays its generated password

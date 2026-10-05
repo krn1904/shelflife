@@ -2,8 +2,8 @@ import Link from 'next/link';
 import { subMonths } from 'date-fns';
 import { activeSite, requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { today } from '@/lib/intake/expiry';
-import { boardWindow } from '@/lib/expiry/display';
+import { todayIn } from '@/lib/intake/expiry';
+import { attentionUntil } from '@/lib/expiry/display';
 import { formatAud } from '@/lib/charts/tokens';
 import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle, QuickAction } from '@/components/ui';
@@ -14,7 +14,8 @@ export default async function ManagePage() {
   const session = await requireRole('manager');
   const site = activeSite(session);
   const supabase = await createClient();
-  const asOf = today();
+  // The site's calendar; with no site there is nothing to count, so any zone will do.
+  const asOf = todayIn(site?.timeZone ?? 'UTC');
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
   const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }] =
@@ -26,7 +27,7 @@ export default async function ManagePage() {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'active')
         .gt('qty_remaining', 0)
-        .lte('expiry_date', boardWindow(asOf).soonEnd),
+        .lte('expiry_date', attentionUntil(asOf)),
       supabase.from('waste_events').select('value_aud').gte('wasted_at', monthStart),
       supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
       supabase
@@ -67,6 +68,7 @@ export default async function ManagePage() {
           <QuickAction href="/manage/waste" title="Waste" hint="Log and review write-offs" />
           <QuickAction href="/manage/products" title="Products & ranging" hint="Par levels, fixtures, tracking modes" />
           <QuickAction href="/manage/expiry" title="Expiry board" hint="Everything dated, by days left" />
+          <QuickAction href="/manage/reminders" title="Reminder settings" hint="When staff are told to check, discount or pull" />
         </div>
       </div>
 

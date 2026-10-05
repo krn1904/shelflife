@@ -61,6 +61,21 @@ export function createBarcodeReader(): BarcodeReader {
   let lastCode = '';
   let lastAt = 0;
 
+  function release() {
+    if (timer) {
+      clearInterval(timer);
+      timer = null;
+    }
+    if (zxingControls) {
+      zxingControls.stop();
+      zxingControls = null;
+    }
+    if (stream) {
+      for (const track of stream.getTracks()) track.stop();
+      stream = null;
+    }
+  }
+
   // A camera reports the same barcode on every frame it stays in view. Collapsing
   // that here means the caller sees one scan per physical presentation of the item.
   function emit(code: string, onCode: (code: string) => void) {
@@ -101,6 +116,12 @@ export function createBarcodeReader(): BarcodeReader {
 
     const failure = await openCamera(video);
     if (failure) return { ok: false, reason: failure };
+    // stop() may have been called while the camera was opening, when it had nothing to
+    // release yet. Without this the stream and the sampling timer would outlive the scanner.
+    if (stopped) {
+      release();
+      return { ok: true, kind: 'native' };
+    }
 
     timer = setInterval(async () => {
       if (stopped || video.readyState < 2) return;
@@ -157,18 +178,7 @@ export function createBarcodeReader(): BarcodeReader {
 
     stop() {
       stopped = true;
-      if (timer) {
-        clearInterval(timer);
-        timer = null;
-      }
-      if (zxingControls) {
-        zxingControls.stop();
-        zxingControls = null;
-      }
-      if (stream) {
-        for (const track of stream.getTracks()) track.stop();
-        stream = null;
-      }
+      release();
     },
   };
 }
