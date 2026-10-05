@@ -561,6 +561,11 @@ async function main() {
       .insert({ org_id: libertySite!.org_id, site_id: libertySite!.id, body: 'RLS check', sent_by: archivedUser!.id });
     check('an archived organisation cannot send messages', archivedSend !== null,
       archivedSend ? '' : 'insert unexpectedly succeeded');
+    // RLS already hides Liberty's sites from its owner; the trigger must refuse even the service role.
+    const { error: archivedTrigger } = await admin.from('site_messages')
+      .insert({ org_id: libertySite!.org_id, site_id: libertySite!.id, body: 'RLS check', sent_by: null });
+    check('and the archive guard refuses it even past RLS', archivedTrigger !== null,
+      archivedTrigger ? '' : 'insert unexpectedly succeeded');
 
     await admin.from('site_messages').delete().in('site_id', [brunswick.id, coburg.id]);
   }
