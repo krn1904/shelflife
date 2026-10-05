@@ -380,7 +380,8 @@ Config shared between the seed and the login buttons lives in
 [src/lib/demo/config.ts](../src/lib/demo/config.ts) (`DEMO_ORG_SLUG`, public `DEMO_PASSWORD`, the
 four `DEMO_LOGINS`) so the two can never offer a login that was never seeded.
 
-`NEXT_PUBLIC_DEMO_MODE=true` enables the one-click logins and the **jump-N-days** button. The
+`NEXT_PUBLIC_DEMO_MODE=true` enables the one-click staff, manager and owner logins (never the
+platform admin) and the **jump-N-days** button. The
 jump moves only the demo organisation's dates so a visitor can watch the engine fire; the engine is
 never told it is a demo, and `demo_jump_days()` refuses on any org not flagged `is_demo`. Leave
 the flag unset anywhere real.

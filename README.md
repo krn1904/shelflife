@@ -207,7 +207,8 @@ Without them the Textract option shows as not set up and the free reader is used
 
 The demo organisation is part of the seed world written by `npm run db:reset` (3 sites,
 ~300 products, 8 months of history). Set `NEXT_PUBLIC_DEMO_MODE=true` on the
-public deployment to enable the four one-click role logins and the **jump 7 days**
+public deployment to enable the one-click staff, manager and owner logins (the demo platform admin has no
+button; it can reach every organisation, so its login is handed out privately) and the **jump 7 days**
 button, which moves the demo organisation's dates so a visitor can watch the expiry engine fire
 without waiting a week. The engine is never told it is a demo — only the data moves —
 and `demo_jump_days()` refuses outright on any org not flagged `is_demo`.

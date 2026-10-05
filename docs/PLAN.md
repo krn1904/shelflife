@@ -222,7 +222,7 @@ Right-sized, not event-sourced:
 
 ## Demo & presentation (do not skip — this is what converts)
 
-- Live URL with **four one-click demo logins**, one per role, no signup
+- Live URL with **one-click demo logins** for staff, manager and owner, no signup (the platform admin is shared privately)
 - Seeded demo org: 3 Melbourne sites, ~400 products, 8 months of delivery and waste history so
   charts look real
 - **A "jump 7 days forward" button in demo mode** so a visitor can watch the expiry engine fire
