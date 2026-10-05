@@ -171,7 +171,7 @@ the snapshot.
 - Add product — scan an unknown barcode, fill it into the global catalogue once
 
 **Manager (tablet/desktop)**
-- Site dashboard: expiring counts, waste $ this month, open deliveries, live activity feed (Realtime) *(not built)*
+- Site dashboard: expiring counts, waste $ this month, open deliveries, recent activity feed with a Refresh button (no Realtime: refreshed on demand)
 - Deliveries list + detail with docket photo
 - Expiry board — columns by days remaining, colour-coded
 - Waste log + reason-code breakdown

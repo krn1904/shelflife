@@ -10,8 +10,11 @@ import { PageHeader, SectionTitle, QuickAction } from '@/components/ui';
 import { loadReminders } from '@/lib/expiry/reminders-data';
 import { ReminderBanner } from '@/components/reminder-banner';
 import { newItemsToReview } from '@/lib/deliveries/review-queue';
+import { RefreshButton } from '@/components/refresh-button';
+import { loadActivity } from '@/lib/activity/feed-data';
+import { clockAt, whenAgo } from '@/lib/activity/feed';
+import { atSite } from '@/lib/deliveries/review';
 
-const ACTIVITY_LIMIT = 8;
 
 export default async function ManagePage() {
   const session = await requireRole('manager');
@@ -21,7 +24,8 @@ export default async function ManagePage() {
   const asOf = todayIn(site?.timeZone ?? 'UTC');
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
-  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }, reminders, toReview] =
+  const now = new Date();
+  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, activity, reminders, toReview] =
     await Promise.all([
       supabase.from('site_products').select('*', { count: 'exact', head: true }),
       // Counted by the database: every dated batch used to be downloaded just to count these.
@@ -33,12 +37,7 @@ export default async function ManagePage() {
         .lte('expiry_date', attentionUntil(asOf)),
       supabase.from('waste_events').select('value_aud').gte('wasted_at', monthStart),
       supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
-      supabase
-        .from('deliveries')
-        .select('id, closed_at, docket_number, suppliers(name)')
-        .eq('status', 'closed')
-        .order('closed_at', { ascending: false })
-        .limit(ACTIVITY_LIMIT),
+      site ? loadActivity(supabase, site.id, now) : Promise.resolve([]),
       loadReminders(session),
       site ? newItemsToReview(supabase, site.id) : Promise.resolve([]),
     ]);
@@ -54,9 +53,12 @@ export default async function ManagePage() {
         title="Site"
         subtitle={site?.name ?? 'No site assigned'}
         actions={
-          <a href="/manage/expiry" className="btn btn-primary">
-            Expiry board
-          </a>
+          <>
+            <RefreshButton loadedAt={clockAt(now, site?.timeZone ?? 'UTC')} />
+            <a href="/manage/expiry" className="btn btn-primary">
+              Expiry board
+            </a>
+          </>
         }
       />
 
@@ -85,24 +87,32 @@ export default async function ManagePage() {
 
       <div>
         <SectionTitle actions={<Link href="/manage/deliveries" className="text-sm text-muted hover:text-ink">All deliveries →</Link>}>
-          Recent deliveries
+          Recent activity
         </SectionTitle>
         <ul className="card divide-y divide-line overflow-hidden">
-          {(recent ?? []).map((d) => (
-            <li key={d.id}>
-              <Link href={`/manage/deliveries/${d.id}`} className="flex flex-wrap items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-surface-2">
-                <span className="font-medium">{d.suppliers?.name ?? 'Unknown supplier'}</span>
-                {d.docket_number && (
-                  <span className="font-mono text-xs text-faint">#{d.docket_number}</span>
-                )}
-                <span className="ml-auto text-xs text-muted">
-                  {d.closed_at ? new Date(d.closed_at).toLocaleDateString('en-AU') : '—'}
+          {activity.map((item) => {
+            const line = (
+              <>
+                <span className="min-w-0">
+                  <span className="font-medium">{item.actor ?? 'Someone'}</span> {item.text}
                 </span>
-              </Link>
-            </li>
-          ))}
-          {(recent ?? []).length === 0 && (
-            <li className="px-4 py-6 text-center text-sm text-muted">Nothing received yet.</li>
+                <span className="ml-auto shrink-0 text-xs text-muted">
+                  {whenAgo(item.at, now, (iso) => atSite(iso, site?.timeZone ?? 'UTC', false))}
+                </span>
+              </>
+            );
+            return (
+              <li key={item.id}>
+                {item.href ? (
+                  <Link href={item.href} className="flex items-baseline gap-3 px-4 py-2.5 text-sm hover:bg-surface-2">{line}</Link>
+                ) : (
+                  <div className="flex items-baseline gap-3 px-4 py-2.5 text-sm">{line}</div>
+                )}
+              </li>
+            );
+          })}
+          {activity.length === 0 && (
+            <li className="px-4 py-6 text-center text-sm text-muted">Nothing in the last week.</li>
           )}
         </ul>
       </div>

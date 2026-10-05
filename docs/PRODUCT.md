@@ -188,6 +188,18 @@ written off this month.
 Nothing else is logged as waste. Damaged, spoiled or recalled stock is rare at a servo and not
 worth a staff member's time to record, so there is deliberately no separate write-off screen.
 
+### The site dashboard
+
+A manager's home (**Site**) shows the counts that matter today (stock needing attention, waste
+over 30 days, open deliveries, ranged products) and **Recent activity**: the site's last week
+as one list, newest first. It covers deliveries received, stock written off, reminders answered
+(checked, put on half price, pulled, sold out) and fixtures checked, each with who did it and
+how long ago, linking to the delivery, waste or expiry board behind it.
+
+The dashboard shows what was true when it loaded. **Refresh** reads it again and shows the time
+of the last read; nothing updates in the background, so an open tablet costs nothing. The
+platform admin page has the same button.
+
 ---
 
 ## Roles and access

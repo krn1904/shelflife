@@ -6,8 +6,13 @@ import { fetchAllPages } from '@/lib/pagination';
 import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle } from '@/components/ui';
 import { AddOrganisationForm } from './organisation-admin';
+import { RefreshButton } from '@/components/refresh-button';
+import { clockAt } from '@/lib/activity/feed';
 
 const RUN_LIMIT = 15;
+
+// The platform has no site of its own; its jobs run on Melbourne's clock, so its times do too.
+const PLATFORM_TIME_ZONE = 'Australia/Melbourne';
 
 // The engine runs nightly, so a day and a half of silence means it has stopped.
 const STALE_AFTER_MS = 36 * 60 * 60 * 1000;
@@ -66,7 +71,11 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Platform" subtitle="Every organisation, and the jobs that keep them fed." />
+      <PageHeader
+        title="Platform"
+        subtitle="Every organisation, and the jobs that keep them fed."
+        actions={<RefreshButton loadedAt={clockAt(new Date(), PLATFORM_TIME_ZONE)} />}
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Active organisations" value={activeOrgs.length} />
