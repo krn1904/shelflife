@@ -40,7 +40,7 @@ ShelfLife exists to be that mechanism, while asking as little of staff as possib
 | **Console staff** | Phone in hand, mid-shift, often in a store room or cool room with poor signal | Receive a delivery fast; be told what to discount or pull today, and answer it in a tap |
 | **Site manager** | Desktop or tablet in the back office | See what is expiring, what was received, what was written off and why |
 | **Owner / multi-site** | Owns or franchises several sites | Compare sites, see waste in dollars, spot which site or supplier is the problem |
-| **Platform admin** | Operating the service | Support organisations, moderate the shared product catalogue, monitor scheduled jobs |
+| **Platform admin** | Operating the service | Support organisations, monitor scheduled jobs (moderating the shared product catalogue is planned, not built) |
 
 ---
 

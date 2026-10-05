@@ -171,12 +171,12 @@ the snapshot.
 - Add product — scan an unknown barcode, fill it into the global catalogue once
 
 **Manager (tablet/desktop)**
-- Site dashboard: expiring counts, waste $ this month, open deliveries, live activity feed (Realtime)
+- Site dashboard: expiring counts, waste $ this month, open deliveries, live activity feed (Realtime) *(not built)*
 - Deliveries list + detail with docket photo
 - Expiry board — columns by days remaining, colour-coded
 - Waste log + reason-code breakdown
 - Products, par levels, tracking modes
-- Users
+- Users *(built as People, `/manage/people`)*
 
 **Owner (desktop)**
 - Multi-site rollup, waste % league table by site, trend charts, CSV export
@@ -184,7 +184,7 @@ the snapshot.
 **Platform admin**
 - Create an organisation with its first site and owner; archive/restore organisations
 - Manage organisation members and issue audit-logged temporary password resets
-- Global catalogue moderation and `job_runs` history
+- Global catalogue moderation *(not built)* and `job_runs` history
 - Archival blocks organisation members and pauses jobs/notifications without deleting records
 
 ---

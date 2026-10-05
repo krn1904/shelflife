@@ -47,7 +47,7 @@ Platform operations are documented in
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · Supabase (Postgres, Auth,
-Realtime, Storage, Edge Functions) · Postgres RLS for organisation isolation
+Storage, Edge Functions) · Postgres RLS for organisation isolation
 
 ## Local development
 
@@ -192,8 +192,7 @@ server, and pretending otherwise would be a bigger promise than this outbox can 
 
 **Receive a delivery** offers two readers. The free one runs Tesseract in the browser and needs
 nothing set up. AWS Textract reads printed tables column by column and is billed per photo (one
-`AnalyzeDocument` call on the intake screen; the **Test docket OCR** bench makes a second,
-invoice-model call to compare them). Textract needs an IAM key allowed to call it:
+`AnalyzeDocument` call per docket on the intake screen). Textract needs an IAM key allowed to call it:
 
 ```bash
 TEXTRACT_ACCESS_KEY_ID=...

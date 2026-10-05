@@ -14,14 +14,14 @@ Browser / PWA ──▶ Next.js (App Router)         Supabase
                   ├─ Server Actions / Routes ──▶ Postgres (RLS per request)
                   └─ Client Components            Auth   (cookie session)
                        │                          Storage (docket / date photos)
-                       └─ Dexie outbox            Realtime
-                                                  Edge Function (cron)
+                       └─ Dexie outbox            Edge Function (cron)
                                                   └─ expiry-engine  02:00
 ```
 
 Everything server-side runs **as the signed-in user**, so Postgres Row-Level Security is the
-real access-control boundary. The two Edge Functions are the only code that uses the service
-key and bypasses RLS; they run on a cron, not in a request.
+real access-control boundary. Only the expiry-engine Edge Function (on a cron) and a few server-only paths
+— platform-admin actions and adding people, which must create logins — use the service key
+and bypass RLS, and those authorise the caller first.
 
 ---
 
