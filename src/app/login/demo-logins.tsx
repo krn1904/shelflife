@@ -2,10 +2,11 @@
 
 import { useActionState } from 'react';
 import { signInAsDemo, type DemoState } from '@/lib/demo/actions';
-import { DEMO_LOGINS } from '@/lib/demo/config';
+import { ONE_CLICK_LOGINS } from '@/lib/demo/config';
 
 /**
- * Four one-click logins, one per role, no signup.
+ * One-click logins for staff, manager and owner, no signup. The platform admin is left
+ * out on purpose (see DemoLogin.oneClick).
  *
  * A visitor to a portfolio piece will not create an account to look around, so the demo
  * has to open in one tap or it does not get seen at all.
@@ -19,11 +20,11 @@ export function DemoLogins() {
     <div className="mt-8 border-t border-line pt-6">
       <h2 className="text-sm font-semibold">Have a look around</h2>
       <p className="mt-1 text-xs text-muted">
-        Demo data, four roles, no signup. Everything you change is fake.
+        Demo data, three roles, no signup. Everything you change is fake.
       </p>
 
       <div className="mt-3 grid gap-2">
-        {DEMO_LOGINS.map((login) => (
+        {ONE_CLICK_LOGINS.map((login) => (
           <form key={login.email} action={formAction}>
             <input type="hidden" name="email" value={login.email} />
             <button

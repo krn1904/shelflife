@@ -26,4 +26,4 @@ How the app works end-to-end, one line per step. For the code-level map see
 | `/app` | staff | The phone PWA — receive deliveries, today's list, expiry board, rotation checks |
 | `/manage` | manager | One site — delivery review, expiry board, waste log, product/par settings, reminder settings, messages to staff, people (owners: staff and managers; managers: staff) |
 | `/owner` | owner | Multi-site rollup, waste league table, trend charts, CSV export |
-| `/admin` | platform_admin | All organisations — lifecycle, catalogue moderation, `job_runs` history |
+| `/admin` | platform_admin | All organisations — lifecycle, sites and members, catalogue size, `job_runs` history (catalogue moderation is not built) |

@@ -14,14 +14,14 @@ Browser / PWA ──▶ Next.js (App Router)         Supabase
                   ├─ Server Actions / Routes ──▶ Postgres (RLS per request)
                   └─ Client Components            Auth   (cookie session)
                        │                          Storage (docket / date photos)
-                       └─ Dexie outbox            Realtime
-                                                  Edge Function (cron)
+                       └─ Dexie outbox            Edge Function (cron)
                                                   └─ expiry-engine  03:00 (pg_cron)
 ```
 
 Everything server-side runs **as the signed-in user**, so Postgres Row-Level Security is the
-real access-control boundary. The two Edge Functions are the only code that uses the service
-key and bypasses RLS; they run on a cron, not in a request.
+real access-control boundary. Only the expiry-engine Edge Function (on a cron) and a few server-only paths
+— platform-admin actions and adding people, which must create logins — use the service key
+and bypass RLS, and those authorise the caller first.
 
 ---
 
@@ -72,8 +72,8 @@ make here:
 | Factory | File | Runs as | Use for |
 |---|---|---|---|
 | `createClient()` | [server.ts](../src/lib/supabase/server.ts) | the signed-in user (RLS) | Server Components, Server Actions, Route Handlers — almost everything |
-| browser client | [client.ts](../src/lib/supabase/client.ts) | the signed-in user (RLS) | Client Components (Realtime, interactive reads) |
-| admin client | [admin.ts](../src/lib/supabase/admin.ts) | service key (**bypasses RLS**) | Edge Functions and platform-admin paths only |
+| browser client | [client.ts](../src/lib/supabase/client.ts) | the signed-in user (RLS) | Client Components (interactive reads) |
+| admin client | [admin.ts](../src/lib/supabase/admin.ts) | service key (**bypasses RLS**) | Server-only: platform-admin actions, and adding or listing people (`src/lib/people`), which need logins created or read |
 
 Credentials are resolved once in [env.ts](../src/lib/supabase/env.ts), which accepts both the
 pre-2025 (`ANON` / `SERVICE_ROLE`) and post-2025 (`PUBLISHABLE` / `SECRET`) Supabase key names
@@ -380,7 +380,8 @@ Config shared between the seed and the login buttons lives in
 [src/lib/demo/config.ts](../src/lib/demo/config.ts) (`DEMO_ORG_SLUG`, public `DEMO_PASSWORD`, the
 four `DEMO_LOGINS`) so the two can never offer a login that was never seeded.
 
-`NEXT_PUBLIC_DEMO_MODE=true` enables the one-click logins and the **jump-N-days** button. The
+`NEXT_PUBLIC_DEMO_MODE=true` enables the one-click staff, manager and owner logins (never the
+platform admin) and the **jump-N-days** button. The
 jump moves only the demo organisation's dates so a visitor can watch the engine fire; the engine is
 never told it is a demo, and `demo_jump_days()` refuses on any org not flagged `is_demo`. Leave
 the flag unset anywhere real.

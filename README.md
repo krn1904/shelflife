@@ -47,7 +47,7 @@ Platform operations are documented in
 ## Stack
 
 Next.js 16 (App Router) · React 19 · TypeScript strict · Tailwind v4 · Supabase (Postgres, Auth,
-Realtime, Storage, Edge Functions) · Postgres RLS for organisation isolation
+Storage, Edge Functions) · Postgres RLS for organisation isolation
 
 ## Local development
 
@@ -208,8 +208,7 @@ server, and pretending otherwise would be a bigger promise than this outbox can 
 
 **Receive a delivery** offers two readers. The free one runs Tesseract in the browser and needs
 nothing set up. AWS Textract reads printed tables column by column and is billed per photo (one
-`AnalyzeDocument` call on the intake screen; the **Test docket OCR** bench makes a second,
-invoice-model call to compare them). Textract needs an IAM key allowed to call it:
+`AnalyzeDocument` call per docket on the intake screen). Textract needs an IAM key allowed to call it:
 
 ```bash
 TEXTRACT_ACCESS_KEY_ID=...
@@ -224,7 +223,8 @@ Without them the Textract option shows as not set up and the free reader is used
 
 The demo organisation is part of the seed world written by `npm run db:reset` (3 sites,
 ~300 products, 8 months of history). Set `NEXT_PUBLIC_DEMO_MODE=true` on the
-public deployment to enable the four one-click role logins and the **jump 7 days**
+public deployment to enable the one-click staff, manager and owner logins (the demo platform admin has no
+button; it can reach every organisation, so its login is handed out privately) and the **jump 7 days**
 button, which moves the demo organisation's dates so a visitor can watch the expiry engine fire
 without waiting a week. The engine is never told it is a demo — only the data moves —
 and `demo_jump_days()` refuses outright on any org not flagged `is_demo`.

@@ -1,6 +1,6 @@
 # ShelfLife — design system: "Night shift"
 
-Status: **built on `feat/night-shift-theme`, not yet merged.** This replaced the warm paper +
+Status: **shipped** (merged to `main` in #24). This replaced the warm paper +
 clay theme. The agreed mockups live on the design canvas (Option C, lime accent):
 <https://claude.ai/artifact/4XnsJRRhnk3Wtkgcr7N44k>. Options A (Ledger) and B (Shelf tag)
 were considered and set aside.

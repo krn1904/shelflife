@@ -15,6 +15,11 @@ export type DemoLogin = {
   role: AppRole;
   label: string;
   blurb: string;
+  /**
+   * Offered as a button on the login page. The platform admin is not: it can reach every
+   * organisation and reset anyone's password, so it is seeded but handed out privately.
+   */
+  oneClick: boolean;
 };
 
 export const DEMO_LOGINS: DemoLogin[] = [
@@ -24,6 +29,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
     role: 'staff',
     label: 'Staff',
     blurb: 'The phone view: today’s list, the expiry board, receiving a delivery.',
+    oneClick: true,
   },
   {
     email: 'manager@demo.shelflife.app',
@@ -31,6 +37,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
     role: 'manager',
     label: 'Manager',
     blurb: 'One site: the expiry board, waste analytics, ranging and par levels.',
+    oneClick: true,
   },
   {
     email: 'owner@demo.shelflife.app',
@@ -38,6 +45,7 @@ export const DEMO_LOGINS: DemoLogin[] = [
     role: 'owner',
     label: 'Owner',
     blurb: 'Three sites: the rollup, the league table and the CSV export.',
+    oneClick: true,
   },
   {
     email: 'admin@demo.shelflife.app',
@@ -45,5 +53,13 @@ export const DEMO_LOGINS: DemoLogin[] = [
     role: 'platform_admin',
     label: 'Platform admin',
     blurb: 'Across organisations: the catalogue, audit trail and scheduled job history.',
+    oneClick: false,
   },
 ];
+
+/** The logins the login page offers as buttons, and the only ones signInAsDemo accepts. */
+export const ONE_CLICK_LOGINS = DEMO_LOGINS.filter((l) => l.oneClick);
+
+export function oneClickLogin(email: string): DemoLogin | undefined {
+  return ONE_CLICK_LOGINS.find((l) => l.email === email);
+}

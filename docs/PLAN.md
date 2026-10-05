@@ -74,7 +74,7 @@ genuinely the fastest way to identify it.
 ## Stack
 
 - **Next.js 15** (App Router) + TypeScript strict, Tailwind + shadcn/ui
-- **Supabase** — Postgres, Auth, Realtime, Storage (docket photos), Edge Functions (cron jobs)
+- **Supabase** — Postgres, Auth, Realtime *(not used)*, Storage (docket photos), Edge Functions (cron jobs)
 - **Organisation isolation via RLS** on every table, keyed by `org_id`
 - **Barcode scanning:** native `BarcodeDetector` API where available, `@zxing/browser` WASM fallback
 - **Offline:** Dexie (IndexedDB) outbox (no service worker), client-generated UUIDs, idempotent upserts
@@ -171,12 +171,12 @@ the snapshot.
 - Add product — scan an unknown barcode, fill it into the global catalogue once
 
 **Manager (tablet/desktop)**
-- Site dashboard: expiring counts, waste $ this month, open deliveries, live activity feed (Realtime)
+- Site dashboard: expiring counts, waste $ this month, open deliveries, live activity feed (Realtime) *(not built)*
 - Deliveries list + detail with docket photo
 - Expiry board — columns by days remaining, colour-coded
 - Waste log + reason-code breakdown
 - Products, par levels, tracking modes
-- Users
+- Users *(built as People, `/manage/people`)*
 
 **Owner (desktop)**
 - Multi-site rollup, waste % league table by site, trend charts, CSV export
@@ -184,7 +184,7 @@ the snapshot.
 **Platform admin**
 - Create an organisation with its first site and owner; archive/restore organisations
 - Manage organisation members and issue audit-logged temporary password resets
-- Global catalogue moderation and `job_runs` history
+- Global catalogue moderation *(not built)* and `job_runs` history
 - Archival blocks organisation members and pauses jobs/notifications without deleting records
 
 ---
@@ -222,7 +222,7 @@ Right-sized, not event-sourced:
 
 ## Demo & presentation (do not skip — this is what converts)
 
-- Live URL with **four one-click demo logins**, one per role, no signup
+- Live URL with **one-click demo logins** for staff, manager and owner, no signup (the platform admin is shared privately)
 - Seeded demo org: 3 Melbourne sites, ~400 products, 8 months of delivery and waste history so
   charts look real
 - **A "jump 7 days forward" button in demo mode** so a visitor can watch the expiry engine fire

@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { requireSession, homePathFor } from '@/lib/auth/session';
-import { DEMO_LOGINS, DEMO_ORG_SLUG, DEMO_PASSWORD } from '@/lib/demo/config';
+import { DEMO_ORG_SLUG, DEMO_PASSWORD, oneClickLogin } from '@/lib/demo/config';
 
 export type DemoState = { status: 'idle' } | { status: 'error'; message: string };
 
@@ -17,8 +17,8 @@ export async function demoEnabled(): Promise<boolean> {
  * One-click sign-in as a demo role.
  *
  * The password is a published constant and these accounts hold nothing real, but the
- * action still refuses unless demo mode is switched on and the email is one of the four
- * on the list — an env flag is the difference between a portfolio piece and an open door.
+ * action still refuses unless demo mode is switched on and the email is one of the
+ * one-click logins (never the platform admin) — an env flag is the difference between a portfolio piece and an open door.
  */
 export async function signInAsDemo(_prev: DemoState, formData: FormData): Promise<DemoState> {
   if (process.env.NEXT_PUBLIC_DEMO_MODE !== 'true') {
@@ -26,7 +26,7 @@ export async function signInAsDemo(_prev: DemoState, formData: FormData): Promis
   }
 
   const email = String(formData.get('email') ?? '');
-  const login = DEMO_LOGINS.find((l) => l.email === email);
+  const login = oneClickLogin(email);
   if (!login) return { status: 'error', message: 'That is not a demo account.' };
 
   const supabase = await createClient();
