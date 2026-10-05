@@ -168,6 +168,10 @@ they tap **Got it**; after that it moves to **Messages** (linked from the Shift 
 manager's list shows each message with *Read by 2 of 3* and who hasn't read it yet, and can
 delete one (it disappears for anyone who hadn't read it).
 
+Staff see only messages sent **since they joined the site**, so someone starting a year in
+doesn't have a year of old notes to tap through. On the manager's list they don't count towards
+earlier messages either; a message sent before anyone now on staff joined says so.
+
 It is one-way: staff acknowledge, they don't reply. Like the reminders it lives in the account,
 so it follows a person to whichever device they sign in on, and nothing is pushed — a message
 appears the next time staff open a page or come back to the app.

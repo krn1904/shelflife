@@ -5,19 +5,22 @@ is already known, so it can be picked up without re-deriving the context.
 
 ---
 
-## Site messages: replies, and staff who join later
+## Site messages: replies, and staff who move sites
 
 **Built (2026-10-05):** a manager's note to everyone on staff at a site, acknowledged with Got it,
-with *Read by N of M* on the manager's side. Chosen deliberately as one-way.
+with *Read by N of M* on the manager's side. Chosen deliberately as one-way. Staff see only
+messages sent since they joined the site (Karan: a new starter must not inherit a year of notes).
 
-Open questions, not decided:
+Not done:
 
 - **Replies.** A thread per message (staff answer, manager answers back) was considered and left
   out. It would need a `site_message_replies` table with the same site-scoped RLS, and a way for
   the manager to notice a reply, since nothing is pushed.
-- **New staff inherit old notes.** A staff member added to a site sees every unread message in
-  the last 50, including ones written before they joined. Filtering to messages sent after their
-  membership was created is a one-line change in `loadStaffMessages()`, if that is wanted.
+- **Staff moved to another site.** "Joined" is `memberships.created_at`, and moving someone
+  (`update_organisation_member`) changes the row's `site_id` in place, so the date stays when
+  they first joined the organisation. A moved staff member therefore sees the new site's
+  messages back to that date (at most the last 50). Fixing it needs a `site_joined_at` column
+  set whenever `site_id` changes.
 
 ---
 

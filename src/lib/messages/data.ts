@@ -19,13 +19,14 @@ async function namesFor(supabase: Supabase, ids: string[]): Promise<Map<string, 
   return new Map((data ?? []).map((p) => [p.id, p.full_name ?? 'Someone']));
 }
 
-async function recentMessages(supabase: Supabase, siteId: string): Promise<SiteMessage[]> {
-  const { data: rows } = await supabase
+/** Newest first; with `since`, only what was sent from then on. */
+async function recentMessages(supabase: Supabase, siteId: string, since?: string): Promise<SiteMessage[]> {
+  let query = supabase
     .from('site_messages')
     .select('id, body, created_at, sent_by')
-    .eq('site_id', siteId)
-    .order('created_at', { ascending: false })
-    .limit(LIST_LIMIT);
+    .eq('site_id', siteId);
+  if (since) query = query.gte('created_at', since);
+  const { data: rows } = await query.order('created_at', { ascending: false }).limit(LIST_LIMIT);
   const names = await namesFor(supabase, (rows ?? []).flatMap((r) => (r.sent_by ? [r.sent_by] : [])));
   return (rows ?? []).map((r) => ({
     id: r.id,
@@ -38,14 +39,15 @@ async function recentMessages(supabase: Supabase, siteId: string): Promise<SiteM
 export type StaffMessages = { site: SessionSite; messages: (SiteMessage & { read: boolean })[]; unread: SiteMessage[] };
 
 /**
- * A staff member's messages at their site, newest first, each marked read or not. Null for
- * anyone who doesn't receive messages, before querying anything.
+ * A staff member's messages at their site, newest first, each marked read or not: only those
+ * sent since they joined the site, so a new starter doesn't inherit a year of old notes. Null
+ * for anyone who doesn't receive messages, before querying anything.
  */
 export async function loadStaffMessages(session: Session): Promise<StaffMessages | null> {
   if (!messagesShownTo(session.primaryRole)) return null;
   const site = activeSite(session);
   if (!site) return null;
-  const { messages, readIds } = await staffMessagesAt(session.userId, site.id);
+  const { messages, readIds } = await staffMessagesAt(session.userId, site.id, site.orgId);
   const read = new Set(readIds);
   return {
     site,
@@ -55,9 +57,20 @@ export async function loadStaffMessages(session: Session): Promise<StaffMessages
 }
 
 // Keyed on plain values so the shell and the page share one read per request.
-const staffMessagesAt = cache(async (userId: string, siteId: string) => {
+const staffMessagesAt = cache(async (userId: string, siteId: string, orgId: string) => {
   const supabase = await createClient();
-  const messages = await recentMessages(supabase, siteId);
+  // When they joined this site: their membership pinned to it, or (rarely) to every site.
+  const { data: membership } = await supabase
+    .from('memberships')
+    .select('created_at')
+    .eq('user_id', userId)
+    .eq('org_id', orgId)
+    .or(`site_id.eq.${siteId},site_id.is.null`)
+    .order('created_at', { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (!membership) return { messages: [] as SiteMessage[], readIds: [] as string[] };
+  const messages = await recentMessages(supabase, siteId, membership.created_at);
   if (messages.length === 0) return { messages, readIds: [] as string[] };
   const { data: reads } = await supabase
     .from('site_message_reads')
@@ -77,28 +90,34 @@ export async function loadSentMessages(site: SessionSite): Promise<SentMessage[]
     // The site's staff: pinned to it, or (rarely) to every site in the organisation.
     supabase
       .from('memberships')
-      .select('user_id')
+      .select('user_id, created_at')
       .eq('org_id', site.orgId)
       .eq('role', 'staff')
       .or(`site_id.eq.${site.id},site_id.is.null`),
   ]);
   if (messages.length === 0) return [];
 
-  const staffIds = (staffRows ?? []).map((m) => m.user_id);
+  // Earliest membership per person, in case they hold both a site and an organisation-wide one.
+  const joined = new Map<string, string>();
+  for (const m of staffRows ?? []) {
+    const seen = joined.get(m.user_id);
+    if (!seen || m.created_at < seen) joined.set(m.user_id, m.created_at);
+  }
   const [names, { data: reads }] = await Promise.all([
-    namesFor(supabase, staffIds),
+    namesFor(supabase, [...joined.keys()]),
     supabase
       .from('site_message_reads')
       .select('message_id, user_id')
       .in('message_id', messages.map((m) => m.id)),
   ]);
-  const staff: Recipient[] = [...new Set(staffIds)].map((id) => ({ userId: id, name: names.get(id) ?? 'Someone' }));
+  const staff: Recipient[] = [...joined].map(([id, joinedAt]) => ({ userId: id, name: names.get(id) ?? 'Someone', joinedAt }));
 
   return messages.map((m) => ({
     ...m,
     reads: readSummary(
       staff,
       (reads ?? []).filter((r) => r.message_id === m.id).map((r) => r.user_id),
+      m.sentAt,
     ),
   }));
 }

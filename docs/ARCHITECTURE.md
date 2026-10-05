@@ -236,7 +236,9 @@ timer, so an idle, visible tab does no work.
 **Site messages** ([src/lib/messages/](../src/lib/messages)) use the same delivery: no push, no
 polling, no realtime subscription. A manager inserts a `site_messages` row for their site; staff
 acknowledge with a `site_message_reads` row (primary key `(message_id, user_id)`, written with
-`ignoreDuplicates` so a double tap needs no update permission). `loadStaffMessages()` is cached per
+`ignoreDuplicates` so a double tap needs no update permission). Staff get only messages sent since
+their membership at the site was created (`memberships.created_at`, `sentSince()`), and
+`readSummary()` leaves later joiners out of each message's count. `loadStaffMessages()` is cached per
 request on plain ids, so the portal layout (unread notes above every staff page,
 [message-notices.tsx](../src/components/message-notices.tsx)) and the Shift and Messages pages
 share one read. The actions call `refresh()` from `next/cache`, which re-renders the layout too,

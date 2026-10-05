@@ -6,6 +6,7 @@ import {
   messagesShownTo,
   readCountLabel,
   readSummary,
+  sentSince,
   unreadMessages,
   validateMessageBody,
 } from './messages';
@@ -38,25 +39,50 @@ test('unread is everything not yet acknowledged, order kept', () => {
   assert.deepEqual(unreadMessages(messages, ['a', 'b', 'c']), []);
 });
 
+const JOINED = '2026-01-01T00:00:00Z';
+const SENT = '2026-10-05T09:00:00Z';
+
+test('staff see only messages sent since they joined the site', () => {
+  assert.equal(sentSince(SENT, JOINED), true);
+  assert.equal(sentSince(SENT, SENT), true, 'sent the moment they joined');
+  assert.equal(sentSince('2025-06-01T00:00:00Z', JOINED), false, 'a year-old note stays hidden');
+});
+
 test('read summary splits current staff into read and waiting, by name', () => {
   const staff = [
-    { userId: 'u3', name: 'Zoe' },
-    { userId: 'u1', name: 'Ali' },
-    { userId: 'u2', name: 'Mei' },
+    { userId: 'u3', name: 'Zoe', joinedAt: JOINED },
+    { userId: 'u1', name: 'Ali', joinedAt: JOINED },
+    { userId: 'u2', name: 'Mei', joinedAt: JOINED },
   ];
   // u9 read it but has since left the site: not counted.
-  const summary = readSummary(staff, ['u2', 'u3', 'u9']);
+  const summary = readSummary(staff, ['u2', 'u3', 'u9'], SENT);
   assert.deepEqual(summary.read.map((r) => r.name), ['Mei', 'Zoe']);
   assert.deepEqual(summary.waiting.map((r) => r.name), ['Ali']);
   assert.equal(summary.total, 3);
   assert.equal(readCountLabel(summary), 'Read by 2 of 3');
 });
 
+test('someone who joined after a message is not counted as waiting on it', () => {
+  const staff = [
+    { userId: 'old', name: 'Ali', joinedAt: JOINED },
+    { userId: 'new', name: 'Bo', joinedAt: '2026-10-06T00:00:00Z' },
+  ];
+  const summary = readSummary(staff, ['old'], SENT);
+  assert.deepEqual(summary.waiting, []);
+  assert.equal(summary.total, 1);
+  assert.equal(readCountLabel(summary), 'Read');
+  assert.equal(summary.joinedLater, 1);
+
+  // Sent before anyone now on staff joined: nobody to read it, but the site isn't empty.
+  const early = readSummary(staff, [], '2025-06-01T00:00:00Z');
+  assert.equal(readCountLabel(early), 'Sent before current staff joined');
+});
+
 test('read count label covers everyone, one person and nobody', () => {
-  const two = [{ userId: 'a', name: 'A' }, { userId: 'b', name: 'B' }];
-  assert.equal(readCountLabel(readSummary(two, ['a', 'b'])), 'Read by all 2');
-  assert.equal(readCountLabel(readSummary(two.slice(0, 1), ['a'])), 'Read');
-  assert.equal(readCountLabel(readSummary([], [])), 'No staff at this site yet');
+  const two = [{ userId: 'a', name: 'A', joinedAt: JOINED }, { userId: 'b', name: 'B', joinedAt: JOINED }];
+  assert.equal(readCountLabel(readSummary(two, ['a', 'b'], SENT)), 'Read by all 2');
+  assert.equal(readCountLabel(readSummary(two.slice(0, 1), ['a'], SENT)), 'Read');
+  assert.equal(readCountLabel(readSummary([], [], SENT)), 'No staff at this site yet');
 });
 
 test('sent time is on the site clock, "Today" only for the site\'s own today', () => {

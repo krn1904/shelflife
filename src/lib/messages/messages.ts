@@ -34,27 +34,41 @@ export function unreadMessages<M extends { id: string }>(messages: M[], readIds:
   return messages.filter((m) => !read.has(m.id));
 }
 
-export type Recipient = { userId: string; name: string };
+/**
+ * A staff member sees only what was sent since they joined the site: someone starting a year
+ * in shouldn't wade through a year of old notes. `joinedAt` is when their membership was created.
+ */
+export function sentSince(sentAt: string, joinedAt: string): boolean {
+  return new Date(sentAt).getTime() >= new Date(joinedAt).getTime();
+}
 
-export type ReadSummary = { read: Recipient[]; waiting: Recipient[]; total: number };
+export type Recipient = { userId: string; name: string; joinedAt: string };
+
+/** `total` counts those who were there when it was sent; `joinedLater` those who weren't. */
+export type ReadSummary = { read: Recipient[]; waiting: Recipient[]; total: number; joinedLater: number };
 
 /**
- * Who on staff has read a message and who hasn't, for the manager's list. Counts only the
- * site's current staff: a read by someone since removed from the site isn't counted.
+ * Who on staff has read a message and who hasn't, for the manager's list. Counts the site's
+ * current staff who were there when it was sent: someone who joined later never sees it, so
+ * they aren't "not yet", and a read by someone since removed from the site isn't counted.
  */
-export function readSummary(staff: Recipient[], readerIds: Iterable<string>): ReadSummary {
+export function readSummary(staff: Recipient[], readerIds: Iterable<string>, sentAt: string): ReadSummary {
   const readers = new Set(readerIds);
+  const audience = staff.filter((s) => sentSince(sentAt, s.joinedAt));
   const byName = (a: Recipient, b: Recipient) => a.name.localeCompare(b.name);
   return {
-    read: staff.filter((s) => readers.has(s.userId)).sort(byName),
-    waiting: staff.filter((s) => !readers.has(s.userId)).sort(byName),
-    total: staff.length,
+    read: audience.filter((s) => readers.has(s.userId)).sort(byName),
+    waiting: audience.filter((s) => !readers.has(s.userId)).sort(byName),
+    total: audience.length,
+    joinedLater: staff.length - audience.length,
   };
 }
 
-/** "Read by 2 of 5", or "No staff at this site yet" when there's nobody to read it. */
+/** "Read by 2 of 5"; when nobody was there to read it, says whether anyone has joined since. */
 export function readCountLabel(summary: ReadSummary): string {
-  if (summary.total === 0) return 'No staff at this site yet';
+  if (summary.total === 0) {
+    return summary.joinedLater > 0 ? 'Sent before current staff joined' : 'No staff at this site yet';
+  }
   if (summary.read.length === summary.total) return summary.total === 1 ? 'Read' : `Read by all ${summary.total}`;
   return `Read by ${summary.read.length} of ${summary.total}`;
 }
