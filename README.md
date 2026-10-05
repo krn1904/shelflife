@@ -203,6 +203,11 @@ and restore it. The UI never permanently deletes an organisation.
 
 Vercel for the app, Supabase for everything else, both on free tiers.
 
+The app's server functions run in Tokyo (`hnd1`, set in [vercel.json](vercel.json)), the same
+region as the hosted database (`ap-northeast-1`). A page waits on several database calls one
+after another, so they need to be next door: from Vercel's default US East region each one
+crossed the Pacific and a page took seconds. If the database ever moves, move this with it.
+
 ```bash
 supabase link --project-ref <ref>
 supabase db push                     # migrations
