@@ -28,5 +28,4 @@ export type ExpiryAction = Tables<'expiry_actions'>;
 export type RotationCheck = Tables<'rotation_checks'>;
 export type WasteEvent = Tables<'waste_events'>;
 export type JobRun = Tables<'job_runs'>;
-export type PushSubscription = Tables<'push_subscriptions'>;
 export type AuditEntry = Tables<'audit_log'>;

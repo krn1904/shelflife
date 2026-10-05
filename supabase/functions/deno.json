@@ -1,8 +1,7 @@
 {
   "imports": {
     "@supabase/supabase-js": "npm:@supabase/supabase-js@^2.115.0",
-    "date-fns": "npm:date-fns@^4.4.0",
-    "web-push": "npm:web-push@^3.6.7"
+    "date-fns": "npm:date-fns@^4.4.0"
   },
-  "//": "Keeps the bare specifiers in src/lib resolvable from Deno, so the Edge Functions can import the same engine and digest logic the app and its tests use rather than a second copy of the rules."
+  "//": "Keeps the bare specifiers in src/lib resolvable from Deno, so the Edge Function can import the same engine logic the app and its tests use rather than a second copy of the rules."
 }

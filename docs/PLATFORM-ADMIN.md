@@ -66,7 +66,7 @@ Archiving:
 
 - Preserves sites, memberships, deliveries, stock, waste and audit history
 - Blocks organisation members from application data and shared catalogue access
-- Pauses expiry-engine processing and daily notifications
+- Pauses expiry-engine processing (and members lose the in-app reminders with their access)
 - Leaves the organisation visible to platform admins
 
 Restoring reverses those access and processing restrictions. Hard deletion has no application
@@ -90,8 +90,7 @@ direct insert/update (and membership delete) policies for their own organisation
 cannot be used by a platform admin.
 Expiry-engine rebuilds and rotation-check upserts lock each organisation and skip rows whose
 organisation is no longer active, so an archive that commits after the job's snapshot cannot
-still insert work. The daily digest rechecks organisation status immediately before dispatch
-and matches subscriptions by organisation, not site id alone. Owners keep organisation-
+still insert work. Owners keep organisation-
 scoped insert/update policies for sites and memberships; those policies use `has_org_role(...,
 owner)` rather than `can_manage_org`, so they do not reopen a direct platform-admin write path.
 
@@ -111,12 +110,9 @@ owner)` rather than `can_manage_org`, so they do not reopen a direct platform-ad
   - `supabase/migrations/20260920000006_audited_admin_writes.sql`
   - `supabase/migrations/20260920000007_atomic_organisation_provisioning.sql`
   - `supabase/migrations/20260920000008_review_scope_and_job_guards.sql`
-- Background-job lifecycle filters: `supabase/functions/expiry-engine/index.ts`,
-  `supabase/functions/daily-digest/index.ts` (both page all active data rather than relying on
-  PostgREST's 1,000-row default response limit). The expiry engine writes actions and rotation
-  checks through RPCs that lock each organisation and skip archived rows; the digest rechecks
-  organisation status immediately before dispatch and only delivers subscriptions whose
-  `org_id` matches the site being processed.
+- Background-job lifecycle filters: `supabase/functions/expiry-engine/index.ts` (pages all
+  active data rather than relying on PostgREST's 1,000-row default response limit). It writes
+  actions and rotation checks through RPCs that lock each organisation and skip archived rows.
 - Owners retain direct insert/update policies for sites and memberships in their own
   organisation. Platform-admin child writes still go through the audited RPCs.
 - RLS verification: `scripts/test-rls.ts`

@@ -4,18 +4,21 @@ import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle, QuickAction } from '@/components/ui';
 import { DemoJump } from '@/components/demo-jump';
 import { demoEnabled } from '@/lib/demo/actions';
+import { loadReminders } from '@/lib/expiry/reminders-data';
+import { ReminderBanner } from '@/components/reminder-banner';
 
 export default async function ShiftPage() {
   const session = await requireSession();
   const supabase = await createClient();
 
   // RLS scopes all of these to what this user may see, so no explicit filter is needed.
-  const [{ count: catalogue }, { data: sites }, { count: openDeliveries }, { count: openActions }] =
+  const [{ count: catalogue }, { data: sites }, { count: openDeliveries }, { count: openActions }, reminders] =
     await Promise.all([
       supabase.from('site_products').select('*', { count: 'exact', head: true }),
       supabase.from('sites').select('name'),
       supabase.from('deliveries').select('*', { count: 'exact', head: true }).eq('status', 'draft'),
       supabase.from('expiry_actions').select('*', { count: 'exact', head: true }).eq('state', 'open'),
+      loadReminders(session),
     ]);
 
   return (
@@ -32,6 +35,8 @@ export default async function ShiftPage() {
         }
       />
 
+      <ReminderBanner reminders={reminders} href="/app/today" />
+
       {(await demoEnabled()) && <DemoJump />}
 
       <div className="grid gap-3 sm:grid-cols-3">
@@ -46,7 +51,7 @@ export default async function ShiftPage() {
           <QuickAction href="/app/deliveries" title="Receive a delivery" hint="Work down the docket from a supplier" />
           <QuickAction href="/app/board" title="Expiry board" hint="All dated stock, and what is coming up" />
           <QuickAction href="/app/scan" title="Look up a product" hint="Scan a barcode to find or add it" />
-          <QuickAction href="/app/settings" title="Settings" hint="Notifications and light or dark theme" />
+          <QuickAction href="/app/settings" title="Settings" hint="Light or dark theme" />
         </div>
       </div>
     </div>

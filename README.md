@@ -136,22 +136,28 @@ stopped firing is the failure mode that costs the most, because nothing looks br
 until the stock is already gone. The platform-admin portal says so in as many words
 when the engine has not reported in for 36 hours.
 
-### The morning digest
+### In-app reminders
 
-`supabase/functions/daily-digest` runs at 06:00 and pushes each site's list to whoever
-has notifications on for that organisation and site. Delivery is cancelled if the
-organisation is no longer active. A day with nothing outstanding sends nothing — a
-daily "all clear" is how people learn to swipe the notification away unread.
+Reminders live inside the account, not on the device: there are no push notifications,
+service-worker push or VAPID keys. When a **staff member or manager** opens ShelfLife and
+something at their site is due today, they see:
 
-```bash
-supabase functions deploy daily-digest
-npx web-push generate-vapid-keys
-supabase secrets set VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=... VAPID_SUBJECT=mailto:you@example.com
-```
+- a banner on their home screen (**Shift** for staff, **Site** for managers) leading with
+  the costliest thing: red for last-day lines, amber for half price, grey for checks and
+  fixtures. **Open** goes to Today (staff) or the Expiry board (managers);
+- a pop-up the first time they open the app that day, until they tap **Open** or
+  **Later**. It is remembered per account on each device, so on a shared store tablet one
+  person's *Later* does not hide it from the next;
+- for staff, a count on the **Today** tab (bottom tabs on a phone, header on a tablet),
+  which drops as cards are answered.
 
-Push is per device, not per account: the store tablet and a manager's own phone are
-separate switches, under **Shift → Notifications**. On iPhone the PWA must be added to
-the home screen first — Safari only allows push for installed apps.
+Owners and platform admins don't get shift reminders. A day with nothing due shows
+nothing — a daily "all clear" is how people learn to ignore it.
+
+Nothing reaches anyone while the app is closed. Coming back to an open ShelfLife after a
+minute or more away (switching back to the tab, waking a tablet, resuming the phone app)
+re-reads the counts. A tablet whose screen stays on and visible all day is never "away", so
+it shows the counts from the last time someone tapped through it.
 
 ### Offline
 
@@ -212,20 +218,19 @@ crossed the Pacific and a page took seconds. If the database ever moves, move th
 supabase link --project-ref <ref>
 supabase db push                     # migrations
 supabase functions deploy expiry-engine
-supabase functions deploy daily-digest
-supabase secrets set CRON_SECRET=... VAPID_PUBLIC_KEY=... VAPID_PRIVATE_KEY=...
+supabase secrets set CRON_SECRET=...
 ```
 
 When a branch adds a migration, run `supabase db push` before testing its Vercel preview: the
 preview runs the new code against the hosted database, and pages fail until it has the migration.
 
 Vercel needs `NEXT_PUBLIC_SUPABASE_URL`, the anon/publishable key, the service/secret
-key, `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, and the `TEXTRACT_*` keys if docket reading should offer
+key, and the `TEXTRACT_*` keys if docket reading should offer
 AWS Textract. Supabase renamed its keys in 2025 and both
 naming schemes are accepted — `NEXT_PUBLIC_SUPABASE_ANON_KEY` or
 `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, and `SUPABASE_SERVICE_ROLE_KEY` or
-`SUPABASE_SECRET_KEY` — so use whichever pair your project's API settings show. Schedule both Edge
-Functions (02:00 and 06:00 Australia/Melbourne), passing `x-cron-secret`.
+`SUPABASE_SECRET_KEY` — so use whichever pair your project's API settings show. Schedule the expiry-engine
+Edge Function at 02:00 Australia/Melbourne, passing `x-cron-secret`.
 
 After deploying, regenerate the database types against the live schema:
 
@@ -265,8 +270,7 @@ the demo's Coburg site with its own reminder settings, every waste reason (inclu
 (`qty_received` < `qty_docketed`), site tracking-mode overrides, ranged-off lines, an
 inactive supplier, a supplier with no history yet (the manual-entry intake path),
 products added by staff scans, suppliers with ABNs (all but Local Bakehouse, the no-ABN case), done/dismissed action history, three weeks of rotation
-checks, and three weeks of `expiry-engine` / `daily-digest` runs including one failure.
-No push subscriptions are seeded — those belong to real devices.
+checks, and three weeks of `expiry-engine` runs including one failure.
 
 | Email | Password | Role | Sees |
 |---|---|---|---|

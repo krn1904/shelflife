@@ -1,9 +1,8 @@
 import type { MetadataRoute } from 'next';
 
 /**
- * Installing to the home screen is not cosmetic here: iOS only delivers Web Push to a PWA
- * that has been installed, so without this the morning digest simply never arrives on an
- * iPhone. start_url points at the shift screen because that is what a staff member opens.
+ * Lets staff add ShelfLife to the home screen and open it full screen like an app.
+ * start_url points at the shift screen because that is what a staff member opens.
  */
 export default function manifest(): MetadataRoute.Manifest {
   return {

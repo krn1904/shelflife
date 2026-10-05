@@ -6,6 +6,9 @@ import { SHIFT_TABS } from '@/components/shift-tabs';
 import { ThemePicker } from '@/components/theme-picker';
 import { roleAtLeast, type Session } from '@/lib/auth/session';
 import { currentTheme } from '@/lib/theme/server';
+import { loadReminders } from '@/lib/expiry/reminders-data';
+import { remindersShownTo } from '@/lib/expiry/reminders';
+import { RefreshOnReturn } from '@/components/refresh-on-return';
 import type { AppRole } from '@/lib/supabase/types';
 import { SubmitButton } from '@/components/submit-button';
 
@@ -32,10 +35,14 @@ export async function PortalShell({ session, children }: { session: Session; chi
   // Staff live in the shift portal on a phone, so they get thumb-reach tabs instead.
   const staffTabs = session.primaryRole === 'staff';
   const theme = await currentTheme();
+  // The count on the Today tab. Same read as the page's banner (cached per request).
+  const reminders = staffTabs ? await loadReminders(session) : null;
+  const badges: Record<string, number> = reminders ? { '/app/today': reminders.summary.total } : {};
 
   return (
     <div className="min-h-dvh">
       <PendingChanges />
+      {remindersShownTo(session.primaryRole) && <RefreshOnReturn />}
       <header className="sticky top-0 z-20 border-b border-line bg-paper/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl flex-wrap items-center gap-x-5 gap-y-2 px-4 py-2.5">
           <span className="flex items-center gap-2 font-bold tracking-tight">
@@ -46,7 +53,7 @@ export async function PortalShell({ session, children }: { session: Session; chi
           {staffTabs ? (
             // Phones use the bottom tabs; from tablet width up the same links sit here.
             <div className="hidden sm:block">
-              <PortalNav links={SHIFT_TABS.map(({ href, label, exact }) => ({ href, label, exact }))} />
+              <PortalNav links={SHIFT_TABS.map(({ href, label, exact }) => ({ href, label, exact, badge: badges[href] }))} />
             </div>
           ) : (
             links.length > 1 && (
@@ -76,7 +83,7 @@ export async function PortalShell({ session, children }: { session: Session; chi
       <main className={`mx-auto max-w-6xl px-4 py-6 sm:py-8 ${staffTabs ? 'pb-28 sm:pb-8' : ''}`}>
         {children}
       </main>
-      {staffTabs && <BottomTabs />}
+      {staffTabs && <BottomTabs badges={badges} />}
     </div>
   );
 }

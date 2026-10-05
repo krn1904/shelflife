@@ -7,6 +7,8 @@ import { attentionUntil } from '@/lib/expiry/display';
 import { formatAud } from '@/lib/charts/tokens';
 import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle, QuickAction } from '@/components/ui';
+import { loadReminders } from '@/lib/expiry/reminders-data';
+import { ReminderBanner } from '@/components/reminder-banner';
 
 const ACTIVITY_LIMIT = 8;
 
@@ -18,7 +20,7 @@ export default async function ManagePage() {
   const asOf = todayIn(site?.timeZone ?? 'UTC');
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
-  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }] =
+  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }, reminders] =
     await Promise.all([
       supabase.from('site_products').select('*', { count: 'exact', head: true }),
       // Counted by the database: every dated batch used to be downloaded just to count these.
@@ -36,6 +38,7 @@ export default async function ManagePage() {
         .eq('status', 'closed')
         .order('closed_at', { ascending: false })
         .limit(ACTIVITY_LIMIT),
+      loadReminders(session),
     ]);
 
   const urgent = urgentCount ?? 0;
@@ -53,6 +56,8 @@ export default async function ManagePage() {
           </a>
         }
       />
+
+      <ReminderBanner reminders={reminders} href="/manage/expiry" />
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
         <Stat label="Needs attention" value={urgent} tone={urgent ? 'critical' : 'default'} hint="expiring within 7 days" />

@@ -170,8 +170,8 @@ export default async function AdminPage() {
               {(runs ?? []).length === 0 && (
                 <tr>
                   <td colSpan={6} className="px-4 py-6 text-center text-muted">
-                    No scheduled job has ever reported in. Deploy the Edge Functions and set
-                    CRON_SECRET.
+                    No scheduled job has ever reported in. Deploy the expiry-engine Edge Function
+                    and set CRON_SECRET.
                   </td>
                 </tr>
               )}
