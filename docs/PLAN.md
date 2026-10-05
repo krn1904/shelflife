@@ -79,6 +79,7 @@ genuinely the fastest way to identify it.
 - **Barcode scanning:** native `BarcodeDetector` API where available, `@zxing/browser` WASM fallback
 - **Offline:** Dexie (IndexedDB) outbox (no service worker), client-generated UUIDs, idempotent upserts
 - **Reminders:** in-app, per account (home-screen banner, once-a-day pop-up, Today-tab count) for staff and managers; no Web Push. Owner email digest via Resend is not built.
+- **Site messages:** a manager's note to everyone on staff at a site, shown until each acknowledges it; one-way, in-app only.
 - **Charts:** Recharts — load the `dataviz` skill before writing any chart code
 - **Deploy:** Vercel + Supabase free tiers, so the demo stays alive indefinitely at zero cost
 
@@ -121,6 +122,7 @@ Core tables (all with `org_id`, `created_at`, RLS enabled):
   `due_date`, `state` (`open` | `done` | `dismissed`)
 - `rotation_checks` — `site_id`, `fixture`, `check_date`, `checked_by`, `state`
 - `waste_events` — `batch_id` (nullable), `product_id`, `qty`, `reason_code`, `value_aud`, `by`
+- `site_messages` — `site_id`, `body` (≤ 500 chars), `sent_by`; `site_message_reads` — `message_id`, `user_id`, `read_at`
 - `audit_log` (`push_subscriptions` existed until reminders moved in-app, 2026-10-05)
 
 **Roles:** `platform_admin` (all organisations), `owner` (multi-site), `manager` (one site),

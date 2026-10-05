@@ -159,6 +159,23 @@ minute or more away (switching back to the tab, waking a tablet, resuming the ph
 re-reads the counts. A tablet whose screen stays on and visible all day is never "away", so
 it shows the counts from the last time someone tapped through it.
 
+### Messages from the manager
+
+A manager (or the owner, for any of their sites) writes a short note to everyone on staff at a
+site under **Site → Message staff** — up to 500 characters, e.g. *"Fridge 3 is being serviced
+at 2pm, move the milk to fridge 1."* Each staff member sees it at the top of every page until
+they tap **Got it**; after that it moves to **Messages** (linked from the Shift screen). The
+manager's list shows each message with *Read by 2 of 3* and who hasn't read it yet, and can
+delete one (it disappears for anyone who hadn't read it).
+
+Staff see only messages sent **since they joined the site**, so someone starting a year in
+doesn't have a year of old notes to tap through. On the manager's list they don't count towards
+earlier messages either; a message sent before anyone now on staff joined says so.
+
+It is one-way: staff acknowledge, they don't reply. Like the reminders it lives in the account,
+so it follows a person to whichever device they sign in on, and nothing is pushed — a message
+appears the next time staff open a page or come back to the app.
+
 ### Offline
 
 Answers on the Today list are sent straight away, or kept in an IndexedDB outbox when

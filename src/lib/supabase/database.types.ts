@@ -582,6 +582,74 @@ export type Database = {
           },
         ]
       }
+      site_message_reads: {
+        Row: {
+          message_id: string
+          read_at: string
+          user_id: string
+        }
+        Insert: {
+          message_id: string
+          read_at?: string
+          user_id: string
+        }
+        Update: {
+          message_id?: string
+          read_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_message_reads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "site_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_messages: {
+        Row: {
+          body: string
+          created_at: string
+          id: string
+          org_id: string
+          sent_by: string | null
+          site_id: string
+        }
+        Insert: {
+          body: string
+          created_at?: string
+          id?: string
+          org_id: string
+          sent_by?: string | null
+          site_id: string
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          id?: string
+          org_id?: string
+          sent_by?: string | null
+          site_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_messages_org_id_fkey"
+            columns: ["org_id"]
+            isOneToOne: false
+            referencedRelation: "orgs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_messages_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_products: {
         Row: {
           active: boolean
