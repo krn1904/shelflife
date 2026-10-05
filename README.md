@@ -238,6 +238,11 @@ supabase functions deploy expiry-engine
 supabase secrets set CRON_SECRET=...
 ```
 
+`supabase/config.toml` points the function at the shared `supabase/functions/deno.json`
+import map and turns off JWT checks (the cron sends `x-cron-secret` instead), so a plain
+`supabase functions deploy expiry-engine` works. Without that section the deploy fails with
+*Relative import path "@supabase/supabase-js" not prefixed with / or ./ or ../*.
+
 When a branch adds a migration, run `supabase db push` before testing its Vercel preview: the
 preview runs the new code against the hosted database, and pages fail until it has the migration.
 
