@@ -176,8 +176,8 @@ worth a staff member's time to record, so there is deliberately no separate writ
 Four roles, enforced at the database level so organisation isolation does not depend on UI correctness:
 
 - **`platform_admin`** — across organisations; provision, archive and restore organisations; support access is audit-logged
-- **`owner`** — every site in their organisation; analytics and user management
-- **`manager`** — one site; deliveries, expiry board, waste, product settings, reminder settings
+- **`owner`** — every site in their organisation; analytics, and adding or removing staff and managers
+- **`manager`** — one site; deliveries, expiry board, waste, product settings, reminder settings, adding or removing staff
 - **`staff`** — one site, phone only; receive, action list, expiry board, waste, rotation checks
 
 ---

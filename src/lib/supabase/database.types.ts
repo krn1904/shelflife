@@ -954,6 +954,15 @@ export type Database = {
         }
         Returns: string
       }
+      add_site_member: {
+        Args: {
+          p_email: string
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_site_id: string
+          p_user_id: string
+        }
+        Returns: string
+      }
       add_supplier: {
         Args: { p_abn?: string | null; p_name: string; p_org_id: string }
         Returns: {
@@ -973,6 +982,13 @@ export type Database = {
       }
       can_manage_org: { Args: { org: string }; Returns: boolean }
       can_manage_site: { Args: { org: string }; Returns: boolean }
+      can_manage_site_role: {
+        Args: {
+          p_role: Database["public"]["Enums"]["app_role"]
+          p_site_id: string
+        }
+        Returns: boolean
+      }
       clear_active_expiry_actions: { Args: never; Returns: number }
       create_organisation_site: {
         Args: {
@@ -1057,6 +1073,7 @@ export type Database = {
         Args: { p_site_id: string }
         Returns: string
       }
+      remove_site_member: { Args: { p_membership_id: string }; Returns: string }
       remove_organisation_member: {
         Args: { p_membership_id: string }
         Returns: string

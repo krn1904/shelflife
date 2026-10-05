@@ -205,6 +205,14 @@ Archiving an organisation preserves its users and operational history while bloc
 access and pausing expiry processing and notifications. Platform admins can continue to inspect
 and restore it. The UI never permanently deletes an organisation.
 
+From then on the organisation runs its own people under **Site → People** (owners also reach it
+from **Group → People**): an **owner** adds or removes staff and managers at any of their sites,
+and a **manager** adds or removes staff at their own site. Adding someone creates their login
+and shows a temporary password once, to hand over. Removing someone takes away their access but
+keeps the login, so their past work stays attributed and they can be added back. Nobody makes
+an owner or platform admin this way, nobody removes themselves, and a login that already
+belongs to another organisation can't be added; those stay with the platform admin.
+
 ## Deploying
 
 Vercel for the app, Supabase for everything else, both on free tiers.

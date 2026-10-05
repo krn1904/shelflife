@@ -468,6 +468,115 @@ async function main() {
     await admin.from('reminder_settings').delete().in('site_id', [brunswick.id, coburg.id]);
   }
 
+  console.log('\nowners and managers manage their own people:');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+
+    // Fresh logins for the run, removed again at the end so db:reset stays the same.
+    const made: string[] = [];
+    async function newLogin(tag: string): Promise<string> {
+      const email = `rls-people-${tag}@shelflife.test`;
+      const existing = (await admin.auth.admin.listUsers({ perPage: 1000 })).data.users.find((u) => u.email === email);
+      if (existing) await admin.auth.admin.deleteUser(existing.id);
+      const { data, error } = await admin.auth.admin.createUser({ email, password: PASSWORD, email_confirm: true });
+      if (error) throw new Error(`could not create ${email}: ${error.message}`);
+      made.push(data.user.id);
+      return data.user.id;
+    }
+    const add = (db: Db, userId: string, siteId: string, role: 'staff' | 'manager' | 'owner') =>
+      db.rpc('add_site_member', { p_user_id: userId, p_site_id: siteId, p_role: role, p_email: 'rls@shelflife.test' });
+
+    const manager = await signIn('manager@metro-petroleum.test');
+    const { data: { user: managerUser } } = await manager.auth.getUser();
+    const newStaff = await newLogin('staff');
+    const hopeful = await newLogin('hopeful');
+
+    const { error: managerAddsStaff } = await add(manager, newStaff, brunswick.id, 'staff');
+    check('a manager can add staff to their own site', managerAddsStaff === null, managerAddsStaff?.message ?? '');
+
+    const { data: added } = await admin.from('audit_log').select('actor_id, site_id')
+      .eq('action', 'member.added').eq('detail->>role', 'staff').eq('site_id', brunswick.id)
+      .order('created_at', { ascending: false }).limit(1).maybeSingle();
+    check('and it is in the audit log under their name', added?.actor_id === managerUser!.id,
+      `got ${JSON.stringify(added)}`);
+
+    const { error: twice } = await add(manager, newStaff, brunswick.id, 'staff');
+    check('adding the same person twice is refused', twice?.code === '23505', twice?.code ?? 'no error');
+
+    const { error: managerAddsManager } = await add(manager, hopeful, brunswick.id, 'manager');
+    check('a manager cannot add a manager', managerAddsManager !== null, managerAddsManager ? '' : 'rpc succeeded');
+
+    const { error: otherSite } = await add(manager, hopeful, coburg.id, 'staff');
+    check('nor add staff at another site', otherSite !== null, otherSite ? '' : 'rpc succeeded');
+
+    const { error: staffAdds } = await add(staff, hopeful, brunswick.id, 'staff');
+    check('staff cannot add anyone', staffAdds !== null, staffAdds ? '' : 'rpc succeeded');
+
+    const { error: ownerAddsOwner } = await add(owner, hopeful, brunswick.id, 'owner');
+    check('nobody adds an owner this way, not even the owner', ownerAddsOwner !== null,
+      ownerAddsOwner ? '' : 'rpc succeeded');
+
+    const { error: foreignOwner } = await add(other, hopeful, brunswick.id, 'staff');
+    check('another organisation\'s owner cannot add people here', foreignOwner !== null,
+      foreignOwner ? '' : 'rpc succeeded');
+
+    const { data: unitedStaff } = await admin.from('memberships').select('user_id')
+      .eq('org_id', united.id).eq('role', 'staff').limit(1).single();
+    const { error: poached } = await add(owner, unitedStaff!.user_id, brunswick.id, 'staff');
+    check('a login from another organisation cannot be pulled in', poached !== null, poached ? '' : 'rpc succeeded');
+
+    const { error: ownerAddsManager } = await add(owner, hopeful, coburg.id, 'manager');
+    check('the owner can add a manager at any of their sites', ownerAddsManager === null,
+      ownerAddsManager?.message ?? '');
+
+    const membershipOf = async (userId: string, orgId = metro.id) =>
+      (await admin.from('memberships').select('id').eq('user_id', userId).eq('org_id', orgId).limit(1).single()).data!.id;
+    const remove = (db: Db, membershipId: string) => db.rpc('remove_site_member', { p_membership_id: membershipId });
+
+    const { data: ownerRow } = await admin.from('memberships').select('id').eq('org_id', metro.id).eq('role', 'owner').limit(1).single();
+    const { error: removesOwner } = await remove(manager, ownerRow!.id);
+    check('a manager cannot remove the owner', removesOwner !== null, removesOwner ? '' : 'rpc succeeded');
+
+    const { error: removesManager } = await remove(manager, await membershipOf(hopeful));
+    check('nor another manager', removesManager !== null, removesManager ? '' : 'rpc succeeded');
+
+    const { error: removesSelf } = await remove(manager, await membershipOf(managerUser!.id));
+    check('nor themselves', removesSelf !== null, removesSelf ? '' : 'rpc succeeded');
+
+    const { error: staffRemoves } = await remove(staff, await membershipOf(newStaff));
+    check('staff cannot remove anyone', staffRemoves !== null, staffRemoves ? '' : 'rpc succeeded');
+
+    const { error: foreignRemove } = await remove(other, await membershipOf(newStaff));
+    check('another organisation cannot remove people here', foreignRemove !== null, foreignRemove ? '' : 'rpc succeeded');
+
+    const { error: managerRemoves } = await remove(manager, await membershipOf(newStaff));
+    const { count: stillThere } = await admin.from('memberships').select('*', { count: 'exact', head: true }).eq('user_id', newStaff);
+    const { data: login } = await admin.auth.admin.getUserById(newStaff);
+    check('a manager can remove staff; the login stays, the access goes',
+      managerRemoves === null && stillThere === 0 && !!login.user,
+      managerRemoves?.message ?? `${stillThere} memberships left`);
+
+    const { error: ownerRemoves } = await remove(owner, await membershipOf(hopeful));
+    check('the owner can remove a manager', ownerRemoves === null, ownerRemoves?.message ?? '');
+
+    const { error: readded } = await add(manager, newStaff, brunswick.id, 'staff');
+    check('someone removed can be added back', readded === null, readded?.message ?? '');
+
+    const archived = await signIn('owner@liberty-oil.test');
+    const { data: libertySite } = await admin.from('sites').select('id')
+      .eq('org_id', orgs!.find((o) => o.slug === 'liberty-oil')!.id).limit(1).single();
+    const { error: archivedAdd } = await add(archived, hopeful, libertySite!.id, 'staff');
+    check('an archived organisation cannot add people', archivedAdd !== null, archivedAdd ? '' : 'rpc succeeded');
+
+    const anon = createClient<Database>(URL, ANON);
+    const { error: anonAdd } = await add(anon, hopeful, brunswick.id, 'staff');
+    check('anonymous callers cannot add people', anonAdd !== null, anonAdd ? '' : 'rpc succeeded');
+
+    for (const id of made) await admin.auth.admin.deleteUser(id);
+  }
+
   console.log('\norganisation lifecycle:');
   {
     const platform = await signIn('admin@shelflife.test');
