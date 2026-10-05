@@ -9,6 +9,7 @@ import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle, QuickAction } from '@/components/ui';
 import { loadReminders } from '@/lib/expiry/reminders-data';
 import { ReminderBanner } from '@/components/reminder-banner';
+import { newItemsToReview } from '@/lib/deliveries/review-queue';
 
 const ACTIVITY_LIMIT = 8;
 
@@ -20,7 +21,7 @@ export default async function ManagePage() {
   const asOf = todayIn(site?.timeZone ?? 'UTC');
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
-  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }, reminders] =
+  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, { data: recent }, reminders, toReview] =
     await Promise.all([
       supabase.from('site_products').select('*', { count: 'exact', head: true }),
       // Counted by the database: every dated batch used to be downloaded just to count these.
@@ -39,7 +40,9 @@ export default async function ManagePage() {
         .order('closed_at', { ascending: false })
         .limit(ACTIVITY_LIMIT),
       loadReminders(session),
+      site ? newItemsToReview(supabase, site.id) : Promise.resolve([]),
     ]);
+  const unreviewed = toReview.length;
 
   const urgent = urgentCount ?? 0;
 
@@ -69,7 +72,8 @@ export default async function ManagePage() {
       <div>
         <SectionTitle>Manage</SectionTitle>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          <QuickAction href="/manage/deliveries" title="Deliveries" hint="What staff received, and what came short" />
+          <QuickAction href="/manage/deliveries" title="Deliveries"
+            hint={unreviewed ? `Correct what staff received; ${unreviewed} new ${unreviewed === 1 ? 'item' : 'items'} to review` : 'What staff received; correct any mistakes'} />
           <QuickAction href="/manage/waste" title="Waste" hint="Log and review write-offs" />
           <QuickAction href="/manage/products" title="Products & ranging" hint="Par levels, fixtures, tracking modes" />
           <QuickAction href="/manage/expiry" title="Expiry board" hint="Everything dated, by days left" />

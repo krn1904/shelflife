@@ -348,6 +348,41 @@ the last line) is in [walk.ts](../src/lib/intake/walk.ts) and tested.
 
 ---
 
+### Manager corrections
+
+A closed delivery is corrected by a manager, never re-opened: re-running `closeDelivery` would
+rewrite batches staff have since acted on. Two `SECURITY DEFINER` functions in
+[delivery_corrections.sql](../supabase/migrations/20261006000001_delivery_corrections.sql) do the
+writes, so each is one transaction with its own audit row:
+
+- `can_correct_site(site)` is the permission: an owner of the site's organisation, or a manager
+  whose membership covers that site. It is stricter than `can_manage_site(org)`, which a manager
+  pinned to another site of the same organisation would pass.
+- `correct_delivery_line(line, qty_docketed, qty_received, batches)` takes the line's dated
+  stock as it should be. A listed batch is updated, a new one is inserted with the delivery's
+  close time as `created_at` (the engine counts shelf life from it), and one left out is deleted.
+  Dates may cover less than arrived. On an `active` batch `qty_remaining` moves by the change in
+  `qty_received`, and the function refuses to drop it below what has already left (written off
+  or sold). A `pulled` or `sold_through` batch stays at 0 remaining: staff cleared that shelf, so
+  a higher count must not raise a reminder for stock already gone. A changed date becomes
+  `expiry_source = 'manual'` and the batch's open reminder is deleted for the next run to plan.
+  The first correction copies staff's figures into `staff_qty_*`. A product no longer tracked
+  by date keeps its closed-out batches untouched, and a line with stock that already left the
+  shelf cannot be removed.
+- `review_docket_product(...)` edits a product with `org_id` set (never the shared catalogue) and
+  stamps `reviewed_at`. Rotation requires a fixture, upserted into `site_products`. Tracking
+  belongs to the product, so a change of mode covers every site that receives it: it is refused
+  if any of those sites is not one the caller runs (a site-pinned manager asks an owner), and
+  rotation is refused until each of them has a fixture. Leaving `batch` deletes the product's
+  untouched active batches and closes the rest as `sold_through`, because the engine plans
+  reminders for every active dated batch whatever the product's tracking mode.
+- Both lock the organisation row and refuse an archived one, as `add_site_member` does.
+
+The form rules (`LineCorrection`, `checkCorrection`, `ProductReview`) are in
+[corrections.ts](../src/lib/deliveries/corrections.ts); the database repeats the ones it can
+check and adds those only it can see. `audit_log` is readable by owners, so the delivery page
+shows the correction from the line itself.
+
 ## Offline sync
 
 Only shelf-side mutations are queued: today that is **answers on the Today list**
@@ -396,11 +431,12 @@ architecture:
 
 `orgs`, `sites`, `profiles`, `memberships`, `suppliers` (optional ABN, unique per organisation),
 `supplier_aliases` (docket names confirmed for a supplier), `products` (the shared catalogue keyed by
-barcode, plus each organisation's own products added from dockets, which carry `org_id`),
+barcode, plus each organisation's own products added from dockets, which carry `org_id` and
+stay on the review list until `reviewed_at` is set),
 `site_products` (per-site overrides incl. `tracking_mode_override`), `deliveries`,
 `delivery_lines` (`qty_docketed` vs `qty_received` kept separate from day one — this is what
 makes v2 reconciliation need no migration; `unit_cost` is the unit price read off the docket when
-the reader is certain of it), `stock_batches` (`checked_at` / `marked_down_at` record staff
+the reader is certain of it; `staff_qty_*` / `corrected_*` record a manager's correction), `stock_batches` (`checked_at` / `marked_down_at` record staff
 answers), `reminder_settings` (one row per site that changed the defaults), `expiry_actions`, `rotation_checks`,
 `waste_events`, `job_runs`, `audit_log`, `site_messages` and `site_message_reads` (manager notes to
 staff and who has read them). (`push_subscriptions` was dropped in

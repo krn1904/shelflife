@@ -28,7 +28,7 @@ export default async function OwnerPage() {
         .select('wasted_at, reason, qty, value_aud, site_id')
         .gte('wasted_at', since),
       supabase.from('sites').select('id, name').order('name'),
-      supabase.from('stock_batches').select('*', { count: 'exact', head: true }).eq('status', 'active'),
+      supabase.from('stock_batches').select('*', { count: 'exact', head: true }).eq('status', 'active').gt('qty_remaining', 0),
       supabase.from('expiry_actions').select('*', { count: 'exact', head: true }).eq('state', 'open'),
     ]);
 

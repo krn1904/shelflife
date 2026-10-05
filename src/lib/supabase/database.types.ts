@@ -163,6 +163,8 @@ export type Database = {
       }
       delivery_lines: {
         Row: {
+          corrected_at: string | null
+          corrected_by: string | null
           created_at: string
           delivery_id: string
           id: string
@@ -170,10 +172,14 @@ export type Database = {
           product_id: string
           qty_docketed: number
           qty_received: number
+          staff_qty_docketed: number | null
+          staff_qty_received: number | null
           unit_cost: number | null
           updated_at: string
         }
         Insert: {
+          corrected_at?: string | null
+          corrected_by?: string | null
           created_at?: string
           delivery_id: string
           id?: string
@@ -181,10 +187,14 @@ export type Database = {
           product_id: string
           qty_docketed?: number
           qty_received?: number
+          staff_qty_docketed?: number | null
+          staff_qty_received?: number | null
           unit_cost?: number | null
           updated_at?: string
         }
         Update: {
+          corrected_at?: string | null
+          corrected_by?: string | null
           created_at?: string
           delivery_id?: string
           id?: string
@@ -192,6 +202,8 @@ export type Database = {
           product_id?: string
           qty_docketed?: number
           qty_received?: number
+          staff_qty_docketed?: number | null
+          staff_qty_received?: number | null
           unit_cost?: number | null
           updated_at?: string
         }
@@ -408,6 +420,8 @@ export type Database = {
           id: string
           name: string
           org_id: string | null
+          reviewed_at: string | null
+          reviewed_by: string | null
           size: string | null
           tracking_mode: Database["public"]["Enums"]["tracking_mode"]
           updated_at: string
@@ -422,6 +436,8 @@ export type Database = {
           id?: string
           name: string
           org_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           size?: string | null
           tracking_mode?: Database["public"]["Enums"]["tracking_mode"]
           updated_at?: string
@@ -436,6 +452,8 @@ export type Database = {
           id?: string
           name?: string
           org_id?: string | null
+          reviewed_at?: string | null
+          reviewed_by?: string | null
           size?: string | null
           tracking_mode?: Database["public"]["Enums"]["tracking_mode"]
           updated_at?: string
@@ -1048,6 +1066,7 @@ export type Database = {
         Args: { p_batch: Database["public"]["Tables"]["stock_batches"]["Row"] }
         Returns: number
       }
+      can_correct_site: { Args: { p_site_id: string }; Returns: boolean }
       can_manage_org: { Args: { org: string }; Returns: boolean }
       can_manage_site: { Args: { org: string }; Returns: boolean }
       can_manage_site_role: {
@@ -1058,6 +1077,15 @@ export type Database = {
         Returns: boolean
       }
       clear_active_expiry_actions: { Args: never; Returns: number }
+      correct_delivery_line: {
+        Args: {
+          p_batches: Json
+          p_line_id: string
+          p_qty_docketed: number
+          p_qty_received: number
+        }
+        Returns: string
+      }
       create_organisation_site: {
         Args: {
           p_address: string | null
@@ -1121,6 +1149,20 @@ export type Database = {
       restore_organisation: {
         Args: { p_org_id: string }
         Returns: undefined
+      }
+      review_docket_product: {
+        Args: {
+          p_barcode: string | null
+          p_brand: string | null
+          p_fixture: string | null
+          p_name: string
+          p_product_id: string
+          p_shelf_life_days: number | null
+          p_site_id: string
+          p_size: string | null
+          p_tracking_mode: Database["public"]["Enums"]["tracking_mode"]
+        }
+        Returns: number
       }
       update_organisation_member: {
         Args: {
