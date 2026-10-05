@@ -19,10 +19,10 @@ test('leads with the last-day count, which is the number that costs money', () =
     ],
     openFixtures: 2,
   });
-  assert.equal(summary.title, '2 lines on their last day');
+  assert.equal(summary.title, '2 products on their last day');
   assert.equal(
     summary.body,
-    '2 lines on their last day, 1 line to put on half price, 1 line to check, 2 fixtures to walk · 1 already past date',
+    '2 products on their last day, 1 product to put on half price, 1 product to check, 2 fixtures to walk · 1 already past date',
   );
   assert.equal(summary.total, 6);
   assert.equal(summary.tone, 'critical');
@@ -30,7 +30,7 @@ test('leads with the last-day count, which is the number that costs money', () =
 
 test('singular and plural both read correctly', () => {
   const one = summariseReminders({ actions: [{ action: 'pull', daysLeft: 0 }], openFixtures: 1 });
-  assert.equal(one.title, '1 line on its last day');
+  assert.equal(one.title, '1 product on its last day');
   assert.ok(one.body.includes('1 fixture to walk'));
 });
 
@@ -39,7 +39,7 @@ test('half price leads, in amber, when nothing is on its last day', () => {
     actions: [{ action: 'markdown', daysLeft: 2 }, { action: 'check', daysLeft: 25 }],
     openFixtures: 0,
   });
-  assert.equal(summary.title, '1 line to put on half price');
+  assert.equal(summary.title, '1 product to put on half price');
   assert.equal(summary.tone, 'warning');
 });
 
@@ -47,7 +47,7 @@ test('checks and fixtures alone are a quiet reminder', () => {
   const summary = summariseReminders({ actions: [{ action: 'check', daysLeft: 25 }], openFixtures: 3 });
   assert.equal(summary.title, "Today's list is ready");
   assert.equal(summary.tone, 'neutral');
-  assert.equal(summary.body, '1 line to check, 3 fixtures to walk');
+  assert.equal(summary.body, '1 product to check, 3 fixtures to walk');
   assert.equal(summary.overdue, 0);
 });
 

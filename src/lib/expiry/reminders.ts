@@ -47,12 +47,12 @@ export function summariseReminders(input: ReminderInput): ReminderSummary {
   const fixtures = input.openFixtures;
   const total = pull + markdown + check + fixtures;
 
-  const lastDay = `${plural(pull, 'line', 'lines')} on ${pull === 1 ? 'its' : 'their'} last day`;
-  const halfPrice = `${plural(markdown, 'line', 'lines')} to put on half price`;
+  const lastDay = `${plural(pull, 'product', 'products')} on ${pull === 1 ? 'its' : 'their'} last day`;
+  const halfPrice = `${plural(markdown, 'product', 'products')} to put on half price`;
   const parts: string[] = [];
   if (pull > 0) parts.push(lastDay);
   if (markdown > 0) parts.push(halfPrice);
-  if (check > 0) parts.push(`${plural(check, 'line', 'lines')} to check`);
+  if (check > 0) parts.push(`${plural(check, 'product', 'products')} to check`);
   if (fixtures > 0) parts.push(`${plural(fixtures, 'fixture', 'fixtures')} to walk`);
 
   // The title leads with the thing that costs money if ignored.
