@@ -83,7 +83,11 @@ export default async function ManageDeliveriesPage(props: PageProps<'/manage/del
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Deliveries" subtitle={`What staff received at ${site.name}`} />
+      <PageHeader
+        title="Deliveries"
+        subtitle={`What staff received at ${site.name}`}
+        actions={<Link href="/manage/suppliers" className="btn btn-outline">Suppliers</Link>}
+      />
 
       <form className="card flex flex-wrap items-end gap-3 p-4 text-sm" action="/manage/deliveries">
         {siteSites.length > 1 && (
