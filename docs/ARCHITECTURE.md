@@ -285,6 +285,24 @@ The look is the "Night shift" design system, documented in [DESIGN.md](DESIGN.md
   `sm` up. The list lives in a plain module ([shift-tabs.ts](../src/components/shift-tabs.ts))
   because the server-rendered shell cannot read data exported from a `'use client'` file.
 
+### Recent activity and Refresh
+
+The manager home's feed is read on the server like the rest of the page:
+[feed-data.ts](../src/lib/activity/feed-data.ts) reads the site's last 7 days from four tables
+(closed `deliveries`, `waste_events`, done `expiry_actions`, done `rotation_checks`), at most 25
+of each, then `buildFeed()` ([feed.ts](../src/lib/activity/feed.ts), tested) merges them newest
+first and keeps 15. A last-day answer that binned stock is left out because its waste row already
+says it, with the quantity. Actor names come from one `profiles` query.
+
+Nothing is pushed or polled. `RefreshButton` ([refresh-button.tsx](../src/components/refresh-button.tsx))
+calls `router.refresh()` inside a transition, which re-renders the page's server components
+and keeps client state. The manager home and `/admin` use it. `RefreshOnReturn` still re-reads
+the page when someone comes back to the tab.
+
+Admin pages show times with `platformTime()` ([time.ts](../src/lib/admin/time.ts)), on
+Melbourne's clock. They used the server's default, which is UTC on Vercel, so the 03:00 engine
+run read as 4:00 pm the day before.
+
 ---
 
 ## Docket-driven intake

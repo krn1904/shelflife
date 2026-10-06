@@ -12,6 +12,7 @@ import { fetchAllPages } from '@/lib/pagination';
 import { SiteAdmin, type ManagedSite } from './site-admin';
 import { PeopleAdmin, type Person } from './people-admin';
 import { OrganisationLifecycleAdmin } from './lifecycle-admin';
+import { platformTime } from '@/lib/admin/time';
 
 const AUDIT_LIMIT = 20;
 
@@ -173,7 +174,7 @@ export default async function OrganisationPage(
           </p>
         ) : archived ? (
           <p className="mt-3 rounded-xl border border-critical/30 bg-critical-soft px-4 py-2.5 text-sm text-critical">
-            Archived {org.archived_at ? new Date(org.archived_at).toLocaleString('en-AU') : ''}.
+            Archived {org.archived_at ? platformTime(org.archived_at) : ''}.
             Member access, scheduled processing and notifications are paused.
           </p>
         ) : (
@@ -228,7 +229,7 @@ export default async function OrganisationPage(
             <li key={entry.id} className="flex flex-wrap items-baseline gap-3 px-4 py-2.5 text-sm">
               <span className="font-mono text-xs">{entry.action}</span>
               <span className="ml-auto text-xs text-faint">
-                {new Date(entry.created_at).toLocaleString('en-AU')}
+                {platformTime(entry.created_at)}
               </span>
             </li>
           ))}

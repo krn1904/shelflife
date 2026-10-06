@@ -6,6 +6,9 @@ import { fetchAllPages } from '@/lib/pagination';
 import { Stat } from '@/components/stat';
 import { PageHeader, SectionTitle } from '@/components/ui';
 import { AddOrganisationForm } from './organisation-admin';
+import { RefreshButton } from '@/components/refresh-button';
+import { clockAt } from '@/lib/activity/feed';
+import { PLATFORM_TIME_ZONE, platformTime } from '@/lib/admin/time';
 
 const RUN_LIMIT = 15;
 
@@ -19,6 +22,11 @@ const STALE_AFTER_MS = 36 * 60 * 60 * 1000;
 function isStale(lastRunAt: string | undefined): boolean {
   if (!lastRunAt) return true;
   return Date.now() - new Date(lastRunAt).getTime() > STALE_AFTER_MS;
+}
+
+/** When this render read its figures, on the platform's clock. Outside the component for the same reason. */
+function loadedAt(): string {
+  return clockAt(new Date(), PLATFORM_TIME_ZONE);
 }
 
 type OrganisationListRow = Pick<
@@ -66,7 +74,11 @@ export default async function AdminPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader title="Platform" subtitle="Every organisation, and the jobs that keep them fed." />
+      <PageHeader
+        title="Platform"
+        subtitle="Every organisation, and the jobs that keep them fed."
+        actions={<RefreshButton loadedAt={loadedAt()} />}
+      />
 
       <div className="grid gap-3 sm:grid-cols-3">
         <Stat label="Active organisations" value={activeOrgs.length} />
@@ -80,7 +92,7 @@ export default async function AdminPage() {
         <p className="rounded-xl border border-critical/30 bg-critical-soft px-4 py-3 text-sm text-critical">
           <strong className="font-semibold">The expiry engine has not run in the last 36 hours</strong>
           {lastEngineRun
-            ? ` — last run ${new Date(lastEngineRun.ran_at).toLocaleString('en-AU')}.`
+            ? ` — last run ${platformTime(lastEngineRun.ran_at)}.`
             : ' — no run has ever been recorded.'}{' '}
           Nothing is being surfaced to staff while this is true.
         </p>
@@ -118,7 +130,7 @@ export default async function AdminPage() {
                 <span className="font-medium text-muted">{org.name}</span>
                 <span className="badge badge-neutral font-mono">{org.slug}</span>
                 <span className="text-xs text-faint">
-                  {org.archived_at ? new Date(org.archived_at).toLocaleDateString('en-AU') : ''}
+                  {org.archived_at ? platformTime(org.archived_at, false) : ''}
                 </span>
                 <Link
                   href={`/admin/organisations/${org.id}`}
@@ -151,7 +163,7 @@ export default async function AdminPage() {
                 <tr key={run.id}>
                   <td className="px-4 py-2.5 font-mono text-xs">{run.job}</td>
                   <td className="px-4 py-2.5 whitespace-nowrap text-muted">
-                    {new Date(run.ran_at).toLocaleString('en-AU')}
+                    {platformTime(run.ran_at)}
                   </td>
                   <td className="px-4 py-2.5">
                     <span className={`badge ${run.ok ? 'badge-neutral text-good' : 'text-critical'}`}
