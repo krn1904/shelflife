@@ -24,14 +24,16 @@ test('matches the sorted-copy percentiles on photo-like pixel spreads', () => {
   for (const grey of spreads) assert.deepEqual(contrastRange(grey), bySorting(grey));
 });
 
-test('photos are stored at most 2400 wide and 4800 tall, never enlarged, in proportion', () => {
+test('photos are stored at most 2400 wide and 8000 tall, never enlarged, in proportion', () => {
   // A 12 MP phone photo, portrait and landscape.
   assert.deepEqual(uploadSize(3024, 4032), { width: 2400, height: 3200 });
   assert.deepEqual(uploadSize(4032, 3024), { width: 2400, height: 1800 });
-  // A long receipt photographed whole is limited by its height instead.
-  assert.deepEqual(uploadSize(2000, 12000), { width: 800, height: 4800 });
+  // A long thermal receipt keeps the full 2400 width the free reader needs.
+  assert.deepEqual(uploadSize(3000, 9000), { width: 2400, height: 7200 });
+  // Only an extreme one is limited by its height instead.
+  assert.deepEqual(uploadSize(2000, 12000), { width: 1333, height: 8000 });
   // Already small: left alone.
   assert.deepEqual(uploadSize(1200, 1600), { width: 1200, height: 1600 });
   // Degenerate sizes never round to zero.
-  assert.deepEqual(uploadSize(1, 100000), { width: 1, height: 4800 });
+  assert.deepEqual(uploadSize(1, 100000), { width: 1, height: 8000 });
 });

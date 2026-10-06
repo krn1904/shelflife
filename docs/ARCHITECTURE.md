@@ -298,7 +298,7 @@ It starts at the docket, not a supplier list:
    site folders, and `startDelivery` accepts the photo only at exactly that path. Every docket
    photo, including one replaced later on the intake screen (`docket-photo.tsx`), goes through
    `forUpload()` ([browser.ts](../src/lib/intake/docket/browser.ts)) on the phone first: at most
-   2400 px wide and 4800 px tall (`uploadSize()`), JPEG at 0.88, re-encoded at 0.7 in the rare
+   2400 px wide and 8000 px tall (`uploadSize()`, so a long receipt keeps its width), JPEG at 0.88, re-encoded at 0.7 in the rare
    case it is still over Textract's 5 MB. A noisy 12 MP test image of 6.1 MB went up at 1.3 MB.
    2400 px is kept rather than going smaller because the free reader needs that width to
    separate digits from table rules. `test:rls` checks the bucket's isolation: own site only,

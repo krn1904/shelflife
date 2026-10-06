@@ -4,10 +4,10 @@
  */
 
 const TARGET_WIDTH = 2400;     // OCR width: wide enough for Tesseract to separate digits from table rules
-const MAX_UPLOAD_HEIGHT = 4800; // a long receipt photographed whole; Textract takes up to 10000 px
+const MAX_UPLOAD_HEIGHT = 8000; // a long receipt keeps its full width for the free reader; Textract takes up to 10000 px
 const UPLOAD_QUALITY = 0.88;
 const FALLBACK_QUALITY = 0.7;   // only when a very detailed photo is still over the limit
-export const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // Textract's limit for a synchronous call
+const MAX_UPLOAD_BYTES = 5 * 1024 * 1024; // Textract's limit for a synchronous call
 
 /** The size a photo is stored at: never enlarged, at most TARGET_WIDTH wide and MAX_UPLOAD_HEIGHT tall. */
 export function uploadSize(width: number, height: number): { width: number; height: number } {
