@@ -10,6 +10,9 @@ is reserved for technical multi-tenant architecture discussions.
 - Portal: `/admin`
 - Scope: all organisations
 - Header identity: `ShelfLife Platform`
+- Times: every time on `/admin` (job history, archive dates, audit entries, the Refresh stamp)
+  is on Melbourne's clock, the one the nightly engine runs on (`platformTime()` in
+  `src/lib/admin/time.ts`). The nightly run shows as about 03:00.
 
 A platform admin still has an organisation membership because `memberships.org_id` is required,
 but that row is only an authorization anchor. It does not limit platform access to that

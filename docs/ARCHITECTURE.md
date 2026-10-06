@@ -299,6 +299,10 @@ calls `router.refresh()` inside a transition, which re-renders the page's server
 and keeps client state. The manager home and `/admin` use it. `RefreshOnReturn` still re-reads
 the page when someone comes back to the tab.
 
+Admin pages show times with `platformTime()` ([time.ts](../src/lib/admin/time.ts)), on
+Melbourne's clock. They used the server's default, which is UTC on Vercel, so the 03:00 engine
+run read as 4:00 pm the day before.
+
 ---
 
 ## Docket-driven intake
