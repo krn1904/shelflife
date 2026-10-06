@@ -658,6 +658,13 @@ async function main() {
     check('a name another supplier has, in any case, is refused', sameName?.code === '23505', sameName?.message ?? 'no error');
     const { error: sameAbn } = await edit(brunswickManager, lion.id, 'RLS Upkeep Lion Dairy', '90000000001');
     check('so is another supplier\'s ABN', sameAbn?.code === '23505', sameAbn?.message ?? 'no error');
+    const { count: auditBefore } = await admin.from('audit_log')
+      .select('*', { count: 'exact', head: true }).eq('action', 'supplier.updated').eq('subject_id', lion.id);
+    const { error: noChange } = await edit(brunswickManager, lion.id, 'RLS Upkeep Lion Dairy', '90000000002');
+    const { count: auditAfter } = await admin.from('audit_log')
+      .select('*', { count: 'exact', head: true }).eq('action', 'supplier.updated').eq('subject_id', lion.id);
+    check('saving without a change writes no audit entry', noChange === null && auditBefore === auditAfter,
+      noChange?.message ?? `${auditBefore} then ${auditAfter}`);
     const { error: off } = await edit(brunswickManager, lion.id, 'RLS Upkeep Lion Dairy', '90000000002', false);
     const { data: lionAfter } = await admin.from('suppliers').select('active').eq('id', lion.id).single();
     check('a manager switches a supplier off', off === null && lionAfter?.active === false, off?.message ?? '');

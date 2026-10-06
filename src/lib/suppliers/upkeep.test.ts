@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { aliasToKeep, lookAlikes, SupplierEdit, SupplierMerge, supplierError, supplierOrder } from './upkeep';
+import { aliasToKeep, isUnchangedSupplier, lookAlikes, SupplierEdit, SupplierMerge, supplierError, supplierOrder } from './upkeep';
 
 const ID = '11111111-1111-4111-8111-111111111111';
 const OTHER = '22222222-2222-4222-8222-222222222222';
@@ -56,4 +56,13 @@ test('refusals read as sentences', () => {
   assert.equal(supplierError({ code: '42501', message: 'only an owner can merge suppliers' }), 'Only an owner can merge suppliers.');
   assert.equal(supplierError({ code: '42501', message: 'not permitted to change this supplier' }), 'You cannot change this supplier.');
   assert.equal(supplierError({ code: '08006' }), 'Could not save that (08006).');
+});
+
+test('a save that changes nothing is recognised, so nothing is written or audited', () => {
+  const current = { name: 'Metcash', abn: '36000002481', active: true };
+  const edit = (over: object) => SupplierEdit.parse({ supplier_id: ID, name: 'Metcash', abn: '36 000 002 481', active: true, ...over });
+  assert.equal(isUnchangedSupplier(current, edit({})), true);
+  assert.equal(isUnchangedSupplier(current, edit({ name: 'Metcash Food' })), false);
+  assert.equal(isUnchangedSupplier(current, edit({ abn: null })), false);
+  assert.equal(isUnchangedSupplier(current, edit({ active: false })), false);
 });

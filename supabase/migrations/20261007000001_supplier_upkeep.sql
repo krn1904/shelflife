@@ -80,6 +80,12 @@ begin
       using errcode = 'unique_violation';
   end if;
 
+  -- Saving a form nobody changed is not a change: no write, and nothing for the audit log.
+  if v_name = v_supplier.name and v_abn is not distinct from v_supplier.abn
+     and coalesce(p_active, v_supplier.active) = v_supplier.active then
+    return;
+  end if;
+
   update public.suppliers
   set name = v_name, abn = v_abn, active = coalesce(p_active, active)
   where id = v_supplier.id;

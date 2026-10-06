@@ -4,7 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { requireRole } from '@/lib/auth/session';
 import { createClient } from '@/lib/supabase/server';
-import { aliasToKeep, SupplierEdit, SupplierMerge, supplierError } from './upkeep';
+import { aliasToKeep, isUnchangedSupplier, SupplierEdit, SupplierMerge, supplierError } from './upkeep';
 
 export type SupplierState =
   | { status: 'idle' }
@@ -34,8 +34,9 @@ export async function saveSupplier(_prev: SupplierState, formData: FormData): Pr
 
   // RLS scopes this read to the caller's organisation; the database function checks again.
   const supabase = await createClient();
-  const { data: current } = await supabase.from('suppliers').select('name').eq('id', edit.supplier_id).maybeSingle();
+  const { data: current } = await supabase.from('suppliers').select('name, abn, active').eq('id', edit.supplier_id).maybeSingle();
   if (!current) return { status: 'error', message: 'That supplier no longer exists.' };
+  if (isUnchangedSupplier(current, edit)) return { status: 'saved', message: 'Nothing changed.' };
 
   const { error } = await supabase.rpc('update_supplier', {
     p_supplier_id: edit.supplier_id,

@@ -313,7 +313,7 @@ It starts at the docket, not a supplier list:
    `/manage/suppliers` through two audited RPCs in
    [supplier_upkeep.sql](../supabase/migrations/20261007000001_supplier_upkeep.sql):
    `update_supplier()` (rename, ABN, on/off; names unique ignoring case, as `add_supplier()`
-   matches them) and, for owners, `merge_suppliers()` (moves deliveries, then aliases, then
+   matches them; a save that changes nothing writes nothing, audit included) and, for owners, `merge_suppliers()` (moves deliveries, then aliases, then
    deletes the duplicate; refuses two different ABNs). Both store the old name as an alias
    normalised by `aliasToKeep()` ([upkeep.ts](../src/lib/suppliers/upkeep.ts)), so recognition
    survives the change. `supplier_activity()` is `security invoker`, so its delivery counts are

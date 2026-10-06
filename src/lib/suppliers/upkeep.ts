@@ -19,6 +19,11 @@ export const SupplierEdit = z.object({
 
 export type SupplierEditInput = z.infer<typeof SupplierEdit>;
 
+/** True when a save would leave the supplier exactly as it is, so there is nothing to write. */
+export function isUnchangedSupplier(current: { name: string; abn: string | null; active: boolean }, edit: SupplierEditInput): boolean {
+  return current.name === edit.name && current.abn === edit.abn && current.active === edit.active;
+}
+
 export const SupplierMerge = z.object({
   keep_id: z.string().uuid({ message: 'Pick the supplier to keep.' }),
   remove_id: z.string().uuid(),
