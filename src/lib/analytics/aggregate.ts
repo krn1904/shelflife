@@ -71,14 +71,7 @@ export function siteLeague(
 
 export type ExpiryBucket = 'overdue' | 'today' | 'soon' | 'watch';
 
-export const BUCKET_LABEL: Record<ExpiryBucket, string> = {
-  overdue: 'Overdue',
-  today: 'Due today',
-  soon: 'Within 7 days',
-  watch: 'Within 30 days',
-};
-
-/** Which column of the expiry board a given days-remaining belongs in. */
+/** The urgency band a given days-remaining falls in; the seed checks use it to cover every band. */
 export function bucketFor(daysLeft: number): ExpiryBucket {
   if (daysLeft < 0) return 'overdue';
   if (daysLeft === 0) return 'today';

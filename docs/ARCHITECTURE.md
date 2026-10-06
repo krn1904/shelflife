@@ -427,7 +427,7 @@ outbox can keep). Split in two on purpose:
 
 - [queue.ts](../src/lib/offline/queue.ts) — framework-free semantics, fully unit-tested:
   `classifyFailure` (retry transient, give up on permanent or after `MAX_ATTEMPTS` = 8),
-  `backoffMs` (exponential, capped at 5 min), `replayOrder` (oldest-first).
+  `replayOrder` (oldest-first). There is no retry timer: the queue drains again on reconnect.
 - [outbox.ts](../src/lib/offline/outbox.ts) — the Dexie/IndexedDB store and `drain(send)`, which
   **replays in order and stops at the first entry needing retry** rather than skipping ahead
   (a later write-off can depend on an earlier one decrementing the batch).

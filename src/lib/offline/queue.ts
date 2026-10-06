@@ -43,11 +43,6 @@ export function classifyFailure(entry: OutboxEntry, error: { permanent: boolean;
   return { status: 'retry', reason: error.message };
 }
 
-/** Exponential backoff, capped, so a long outage does not become a tight retry loop. */
-export function backoffMs(attempts: number): number {
-  return Math.min(2 ** attempts * 1000, 5 * 60 * 1000);
-}
-
 /**
  * Replay order: oldest first, always.
  *

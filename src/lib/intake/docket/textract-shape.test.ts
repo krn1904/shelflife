@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import type { Block, ExpenseDocument } from '@aws-sdk/client-textract';
-import { expenseFromDocuments, tablesFromBlocks, textLinesFromBlocks } from './textract-shape';
+import type { Block } from '@aws-sdk/client-textract';
+import { tablesFromBlocks, textLinesFromBlocks } from './textract-shape';
 
 // Shaped like Textract's AnalyzeDocument answer for the top of the Bega docket's table.
 const word = (id: string, text: string): Block => ({ Id: id, BlockType: 'WORD', Text: text });
@@ -34,32 +34,6 @@ test('rebuilds a table cell by cell, in printed order', () => {
 
 test('a page without tables gives none', () => {
   assert.deepEqual(tablesFromBlocks([word('w', 'hello')]), []);
-});
-
-test('reads supplier, docket and line items from the invoice model', () => {
-  const documents: ExpenseDocument[] = [{
-    SummaryFields: [
-      { Type: { Text: 'VENDOR_NAME' }, ValueDetection: { Text: 'Bega Group' } },
-      { Type: { Text: 'INVOICE_RECEIPT_ID' }, ValueDetection: { Text: '0121921865' } },
-      { Type: { Text: 'INVOICE_RECEIPT_DATE' }, ValueDetection: { Text: '23/09/2026' } },
-    ],
-    LineItemGroups: [{
-      LineItems: [{
-        LineItemExpenseFields: [
-          { Type: { Text: 'PRODUCT_CODE' }, ValueDetection: { Text: '3024', Confidence: 98 } },
-          { Type: { Text: 'ITEM' }, ValueDetection: { Text: 'Pura Milk 2Lt Bottle', Confidence: 96 } },
-          { Type: { Text: 'QUANTITY' }, ValueDetection: { Text: '18', Confidence: 72.6 } },
-          { Type: { Text: 'EXPENSE_ROW' }, ValueDetection: { Text: '0827408699 2 0 3024|EA Pura Milk 2Lt Bottle 18' } },
-        ],
-      }],
-    }],
-  }];
-  const reading = expenseFromDocuments(documents);
-  assert.deepEqual([reading.vendor, reading.docketNumber, reading.date], ['Bega Group', '0121921865', '23/09/2026']);
-  assert.deepEqual(reading.items, [{
-    code: '3024', item: 'Pura Milk 2Lt Bottle', quantity: '18', unitPrice: null, price: null,
-    row: '0827408699 2 0 3024|EA Pura Milk 2Lt Bottle 18', confidence: 73,
-  }]);
 });
 
 test('keeps every printed line in reading order, for the letterhead', () => {

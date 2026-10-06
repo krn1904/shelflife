@@ -2,7 +2,6 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
   MAX_ATTEMPTS,
-  backoffMs,
   classifyFailure,
   pendingCount,
   replayOrder,
@@ -63,12 +62,6 @@ test('a transient failure eventually gives up rather than retrying forever', () 
   });
   assert.equal(last.status, 'give-up');
   assert.match(last.status === 'give-up' ? last.reason : '', /after 8 attempts/);
-});
-
-test('backoff grows and then stops growing', () => {
-  assert.equal(backoffMs(0), 1000);
-  assert.equal(backoffMs(3), 8000);
-  assert.equal(backoffMs(99), 5 * 60 * 1000);
 });
 
 test('the pending count excludes entries that have given up', () => {

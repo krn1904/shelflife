@@ -9,12 +9,6 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 
 export type ExpiryActionKind = 'check' | 'markdown' | 'pull';
 
-export const ACTION_LABEL: Record<ExpiryActionKind, string> = {
-  check: 'Check',
-  markdown: 'Half price',
-  pull: 'Last day',
-};
-
 /** Groups by shelf life on arrival: how long the batch had left the day it came in. */
 export type ShelfLifeGroup = 'short' | 'medium' | 'long';
 

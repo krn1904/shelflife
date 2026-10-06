@@ -35,7 +35,6 @@ export const LineCorrection = z.object({
 });
 
 export type LineCorrectionInput = z.infer<typeof LineCorrection>;
-export type CorrectionBatch = LineCorrectionInput['batches'][number];
 
 /** The line as it stands, for comparing a correction against. */
 export type CurrentLine = {
@@ -118,8 +117,6 @@ export const ProductReview = z.object({
   message: 'Rotation stock is checked by fixture. Say which fixture it sits on.',
   path: ['fixture'],
 });
-
-export type ProductReviewInput = z.infer<typeof ProductReview>;
 
 /** '' from an untouched input means "not set". Barcodes are stored without spaces or dashes. */
 export function productReviewFrom(form: FormData) {
