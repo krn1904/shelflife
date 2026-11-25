@@ -94,7 +94,7 @@ async function markReadUpTo(
   thread: { messageId: string; staffId: string },
   readerId: string,
   seenUpTo: string,
-): Promise<void> {
+): Promise<boolean> {
   const { data: existing } = await supabase
     .from('site_message_thread_reads')
     .select('last_read_at')
@@ -104,12 +104,13 @@ async function markReadUpTo(
     .maybeSingle();
 
   const alreadyFurther = existing && new Date(existing.last_read_at).getTime() >= new Date(seenUpTo).getTime();
-  if (alreadyFurther) return;
+  if (alreadyFurther) return false;
 
-  await supabase.from('site_message_thread_reads').upsert(
+  const { error } = await supabase.from('site_message_thread_reads').upsert(
     { message_id: thread.messageId, staff_id: thread.staffId, reader_id: readerId, last_read_at: seenUpTo },
     { onConflict: 'message_id,staff_id,reader_id' },
   );
+  return !error;
 }
 
 /**
@@ -170,6 +171,37 @@ export async function markThreadRead(formData: FormData): Promise<void> {
   if (!messageId.success || !seenUpTo.success || !staffId) return;
 
   const supabase = await createClient();
-  await markReadUpTo(supabase, { messageId: messageId.data, staffId }, session.userId, seenUpTo.data);
-  refresh();
+  const moved = await markReadUpTo(supabase, { messageId: messageId.data, staffId }, session.userId, seenUpTo.data);
+  // Opening the same thread again must not refresh, or the page that marks it seen would reload forever.
+  if (moved) refresh();
+}
+
+const seenThread = z.object({
+  messageId: uuid,
+  staffId: uuid.nullable(),
+  seenUpTo: timestamp,
+});
+
+/**
+ * The threads on screen, marked seen in one go. Staff are always recorded against their own
+ * thread. This does not refresh the page, so the replies stay marked new until the next visit.
+ */
+export async function markThreadsSeen(raw: unknown): Promise<void> {
+  const session = await requireSession();
+  const parsed = z.array(seenThread).max(500).safeParse(raw);
+  if (!parsed.success || parsed.data.length === 0) return;
+
+  const supabase = await createClient();
+  for (const thread of parsed.data) {
+    const staffId = session.primaryRole === 'staff' ? session.userId : thread.staffId;
+    if (!staffId) continue;
+    // No refresh: this page should keep showing what was new until the reader leaves it.
+    // The next navigation reads the updated cursor.
+    await markReadUpTo(
+      supabase,
+      { messageId: thread.messageId, staffId },
+      session.userId,
+      thread.seenUpTo,
+    );
+  }
 }

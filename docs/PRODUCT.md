@@ -153,7 +153,8 @@ admins don't get shift reminders. (An owner email digest is planned but not buil
 
 Managers can also send their staff a short note (**Site → Message staff**): it stays at the top
 of every staff page until each person taps **Got it**, and the manager sees who has read it.
-Staff don't reply in the app.
+Each staff member can reply in a private thread under that note; the manager or owner answers
+there, and other staff never see it. A reply stays new until that person opens Messages.
 
 How early an item is mentioned depends on its **shelf life when it arrived**, because a 14-day
 smoothie and an 8-month bag of chips need very different warnings. Each batch is put in a group

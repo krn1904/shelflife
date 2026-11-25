@@ -194,6 +194,8 @@ export type SentThread = {
   replies: ThreadReply[];
   /** How many of those this manager hasn't seen. */
   newReplies: number;
+  /** Those unseen replies, in thread order. */
+  unseen: ThreadReply[];
 };
 
 export type SentMessage = SiteMessage & {
@@ -222,11 +224,13 @@ const managerThreadsAt = cache(async (siteId: string, readerId: string) => {
       .map((reply) => withAuthor(reply, names));
     const threads = groupThreads(messageReplies).map((thread) => {
       const lastReadAt = opened.get(threadKey(messageId, thread.staffId)) ?? null;
+      const unseen = unreadReplies(thread.replies, readerId, lastReadAt);
       return {
         staffId: thread.staffId,
         staffName: names.get(thread.staffId) ?? 'Someone',
         replies: thread.replies,
-        newReplies: unreadReplies(thread.replies, readerId, lastReadAt).length,
+        newReplies: unseen.length,
+        unseen,
       };
     });
     threadsByMessage.set(messageId, threads);

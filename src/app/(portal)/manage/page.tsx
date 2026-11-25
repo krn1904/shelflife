@@ -14,6 +14,8 @@ import { RefreshButton } from '@/components/refresh-button';
 import { loadActivity } from '@/lib/activity/feed-data';
 import { clockAt, whenAgo } from '@/lib/activity/feed';
 import { atSite } from '@/lib/deliveries/review';
+import { loadUnreadReplyCount } from '@/lib/messages/data';
+import { newRepliesLabel } from '@/lib/messages/messages';
 
 
 export default async function ManagePage() {
@@ -25,7 +27,7 @@ export default async function ManagePage() {
   const monthStart = subMonths(new Date(asOf), 1).toISOString();
 
   const now = new Date();
-  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, activity, reminders, toReview] =
+  const [{ count: ranged }, { count: urgentCount }, { data: waste }, { count: openDeliveries }, activity, reminders, toReview, newReplies] =
     await Promise.all([
       supabase.from('site_products').select('*', { count: 'exact', head: true }),
       // Counted by the database: every dated batch used to be downloaded just to count these.
@@ -40,8 +42,10 @@ export default async function ManagePage() {
       site ? loadActivity(supabase, site.id, now) : Promise.resolve([]),
       loadReminders(session),
       site ? newItemsToReview(supabase, site.id) : Promise.resolve([]),
+      site ? loadUnreadReplyCount(site, session.userId) : Promise.resolve(0),
     ]);
   const unreviewed = toReview.length;
+  const replyLabel = newRepliesLabel(newReplies);
 
   const urgent = urgentCount ?? 0;
 
@@ -80,7 +84,11 @@ export default async function ManagePage() {
           <QuickAction href="/manage/products" title="Products & ranging" hint="Par levels, fixtures, tracking modes" />
           <QuickAction href="/manage/expiry" title="Expiry board" hint="Everything dated, by days left" />
           <QuickAction href="/manage/reminders" title="Reminder settings" hint="When staff are told to check, discount or pull" />
-          <QuickAction href="/manage/messages" title="Message staff" hint="Send a note; see who has read it" />
+          <QuickAction
+            href="/manage/messages"
+            title="Message staff"
+            hint={replyLabel ? `${replyLabel} · see who has read each note` : 'Send a note; see who has read it'}
+          />
           <QuickAction href="/manage/people" title="People" hint="Add or remove the people who work here" />
         </div>
       </div>

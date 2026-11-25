@@ -79,7 +79,7 @@ genuinely the fastest way to identify it.
 - **Barcode scanning:** native `BarcodeDetector` API where available, `@zxing/browser` WASM fallback
 - **Offline:** Dexie (IndexedDB) outbox (no service worker), client-generated UUIDs, idempotent upserts
 - **Reminders:** in-app, per account (home-screen banner, once-a-day pop-up, Today-tab count) for staff and managers; no Web Push. Owner email digest via Resend is not built.
-- **Site messages:** a manager's note to everyone on staff at a site, shown until each acknowledges it; one-way, in-app only.
+- **Site messages:** a manager's note to everyone on staff at a site, shown until each acknowledges it; each staff member has a private reply thread with the manager, in-app only.
 - **Charts:** Recharts — load the `dataviz` skill before writing any chart code
 - **Deploy:** Vercel + Supabase free tiers, so the demo stays alive indefinitely at zero cost
 

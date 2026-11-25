@@ -1,6 +1,7 @@
+import type { ReactNode } from 'react';
 import Link from 'next/link';
 import { acknowledgeMessage } from '@/lib/messages/actions';
-import { formatSentAt } from '@/lib/messages/messages';
+import { formatSentAt, newRepliesLabel } from '@/lib/messages/messages';
 import type { SiteMessage } from '@/lib/messages/data';
 import { SubmitButton } from '@/components/submit-button';
 
@@ -8,7 +9,17 @@ import { SubmitButton } from '@/components/submit-button';
 const SHOWN = 2;
 
 /** One message with its Got it button. Used at the top of every staff page and on the Messages page. */
-export function MessageCard({ message, timeZone, read = false }: { message: SiteMessage; timeZone: string; read?: boolean }) {
+export function MessageCard({
+  message,
+  timeZone,
+  read = false,
+  children,
+}: {
+  message: SiteMessage;
+  timeZone: string;
+  read?: boolean;
+  children?: ReactNode;
+}) {
   return (
     <div className={`card p-4 ${read ? '' : 'border-brand'}`}>
       <div className="text-xs text-muted">
@@ -23,6 +34,7 @@ export function MessageCard({ message, timeZone, read = false }: { message: Site
           </SubmitButton>
         </form>
       )}
+      {children}
     </div>
   );
 }
@@ -33,8 +45,17 @@ export function MessageCard({ message, timeZone, read = false }: { message: Site
  * the bottom tabs. Server-rendered: no timers, no polling; a new message shows on the next
  * page load or when the app comes back to the foreground.
  */
-export function MessageNotices({ unread, timeZone }: { unread: SiteMessage[]; timeZone: string }) {
-  if (unread.length === 0) return null;
+export function MessageNotices({
+  unread,
+  timeZone,
+  newReplies = 0,
+}: {
+  unread: SiteMessage[];
+  timeZone: string;
+  newReplies?: number;
+}) {
+  const replyLabel = newRepliesLabel(newReplies);
+  if (unread.length === 0 && !replyLabel) return null;
   // Oldest first, so a series of notes reads in the order they were written.
   const oldestFirst = [...unread].reverse();
   const more = unread.length - SHOWN;
@@ -47,6 +68,11 @@ export function MessageNotices({ unread, timeZone }: { unread: SiteMessage[]; ti
       {more > 0 && (
         <Link href="/app/messages" className="block text-sm text-brand-text">
           {more} more {more === 1 ? 'message' : 'messages'} →
+        </Link>
+      )}
+      {replyLabel && (
+        <Link href="/app/messages" className="block text-sm text-brand-text">
+          {replyLabel} →
         </Link>
       )}
     </section>

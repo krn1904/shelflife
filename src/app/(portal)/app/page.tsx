@@ -7,6 +7,7 @@ import { demoEnabled } from '@/lib/demo/actions';
 import { loadReminders } from '@/lib/expiry/reminders-data';
 import { ReminderBanner } from '@/components/reminder-banner';
 import { loadStaffMessages } from '@/lib/messages/data';
+import { newRepliesLabel } from '@/lib/messages/messages';
 
 export default async function ShiftPage() {
   const session = await requireSession();
@@ -23,6 +24,12 @@ export default async function ShiftPage() {
       loadStaffMessages(session),
     ]);
   const unread = messages?.unread.length ?? 0;
+  const newReplies = messages?.answered.reduce((count, message) => count + message.newReplies.length, 0) ?? 0;
+  const replyLabel = newRepliesLabel(newReplies);
+  const messageHint = [
+    unread > 0 ? (unread === 1 ? '1 new note' : `${unread} new notes`) : null,
+    replyLabel,
+  ].filter(Boolean).join(' · ') || 'Notes from your manager';
 
   return (
     <div className="space-y-8">
@@ -57,7 +64,7 @@ export default async function ShiftPage() {
           <QuickAction
             href="/app/messages"
             title="Messages"
-            hint={unread > 0 ? `${unread} new from your manager` : 'Notes from your manager'}
+            hint={messageHint}
           />
           <QuickAction href="/app/settings" title="Settings" hint="Light or dark theme" />
         </div>

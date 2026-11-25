@@ -252,16 +252,22 @@ polling, no realtime subscription. A manager inserts a `site_messages` row for t
 acknowledge with a `site_message_reads` row (primary key `(message_id, user_id)`, written with
 `ignoreDuplicates` so a double tap needs no update permission). Staff get only messages sent since
 their membership at the site was created (`memberships.created_at`, `sentSince()`), and
-`readSummary()` leaves later joiners out of each message's count. `loadStaffMessages()` is cached per
-request on plain ids, so the portal layout (unread notes above every staff page,
+`readSummary()` leaves later joiners out of each message's count. Under each note, that staff
+member has a private thread with the site's manager and owner (`site_message_replies`); other
+staff never see it. `unreadReplies()` is what the reader hasn't opened, from
+`site_message_thread_reads`. Opening Messages calls `markThreadsSeen()` up to the newest reply
+on screen and does not refresh, so those replies stay marked new until the next visit.
+`loadStaffMessages()` is cached per
+request on plain ids, so the portal layout (unread notes and a new-reply link above every staff page,
 [message-notices.tsx](../src/components/message-notices.tsx)) and the Shift and Messages pages
 share one read. The actions call `refresh()` from `next/cache`, which re-renders the layout too,
 so a note leaves the screen as soon as it is acknowledged. Notes render inline at the top of the
 page, never floating, so they don't cover the reminder pop-up or the bottom tabs. RLS: everyone at
 the site reads messages; only `can_manage_site` at that site inserts (as themselves, `sent_by =
 auth.uid()`) or deletes; there is no update. A reader sees only their own read rows; the site's
-manager or owner sees all of them. `require_active_org_write` stops an archived organisation
-sending.
+manager or owner sees all of them. Replies are insert-only, written as yourself, and only in a
+thread that belongs to someone on staff at the site. `require_active_org_write` stops an archived
+organisation sending.
 
 ---
 

@@ -2,9 +2,11 @@ import { activeSite, requireRole } from '@/lib/auth/session';
 import { firstParam } from '@/lib/search-params';
 import { loadSentMessages } from '@/lib/messages/data';
 import { deleteMessage } from '@/lib/messages/actions';
-import { formatSentAt, readCountLabel } from '@/lib/messages/messages';
+import { formatSentAt, newRepliesLabel, readCountLabel } from '@/lib/messages/messages';
 import { PageHeader, SectionTitle } from '@/components/ui';
 import { SubmitButton } from '@/components/submit-button';
+import { MarkThreadsSeen, ReplyList, type SeenThread } from '@/components/message-thread';
+import { ReplyForm } from '@/components/reply-form';
 import { MessageForm } from './message-form';
 
 /** Send a note to a site's staff, and see who has read the ones already sent. */
@@ -18,10 +20,19 @@ export default async function ManagerMessagesPage(props: PageProps<'/manage/mess
   const sent = await loadSentMessages(site, session.userId);
   // Owners pick which of their sites to write to; a manager has just the one.
   const siteSites = session.sites.filter((s) => s.orgId === site.orgId);
+  const seen: SeenThread[] = sent.flatMap((message) => message.threads.flatMap((thread) => {
+    const latest = thread.replies[thread.replies.length - 1];
+    if (!latest) return [];
+    return [{ messageId: message.id, staffId: thread.staffId, seenUpTo: latest.sentAt }];
+  }));
 
   return (
     <div className="space-y-6">
-      <PageHeader title="Messages" subtitle={`Notes to staff at ${site.name}. Each person taps Got it once they've read it.`} />
+      <PageHeader
+        title="Messages"
+        subtitle={`Notes to staff at ${site.name}. Each person taps Got it, and replies stay in their own thread.`}
+      />
+      <MarkThreadsSeen threads={seen} />
 
       {siteSites.length > 1 && (
         <form className="card flex flex-wrap items-end gap-3 p-4 text-sm" action="/manage/messages">
@@ -65,6 +76,26 @@ export default async function ManagerMessagesPage(props: PageProps<'/manage/mess
                     </>
                   )}
                 </dl>
+              )}
+              {m.threads.length > 0 ? (
+                <div className="mt-3 space-y-3">
+                  {m.threads.map((thread) => {
+                    const label = newRepliesLabel(thread.newReplies);
+                    const newIds = new Set(thread.unseen.map((reply) => reply.id));
+                    return (
+                      <div key={thread.staffId}>
+                        <div className="text-xs text-muted">
+                          Replies with {thread.staffName}
+                          {label && <span className="ml-2 font-medium text-brand-text">{label}</span>}
+                        </div>
+                        <ReplyList replies={thread.replies} newIds={newIds} timeZone={site.timeZone} />
+                        <ReplyForm messageId={m.id} staffId={thread.staffId} label={`Reply to ${thread.staffName}`} />
+                      </div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="mt-3 text-xs text-muted">No replies yet.</p>
               )}
               <form action={deleteMessage} className="mt-3">
                 <input type="hidden" name="message_id" value={m.id} />
