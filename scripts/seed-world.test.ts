@@ -4,6 +4,7 @@ import { differenceInCalendarDays, parseISO } from 'date-fns';
 import { bucketFor } from '../src/lib/analytics/aggregate';
 import { WASTE_REASONS } from '../src/lib/expiry/waste-reasons';
 import { DEMO_LOGINS } from '../src/lib/demo/config';
+import { unreadReplies, type Reply } from '../src/lib/messages/messages';
 import { buildWorld, melbourneDate, USER_COLUMNS } from './seed-world';
 
 // Mid-morning in Melbourne, so "today" rows exist but the clock guard still matters.
@@ -22,6 +23,7 @@ test('every user reference resolves to a seeded account', () => {
     ...world.orgs.flatMap((o) => [
       ...o.memberships, ...o.deliveries, ...o.expiryActions, ...o.rotationChecks,
       ...o.waste, ...o.audit, ...(o.archive ? [o.archive] : []),
+      ...o.messages, ...o.messageReads, ...o.replies, ...o.threadReads,
     ]),
   ];
   for (const row of rows) {
@@ -41,6 +43,10 @@ test('nothing is dated in the future', () => {
     ...o.rotationChecks.map((c) => c.checked_at),
     ...o.expiryActions.map((a) => a.actioned_at),
     ...o.audit.map((a) => a.created_at),
+    ...o.messages.map((m) => m.created_at),
+    ...o.messageReads.map((r) => r.read_at),
+    ...o.replies.map((r) => r.created_at),
+    ...o.threadReads.map((r) => r.last_read_at),
   ]).concat(world.jobRuns.map((r) => r.ran_at));
   for (const stamp of stamps) {
     if (stamp) assert.ok(Date.parse(stamp) <= now, `${stamp} is in the future`);
@@ -100,6 +106,45 @@ test('the demo organisation uses every waste reason and every login', () => {
   for (const login of DEMO_LOGINS) {
     assert.ok(world.users.some((u) => u.email === login.email && members.has(u.key)), login.email);
   }
+});
+
+test('every reply follows the rules the table enforces', () => {
+  for (const o of world.orgs) {
+    for (const reply of o.replies) {
+      const message = o.messages.find((m) => m.id === reply.message_id)!;
+      const isStaffHere = o.memberships.some((m) =>
+        m.user_id === reply.staff_id && m.role === 'staff' && m.site_id === message.site_id);
+      const managesHere = o.memberships.some((m) =>
+        m.user_id === reply.author_id && (m.role === 'owner' || (m.role === 'manager' && m.site_id === message.site_id)));
+      const writtenByThreadOwner = reply.author_id === reply.staff_id;
+
+      assert.equal(reply.site_id, message.site_id);
+      assert.ok(isStaffHere, `${reply.staff_id} is not staff at the message's site`);
+      assert.ok(writtenByThreadOwner || managesHere, `${reply.author_id} may not write in ${reply.staff_id}'s thread`);
+      assert.ok(Date.parse(reply.created_at!) > Date.parse(message.created_at!), 'reply before its message');
+    }
+  }
+});
+
+test('the demo has a new answer waiting for staff and a new reply waiting for the manager', () => {
+  const demo = world.orgs.find((o) => o.org.is_demo)!;
+  const brunswick = demo.sites.find((s) => s.name === 'Brunswick')!;
+  const brunswickMessages = new Set(demo.messages.filter((m) => m.site_id === brunswick.id).map((m) => m.id));
+  const replies = demo.replies.filter((r) => brunswickMessages.has(r.message_id));
+
+  function newRepliesFor(readerId: string): string[] {
+    return [...brunswickMessages].flatMap((messageId) => {
+      const thread: Reply[] = replies
+        .filter((r) => r.message_id === messageId && r.staff_id === 'demo-staff')
+        .map((r) => ({ id: r.id!, staffId: r.staff_id, authorId: r.author_id ?? null, body: r.body, sentAt: r.created_at! }));
+      const lastRead = demo.threadReads.find((read) =>
+        read.message_id === messageId && read.staff_id === 'demo-staff' && read.reader_id === readerId);
+      return unreadReplies(thread, readerId, lastRead?.last_read_at ?? null).map((r) => r.body);
+    });
+  }
+
+  assert.deepEqual(newRepliesFor('demo-staff'), ['Yes, the cool room is fine. Yoghurts on the top shelf.']);
+  assert.deepEqual(newRepliesFor('demo-manager'), ['I can stay until 5 and count it in.']);
 });
 
 test('the RLS suite finds the organisations it expects', () => {

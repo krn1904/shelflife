@@ -902,6 +902,166 @@ async function main() {
     await admin.from('site_messages').delete().in('site_id', [brunswick.id, coburg.id]);
   }
 
+  console.log('\nsite message replies (one private thread per staff member):');
+  {
+    const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
+    const brunswick = metroSites!.find((x) => x.name === 'Brunswick')!;
+    const coburg = metroSites!.find((x) => x.name === 'Coburg')!;
+    await admin.from('site_messages').delete().in('site_id', [brunswick.id, coburg.id]);
+
+    const manager = await signIn('manager@metro-petroleum.test');
+    const coburgManager = await signIn('coburg.manager@metro-petroleum.test');
+    const preston = await signIn('preston.staff@metro-petroleum.test');
+    const { data: { user: staffUser } } = await staff.auth.getUser();
+    const { data: { user: managerUser } } = await manager.auth.getUser();
+    const { data: { user: ownerUser } } = await owner.auth.getUser();
+    const { data: { user: prestonUser } } = await preston.auth.getUser();
+
+    // A second Brunswick staff member for the run, so there are two threads to keep apart.
+    const secondEmail = 'rls-replies-second@shelflife.test';
+    const leftover = (await admin.auth.admin.listUsers({ perPage: 1000 })).data.users.find((u) => u.email === secondEmail);
+    if (leftover) await admin.auth.admin.deleteUser(leftover.id);
+    const { data: created, error: createError } = await admin.auth.admin.createUser({
+      email: secondEmail, password: PASSWORD, email_confirm: true,
+    });
+    if (createError) throw new Error(`could not create ${secondEmail}: ${createError.message}`);
+    const secondId = created.user.id;
+    const { data: secondMembership } = await admin.from('memberships')
+      .insert({ user_id: secondId, org_id: metro.id, site_id: brunswick.id, role: 'staff' })
+      .select('id').single();
+    const second = await signIn(secondEmail);
+
+    const { data: sent } = await manager.from('site_messages')
+      .insert({ org_id: metro.id, site_id: brunswick.id, body: 'RLS check: replies', sent_by: managerUser!.id })
+      .select('id').single();
+    const onMessage = { message_id: sent!.id, org_id: metro.id, site_id: brunswick.id };
+    const repliesOn = async (db: Db) =>
+      (await db.from('site_message_replies').select('staff_id, author_id').eq('message_id', sent!.id)).data ?? [];
+
+    const { data: ownReply, error: ownReplyError } = await staff.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: staffUser!.id, author_id: staffUser!.id, body: 'Riley here' })
+      .select('created_at').single();
+    check('staff can reply in their own thread, and read the reply back', ownReplyError === null && !!ownReply?.created_at,
+      ownReplyError?.message ?? '');
+
+    const { error: secondReply } = await second.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: secondId, author_id: secondId, body: 'Second here' });
+    check('a second staff member gets a thread of their own', secondReply === null, secondReply?.message ?? '');
+
+    const { error: intoOtherThread } = await staff.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: secondId, author_id: staffUser!.id, body: 'RLS check' });
+    check('staff cannot write in a colleague\'s thread', intoOtherThread !== null,
+      intoOtherThread ? '' : 'insert unexpectedly succeeded');
+
+    const { error: impersonated } = await staff.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: staffUser!.id, author_id: managerUser!.id, body: 'RLS check' });
+    check('nor reply in the manager\'s name', impersonated !== null, impersonated ? '' : 'insert unexpectedly succeeded');
+
+    const staffSees = await repliesOn(staff);
+    check('staff see only their own thread', staffSees.length === 1 && staffSees[0].staff_id === staffUser!.id,
+      `got ${JSON.stringify(staffSees)}`);
+
+    const { error: answer } = await manager.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: staffUser!.id, author_id: managerUser!.id, body: 'Thanks Riley' });
+    check('the manager can answer in a staff member\'s thread', answer === null, answer?.message ?? '');
+
+    const managerSees = await repliesOn(manager);
+    check('the manager sees every thread at their site',
+      managerSees.length === 3 && new Set(managerSees.map((r) => r.staff_id)).size === 2, `got ${managerSees.length}`);
+
+    const { error: ownerAnswer } = await owner.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: secondId, author_id: ownerUser!.id, body: 'Owner here' });
+    check('the owner can answer too', ownerAnswer === null && (await repliesOn(owner)).length === 4,
+      ownerAnswer?.message ?? '');
+
+    const { error: managerThread } = await manager.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: managerUser!.id, author_id: managerUser!.id, body: 'RLS check' });
+    check('a thread belongs to someone on staff, not the manager', managerThread !== null,
+      managerThread ? '' : 'insert unexpectedly succeeded');
+
+    const { error: elsewhereThread } = await manager.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: prestonUser!.id, author_id: managerUser!.id, body: 'RLS check' });
+    check('nor someone on staff at another site', elsewhereThread !== null,
+      elsewhereThread ? '' : 'insert unexpectedly succeeded');
+
+    check('another site\'s manager sees no threads here', (await repliesOn(coburgManager)).length === 0);
+    const { error: coburgAnswer } = await coburgManager.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: staffUser!.id, author_id: (await coburgManager.auth.getUser()).data.user!.id, body: 'RLS check' });
+    check('and cannot answer in them', coburgAnswer !== null, coburgAnswer ? '' : 'insert unexpectedly succeeded');
+
+    check('staff at another site see none', (await repliesOn(preston)).length === 0);
+    check('another organisation sees none', (await repliesOn(other)).length === 0);
+    const { data: { user: otherUser } } = await other.auth.getUser();
+    const { error: planted } = await other.from('site_message_replies')
+      .insert({ ...onMessage, org_id: united.id, staff_id: otherUser!.id, author_id: otherUser!.id, body: 'RLS check' });
+    check('nor plant a reply here under its own org_id', planted !== null, planted ? '' : 'insert unexpectedly succeeded');
+
+    const { data: edited } = await staff.from('site_message_replies')
+      .update({ body: 'Edited' }).eq('message_id', sent!.id).select('id');
+    const { data: staffDeleted } = await staff.from('site_message_replies').delete().eq('message_id', sent!.id).select('id');
+    const { data: managerDeleted } = await manager.from('site_message_replies').delete().eq('message_id', sent!.id).select('id');
+    check('replies cannot be edited or deleted one by one',
+      (edited?.length ?? 0) === 0 && (staffDeleted?.length ?? 0) === 0 && (managerDeleted?.length ?? 0) === 0,
+      `edited ${edited?.length}, deleted ${staffDeleted?.length} / ${managerDeleted?.length}`);
+
+    const threadRead = (staffId: string, readerId: string) =>
+      ({ message_id: sent!.id, staff_id: staffId, reader_id: readerId, last_read_at: ownReply!.created_at });
+    const { error: staffOpened } = await staff.from('site_message_thread_reads')
+      .upsert(threadRead(staffUser!.id, staffUser!.id), { onConflict: 'message_id,staff_id,reader_id' });
+    check('staff can mark their own thread opened, and again', staffOpened === null, staffOpened?.message ?? '');
+
+    const { error: openedOther } = await staff.from('site_message_thread_reads')
+      .insert(threadRead(secondId, staffUser!.id));
+    check('but not a colleague\'s thread', openedOther !== null, openedOther ? '' : 'insert unexpectedly succeeded');
+
+    const { error: openedAsManager } = await staff.from('site_message_thread_reads')
+      .insert(threadRead(staffUser!.id, managerUser!.id));
+    check('nor mark it opened for someone else', openedAsManager !== null,
+      openedAsManager ? '' : 'insert unexpectedly succeeded');
+
+    const { error: managerOpened } = await manager.from('site_message_thread_reads')
+      .insert(threadRead(staffUser!.id, managerUser!.id));
+    check('the manager can mark a staff thread opened', managerOpened === null, managerOpened?.message ?? '');
+
+    const { error: coburgOpened } = await coburgManager.from('site_message_thread_reads')
+      .insert(threadRead(staffUser!.id, (await coburgManager.auth.getUser()).data.user!.id));
+    check('another site\'s manager cannot', coburgOpened !== null, coburgOpened ? '' : 'insert unexpectedly succeeded');
+
+    const { data: staffReadRows } = await staff.from('site_message_thread_reads').select('reader_id').eq('message_id', sent!.id);
+    check('when someone last looked is private to them',
+      staffReadRows?.length === 1 && staffReadRows[0].reader_id === staffUser!.id, `got ${JSON.stringify(staffReadRows)}`);
+
+    const { error: removeError } = await manager.rpc('remove_site_member', { p_membership_id: secondMembership!.id });
+    const { error: replyAfterRemoval } = await second.from('site_message_replies')
+      .insert({ ...onMessage, staff_id: secondId, author_id: secondId, body: 'RLS check' });
+    check('someone removed from the site loses their thread at once',
+      removeError === null && (await repliesOn(second)).length === 0 && replyAfterRemoval !== null,
+      removeError?.message ?? (replyAfterRemoval ? 'still sees the thread' : 'could still reply'));
+
+    await manager.from('site_messages').delete().eq('id', sent!.id);
+    const { count: repliesLeft } = await admin.from('site_message_replies')
+      .select('*', { count: 'exact', head: true }).eq('message_id', sent!.id);
+    const { count: readsLeft } = await admin.from('site_message_thread_reads')
+      .select('*', { count: 'exact', head: true }).eq('message_id', sent!.id);
+    check('deleting the message deletes its threads and who-opened-what', repliesLeft === 0 && readsLeft === 0,
+      `${repliesLeft} replies, ${readsLeft} reads left`);
+
+    // RLS already hides Liberty's sites from its people; the trigger must refuse even the service role.
+    const { data: libertySite } = await admin.from('sites').select('id, org_id')
+      .eq('org_id', orgs!.find((o) => o.slug === 'liberty-oil')!.id).limit(1).single();
+    const { data: libertyManager } = await admin.from('memberships').select('user_id')
+      .eq('org_id', libertySite!.org_id).eq('role', 'manager').limit(1).single();
+    const { error: archivedReply } = await admin.from('site_message_replies').insert({
+      message_id: sent!.id, org_id: libertySite!.org_id, site_id: libertySite!.id,
+      staff_id: libertyManager!.user_id, author_id: libertyManager!.user_id, body: 'RLS check',
+    });
+    check('an archived organisation cannot reply, even past RLS',
+      archivedReply?.message.includes('archived') === true, archivedReply?.message ?? 'insert unexpectedly succeeded');
+
+    await admin.auth.admin.deleteUser(secondId);
+    await admin.from('site_messages').delete().in('site_id', [brunswick.id, coburg.id]);
+  }
+
   console.log('\nowners and managers manage their own people:');
   {
     const { data: metroSites } = await admin.from('sites').select('id, name').eq('org_id', metro.id);
@@ -1442,7 +1602,8 @@ async function main() {
   console.log('\nanonymous (no session):');
   {
     const anon = createClient<Database>(URL, ANON);
-    for (const table of ['orgs', 'sites', 'suppliers', 'memberships', 'products', 'site_messages', 'site_message_reads'] as const) {
+    for (const table of ['orgs', 'sites', 'suppliers', 'memberships', 'products', 'site_messages', 'site_message_reads',
+      'site_message_replies', 'site_message_thread_reads'] as const) {
       const { data } = await anon.from(table).select('*');
       check(`anon reads zero rows from ${table}`, (data?.length ?? 0) === 0, `got ${data?.length}`);
     }
