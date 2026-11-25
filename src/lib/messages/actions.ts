@@ -1,9 +1,10 @@
 'use server';
 
 import { refresh } from 'next/cache';
+import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
-import { requireRole, requireSession } from '@/lib/auth/session';
-import { validateMessageBody } from './messages';
+import { requireRole, requireSession, type Session } from '@/lib/auth/session';
+import { validateMessageBody, validateReplyBody } from './messages';
 
 export type SendMessageState =
   | { status: 'idle' }
@@ -58,5 +59,117 @@ export async function acknowledgeMessage(formData: FormData): Promise<void> {
   await supabase
     .from('site_message_reads')
     .upsert({ message_id: id, user_id: session.userId }, { onConflict: 'message_id,user_id', ignoreDuplicates: true });
+  refresh();
+}
+
+// Replies -------------------------------------------------------------------------------
+
+export type SendReplyState =
+  | { status: 'idle' }
+  | { status: 'sent'; at: number }
+  | { status: 'error'; message: string };
+
+const uuid = z.string().uuid();
+const timestamp = z.iso.datetime({ offset: true });
+
+type Supabase = Awaited<ReturnType<typeof createClient>>;
+
+/**
+ * Whose thread a reply or read is for. Staff only ever have their own, so a staff_id in the
+ * form is ignored for them; a manager or owner names the staff member they're answering.
+ */
+function threadOwner(session: Session, formData: FormData): string | null {
+  if (session.primaryRole === 'staff') return session.userId;
+  const staffId = uuid.safeParse(String(formData.get('staff_id') ?? ''));
+  return staffId.success ? staffId.data : null;
+}
+
+/**
+ * Moves this reader's "last opened" for a thread on to `seenUpTo`, the newest reply they were
+ * shown. Never moves it back, so an older tab can't make replies new again. RLS decides
+ * whether they may read the thread at all.
+ */
+async function markReadUpTo(
+  supabase: Supabase,
+  thread: { messageId: string; staffId: string },
+  readerId: string,
+  seenUpTo: string,
+): Promise<void> {
+  const { data: existing } = await supabase
+    .from('site_message_thread_reads')
+    .select('last_read_at')
+    .eq('message_id', thread.messageId)
+    .eq('staff_id', thread.staffId)
+    .eq('reader_id', readerId)
+    .maybeSingle();
+
+  const alreadyFurther = existing && new Date(existing.last_read_at).getTime() >= new Date(seenUpTo).getTime();
+  if (alreadyFurther) return;
+
+  await supabase.from('site_message_thread_reads').upsert(
+    { message_id: thread.messageId, staff_id: thread.staffId, reader_id: readerId, last_read_at: seenUpTo },
+    { onConflict: 'message_id,staff_id,reader_id' },
+  );
+}
+
+/**
+ * Replies in a thread under a site message: staff in their own, a manager or owner in any
+ * thread at their site. The app checks the text and the ids; RLS decides who may write where.
+ * Sending also marks the thread read for the sender, up to their own reply.
+ */
+export async function sendReply(_prev: SendReplyState, formData: FormData): Promise<SendReplyState> {
+  const session = await requireSession();
+
+  const messageId = uuid.safeParse(String(formData.get('message_id') ?? ''));
+  if (!messageId.success) return { status: 'error', message: 'That message was not found.' };
+
+  const staffId = threadOwner(session, formData);
+  if (!staffId) return { status: 'error', message: 'Choose who you are answering.' };
+
+  const check = validateReplyBody(formData.get('body'));
+  if (!check.ok) return { status: 'error', message: check.message };
+
+  const supabase = await createClient();
+  const { data: message } = await supabase
+    .from('site_messages')
+    .select('id, org_id, site_id')
+    .eq('id', messageId.data)
+    .maybeSingle();
+  if (!message) return { status: 'error', message: 'That message is no longer there.' };
+
+  const { data: reply, error } = await supabase
+    .from('site_message_replies')
+    .insert({
+      message_id: message.id,
+      org_id: message.org_id,
+      site_id: message.site_id,
+      staff_id: staffId,
+      author_id: session.userId,
+      body: check.body,
+    })
+    .select('created_at')
+    .single();
+  if (error || !reply) return { status: 'error', message: `Could not send the reply (${error?.code ?? 'unknown'}).` };
+
+  await markReadUpTo(supabase, { messageId: message.id, staffId }, session.userId, reply.created_at);
+
+  refresh();
+  // `at` makes each send a new state, so the form clears after every one, not just the first.
+  return { status: 'sent', at: Date.now() };
+}
+
+/**
+ * Opened a thread: what it showed is no longer new. `seen_up_to` is the newest reply on screen,
+ * not the clock, so a reply that arrives while the page is open still shows as new.
+ */
+export async function markThreadRead(formData: FormData): Promise<void> {
+  const session = await requireSession();
+  const messageId = uuid.safeParse(String(formData.get('message_id') ?? ''));
+  const seenUpTo = timestamp.safeParse(String(formData.get('seen_up_to') ?? ''));
+  const staffId = threadOwner(session, formData);
+  if (!messageId.success || !seenUpTo.success || !staffId) return;
+
+  const supabase = await createClient();
+  await markReadUpTo(supabase, { messageId: messageId.data, staffId }, session.userId, seenUpTo.data);
   refresh();
 }

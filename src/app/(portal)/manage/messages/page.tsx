@@ -15,7 +15,7 @@ export default async function ManagerMessagesPage(props: PageProps<'/manage/mess
 
   if (!site) return <PageHeader title="Messages" subtitle="No site assigned" />;
 
-  const sent = await loadSentMessages(site);
+  const sent = await loadSentMessages(site, session.userId);
   // Owners pick which of their sites to write to; a manager has just the one.
   const siteSites = session.sites.filter((s) => s.orgId === site.orgId);
 
