@@ -194,7 +194,9 @@ Staff see only messages sent **since they joined the site**, so someone starting
 doesn't have a year of old notes to tap through. On the manager's list they don't count towards
 earlier messages either; a message sent before anyone now on staff joined says so.
 
-It is one-way: staff acknowledge, they don't reply. Like the reminders it lives in the account,
+Each staff member can reply under a note. That thread is private to them and the people who
+run the site: other staff never see it, and a manager answers in that same thread. A reply
+shows as new until the person opens Messages. Like the reminders it lives in the account,
 so it follows a person to whichever device they sign in on, and nothing is pushed — a message
 appears the next time staff open a page or come back to the app.
 

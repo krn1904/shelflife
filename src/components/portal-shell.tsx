@@ -89,7 +89,11 @@ export async function PortalShell({ session, children }: { session: Session; chi
         {messages && (
           // The Messages page lists them itself.
           <HideOnPath path="/app/messages">
-            <MessageNotices unread={messages.unread} timeZone={messages.site.timeZone} />
+            <MessageNotices
+              unread={messages.unread}
+              timeZone={messages.site.timeZone}
+              newReplies={messages.answered.reduce((count, message) => count + message.newReplies.length, 0)}
+            />
           </HideOnPath>
         )}
         {children}

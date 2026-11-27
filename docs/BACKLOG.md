@@ -8,14 +8,16 @@ is already known, so it can be picked up without re-deriving the context.
 ## Site messages: replies, and staff who move sites
 
 **Built (2026-10-05):** a manager's note to everyone on staff at a site, acknowledged with Got it,
-with *Read by N of M* on the manager's side. Chosen deliberately as one-way. Staff see only
-messages sent since they joined the site (Karan: a new starter must not inherit a year of notes).
+with *Read by N of M* on the manager's side. Staff see only messages sent since they joined the
+site (Karan: a new starter must not inherit a year of notes).
+
+**Built (2026-11-26):** a private reply thread per staff member under each note. Staff reply,
+the manager or owner answers in that thread, and other staff never see it. Opening Messages
+marks the thread seen up to the newest reply on screen, so the next visit is what is new.
+Nothing is pushed.
 
 Not done:
 
-- **Replies.** A thread per message (staff answer, manager answers back) was considered and left
-  out. It would need a `site_message_replies` table with the same site-scoped RLS, and a way for
-  the manager to notice a reply, since nothing is pushed.
 - **Staff moved to another site.** "Joined" is `memberships.created_at`, and moving someone
   (`update_organisation_member`) changes the row's `site_id` in place, so the date stays when
   they first joined the organisation. A moved staff member therefore sees the new site's
