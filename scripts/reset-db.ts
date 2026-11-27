@@ -74,7 +74,9 @@ async function preflight() {
   // Reminder plans (20261002000001): the seed writes a site's settings and staff answers.
   const { error: reminders } = await admin.from('stock_batches').select('marked_down_at').limit(1);
   const { error: settings } = await admin.from('reminder_settings').select('site_id').limit(1);
-  const error = columns ?? latest ?? reminders ?? settings;
+  // Message replies (20261125000001): the seed writes the demo's reply threads.
+  const { error: replies } = await admin.from('site_message_thread_reads').select('message_id').limit(1);
+  const error = columns ?? latest ?? reminders ?? settings ?? replies;
   if (error) {
     throw new Error(
       `the database is missing migrations (${error.message}).\n` +
@@ -111,12 +113,15 @@ async function wipe() {
   // is not guaranteed to succeed.
   for (const table of [
     'waste_events', 'expiry_actions', 'rotation_checks', 'stock_batches', 'delivery_lines',
-    'deliveries', 'site_products', 'reminder_settings', 'site_message_reads', 'site_messages',
+    'deliveries', 'site_products', 'reminder_settings', 'site_message_thread_reads',
+    'site_message_replies', 'site_message_reads', 'site_messages',
     'supplier_aliases', 'suppliers', 'memberships', 'sites',
     'audit_log', 'job_runs', 'orgs', 'products',
   ] as const) {
     // Tables keyed by their parent have no id column.
-    const key = table === 'reminder_settings' ? 'site_id' : table === 'site_message_reads' ? 'message_id' : 'id';
+    const key = table === 'reminder_settings' ? 'site_id'
+      : table === 'site_message_reads' || table === 'site_message_thread_reads' ? 'message_id'
+      : 'id';
     await deleteAll(table, key);
   }
 
@@ -172,6 +177,10 @@ async function writeOrg(plan: OrgPlan, ids: Map<string, string>) {
   await insertAll('rotation_checks', r(plan.rotationChecks));
   await insertAll('waste_events', r(plan.waste));
   await insertAll('audit_log', r(plan.audit));
+  await insertAll('site_messages', r(plan.messages));
+  await insertAll('site_message_reads', r(plan.messageReads));
+  await insertAll('site_message_replies', r(plan.replies));
+  await insertAll('site_message_thread_reads', r(plan.threadReads));
 
   // Last: an archived organisation refuses new sites, members, actions and checks.
   if (plan.archive) {
@@ -196,7 +205,8 @@ function report() {
     );
   }
   console.log(`  ${world.products.length} catalogue products, ${sum((o) => o.siteProducts)} ranged lines, ` +
-    `${sum((o) => o.deliveryLines)} docket lines, ${world.jobRuns.length} job runs, ${sum((o) => o.audit)} audit entries`);
+    `${sum((o) => o.deliveryLines)} docket lines, ${world.jobRuns.length} job runs, ${sum((o) => o.audit)} audit entries, ` +
+    `${sum((o) => o.messages)} site messages with ${sum((o) => o.replies)} replies`);
   console.log('\nlogins');
   for (const u of world.users) console.log(`  ${u.email.padEnd(36)} ${u.password}`);
 }

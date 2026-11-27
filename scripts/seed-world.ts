@@ -22,6 +22,7 @@ import { SEED_CATALOGUE } from './seed-catalogue';
 
 export const SEED_PASSWORD = 'shelflife-dev-password';
 export const SITE_TIMEZONE = 'Australia/Melbourne';
+const HOUR_MS = 60 * 60 * 1000;
 
 // ---------------------------------------------------------------------------------------
 // Randomness and time
@@ -353,6 +354,10 @@ export type OrgPlan = {
   reminderSettings: TablesInsert<'reminder_settings'>[];
   waste: TablesInsert<'waste_events'>[];
   audit: TablesInsert<'audit_log'>[];
+  messages: TablesInsert<'site_messages'>[];
+  messageReads: TablesInsert<'site_message_reads'>[];
+  replies: TablesInsert<'site_message_replies'>[];
+  threadReads: TablesInsert<'site_message_thread_reads'>[];
 };
 
 export type World = {
@@ -366,7 +371,7 @@ export type World = {
 /** Columns that hold a user key until the reset script resolves it to an auth id. */
 export const USER_COLUMNS = [
   'created_by', 'user_id', 'received_by', 'actioned_by', 'checked_by', 'wasted_by',
-  'actor_id', 'archived_by', 'updated_by',
+  'actor_id', 'archived_by', 'updated_by', 'sent_by', 'staff_id', 'author_id', 'reader_id',
 ] as const;
 
 const NON_EXPIRY_NOTES: Record<Exclude<WasteReason, 'expired' | 'recalled'>, string[]> = {
@@ -459,6 +464,7 @@ export function buildWorld(now: Date): World {
       },
       sites: [], memberships: [], suppliers: [], siteProducts: [], deliveries: [],
       deliveryLines: [], batches: [], expiryActions: [], rotationChecks: [], reminderSettings: [], waste: [], audit: [],
+      messages: [], messageReads: [], replies: [], threadReads: [],
     };
 
     const siteIds = new Map(config.sites.map((s) => [s.key, uuid()]));
@@ -553,6 +559,8 @@ export function buildWorld(now: Date): World {
       { subject_type: 'org', subject_id: plan.org.id! });
   }
 
+  seedMessages(orgs.find((o) => o.org.is_demo)!);
+
   return {
     asOf,
     users: USERS,
@@ -572,6 +580,79 @@ export function buildWorld(now: Date): World {
     extra: Partial<TablesInsert<'audit_log'>>,
   ) {
     plan.audit.push({ actor_id: actor, action, org_id: plan.org.id!, created_at: createdAt, ...extra });
+  }
+
+  /**
+   * The demo's messages, so every message screen has something on it. Brunswick has a
+   * thread the manager answered that Riley hasn't opened since, a reply Sam hasn't seen
+   * yet, and a plain notice. Coburg has a finished conversation the owner sees too.
+   * Metro gets none: the RLS suite clears its messages before testing them.
+   */
+  function seedMessages(plan: OrgPlan) {
+    const hoursAgo = (hours: number) => new Date(now.getTime() - hours * HOUR_MS).toISOString();
+    const siteIdFor = (name: string) => plan.sites.find((site) => site.name === name)!.id!;
+
+    function message(siteName: string, sentBy: string, body: string, hoursBack: number): string {
+      const id = uuid();
+      plan.messages.push({
+        id,
+        org_id: plan.org.id!,
+        site_id: siteIdFor(siteName),
+        sent_by: sentBy,
+        body,
+        created_at: hoursAgo(hoursBack),
+      });
+      return id;
+    }
+
+    function acknowledged(messageId: string, userId: string, hoursBack: number) {
+      plan.messageReads.push({ message_id: messageId, user_id: userId, read_at: hoursAgo(hoursBack) });
+    }
+
+    /** A reply in `staffId`'s thread. Writing it also marks the thread seen for its author, as sendReply does. */
+    function reply(messageId: string, staffId: string, authorId: string, body: string, hoursBack: number) {
+      const sent = plan.messages.find((m) => m.id === messageId)!;
+      plan.replies.push({
+        id: uuid(),
+        message_id: messageId,
+        org_id: sent.org_id,
+        site_id: sent.site_id,
+        staff_id: staffId,
+        author_id: authorId,
+        body,
+        created_at: hoursAgo(hoursBack),
+      });
+      threadSeen(messageId, staffId, authorId, hoursBack);
+    }
+
+    function threadSeen(messageId: string, staffId: string, readerId: string, hoursBack: number) {
+      const existing = plan.threadReads.find((read) =>
+        read.message_id === messageId && read.staff_id === staffId && read.reader_id === readerId);
+      if (existing) existing.last_read_at = hoursAgo(hoursBack);
+      else plan.threadReads.push({ message_id: messageId, staff_id: staffId, reader_id: readerId, last_read_at: hoursAgo(hoursBack) });
+    }
+
+    const notice = message('Brunswick', 'demo-manager',
+      'Stocktake Sunday from 6am. Please don’t receive any deliveries until it’s done.', 6 * 24 + 3);
+    acknowledged(notice, 'demo-staff', 6 * 24 + 1);
+
+    const fridge = message('Brunswick', 'demo-manager',
+      'Fridge 3 is being serviced Thursday at 2pm. Everything in it needs to be in fridge 1 or the cool room by then.', 50);
+    acknowledged(fridge, 'demo-staff', 49);
+    reply(fridge, 'demo-staff', 'demo-staff', 'Fridge 1 is nearly full. OK to put the milk in the cool room?', 48);
+    reply(fridge, 'demo-staff', 'demo-manager', 'Yes, the cool room is fine. Yoghurts on the top shelf.', 46);
+
+    const lateDelivery = message('Brunswick', 'demo-manager',
+      'Lion delivery is running late today, expected around 4pm. Can someone stay to count it in?', 5);
+    acknowledged(lateDelivery, 'demo-staff', 4);
+    reply(lateDelivery, 'demo-staff', 'demo-staff', 'I can stay until 5 and count it in.', 1);
+
+    const freezer = message('Coburg', 'demo-coburg-manager',
+      'New Peters ice-cream range arrives Friday. Make room in the front freezer.', 74);
+    acknowledged(freezer, 'demo-coburg-staff', 73);
+    reply(freezer, 'demo-coburg-staff', 'demo-coburg-staff', 'Done, the old stock is at the back now.', 72);
+    reply(freezer, 'demo-coburg-staff', 'demo-coburg-manager', 'Thanks Casey.', 70);
+    threadSeen(freezer, 'demo-coburg-staff', 'demo-coburg-staff', 69);
   }
 
   function simulate(

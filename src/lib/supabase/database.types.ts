@@ -626,6 +626,76 @@ export type Database = {
           },
         ]
       }
+      site_message_replies: {
+        Row: {
+          author_id: string | null
+          body: string
+          created_at: string
+          id: string
+          message_id: string
+          org_id: string
+          site_id: string
+          staff_id: string
+        }
+        Insert: {
+          author_id?: string | null
+          body: string
+          created_at?: string
+          id?: string
+          message_id: string
+          org_id: string
+          site_id: string
+          staff_id: string
+        }
+        Update: {
+          author_id?: string | null
+          body?: string
+          created_at?: string
+          id?: string
+          message_id?: string
+          org_id?: string
+          site_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_message_replies_message_id_org_id_site_id_fkey"
+            columns: ["message_id", "org_id", "site_id"]
+            isOneToOne: false
+            referencedRelation: "site_messages"
+            referencedColumns: ["id", "org_id", "site_id"]
+          },
+        ]
+      }
+      site_message_thread_reads: {
+        Row: {
+          last_read_at: string
+          message_id: string
+          reader_id: string
+          staff_id: string
+        }
+        Insert: {
+          last_read_at?: string
+          message_id: string
+          reader_id: string
+          staff_id: string
+        }
+        Update: {
+          last_read_at?: string
+          message_id?: string
+          reader_id?: string
+          staff_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_message_thread_reads_message_id_fkey"
+            columns: ["message_id"]
+            isOneToOne: false
+            referencedRelation: "site_messages"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_messages: {
         Row: {
           body: string
@@ -1109,6 +1179,10 @@ export type Database = {
         Returns: number
       }
       has_active_membership: { Args: never; Returns: boolean }
+      is_staff_at_site: {
+        Args: { p_site_id: string; p_user_id: string }
+        Returns: boolean
+      }
       is_valid_timezone: { Args: { p_timezone: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       merge_suppliers: {

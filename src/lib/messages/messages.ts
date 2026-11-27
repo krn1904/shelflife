@@ -2,8 +2,11 @@ import type { AppRole } from '@/lib/supabase/types';
 
 /**
  * Site messages: a manager writes a short note to everyone on staff at their site ("Fridge 3
- * is being serviced at 2, move the milk"), and each staff member taps Got it. One-way: the
- * manager sees who has read it, staff don't reply.
+ * is being serviced at 2, move the milk"), and each staff member taps Got it. The manager sees
+ * who has read it.
+ *
+ * Under each message, every staff member has a private thread with the site's manager and
+ * owner: staff reply, the manager answers back, and other staff never see it.
  *
  * Kept in the account, like the reminders, so a message follows the person to whichever
  * device they sign in on and a shared tablet shows each person their own unread ones.
@@ -19,13 +22,22 @@ export function messagesShownTo(role: AppRole): boolean {
 
 export type BodyCheck = { ok: true; body: string } | { ok: false; message: string };
 
-export function validateMessageBody(raw: unknown): BodyCheck {
+function validateBody(raw: unknown, emptyMessage: string): BodyCheck {
   const body = typeof raw === 'string' ? raw.trim() : '';
-  if (body.length === 0) return { ok: false, message: 'Write a message first.' };
+  if (body.length === 0) return { ok: false, message: emptyMessage };
   if (body.length > MESSAGE_MAX_LENGTH) {
     return { ok: false, message: `Keep it to ${MESSAGE_MAX_LENGTH} characters (this is ${body.length}).` };
   }
   return { ok: true, body };
+}
+
+export function validateMessageBody(raw: unknown): BodyCheck {
+  return validateBody(raw, 'Write a message first.');
+}
+
+/** Same limit as messages, and as the check on site_message_replies.body. */
+export function validateReplyBody(raw: unknown): BodyCheck {
+  return validateBody(raw, 'Write a reply first.');
 }
 
 /** The messages this person hasn't tapped Got it on, in the order given. */
@@ -86,4 +98,74 @@ export function formatSentAt(sentAt: string, timeZone: string, now: Date = new D
     .format(at)
     .replace(',', ''); // en-AU writes "Mon, 5 Oct"
   return `${date}, ${time}`;
+}
+
+/**
+ * One reply in a thread. `staffId` is whose thread it is; `authorId` who wrote it (that staff
+ * member, or the manager or owner answering them). Null once the author's login is deleted.
+ */
+export type Reply = {
+  id: string;
+  staffId: string;
+  authorId: string | null;
+  body: string;
+  sentAt: string;
+};
+
+export type Thread<R extends Reply = Reply> = { staffId: string; replies: R[] };
+
+function toTime(iso: string): number {
+  return new Date(iso).getTime();
+}
+
+function oldestFirst(a: Reply, b: Reply): number {
+  return toTime(a.sentAt) - toTime(b.sentAt);
+}
+
+function lastReplyTime(thread: Thread): number {
+  const lastReply = thread.replies[thread.replies.length - 1];
+  return toTime(lastReply.sentAt);
+}
+
+/**
+ * One message's replies as threads, one per staff member: each reads oldest first, and the
+ * thread with the latest reply comes first, so a manager sees the newest conversation on top.
+ */
+export function groupThreads<R extends Reply>(replies: R[]): Thread<R>[] {
+  const repliesByStaff = new Map<string, R[]>();
+  for (const reply of replies) {
+    const existing = repliesByStaff.get(reply.staffId) ?? [];
+    existing.push(reply);
+    repliesByStaff.set(reply.staffId, existing);
+  }
+
+  const threads: Thread<R>[] = [];
+  for (const [staffId, staffReplies] of repliesByStaff) {
+    threads.push({ staffId, replies: staffReplies.sort(oldestFirst) });
+  }
+
+  return threads.sort((a, b) => lastReplyTime(b) - lastReplyTime(a));
+}
+
+/**
+ * The replies in a thread this reader hasn't seen: written by someone else after they last
+ * opened it. A thread they have never opened (`lastReadAt` null) is all new. Their own replies
+ * are never new to them.
+ */
+export function unreadReplies<R extends Reply>(replies: R[], readerId: string, lastReadAt: string | null): R[] {
+  return replies.filter((reply) => {
+    const writtenByReader = reply.authorId === readerId;
+    if (writtenByReader) return false;
+
+    const neverOpened = lastReadAt === null;
+    if (neverOpened) return true;
+
+    return toTime(reply.sentAt) > toTime(lastReadAt);
+  });
+}
+
+/** "1 new reply", "3 new replies"; nothing to say when there are none. */
+export function newRepliesLabel(count: number): string | null {
+  if (count <= 0) return null;
+  return count === 1 ? '1 new reply' : `${count} new replies`;
 }
